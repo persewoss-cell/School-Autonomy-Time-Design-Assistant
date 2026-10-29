@@ -348,3 +348,26 @@ export function validateDesign(doc: DesignDoc): Issue[] {
     ...checkChecklist(doc),
   ];
 }
+
+/** 체크리스트 결과: 프로그램이 판정하는 항목은 점검 결과로, 나머지는 교사 확인 표시로 */
+export function checklistResults(doc: DesignDoc): { id: string; area: string; label: string; ok: boolean; auto: boolean }[] {
+  const issues = validateDesign(doc);
+  const noErrorIn = (...steps: StepKey[]) => !issues.some((i) => i.level === "error" && i.step && steps.includes(i.step));
+  const kind = doc.basic.type === "subject" ? "과목" : "활동";
+  const auto: Record<string, () => boolean> = {
+    name: () => noErrorIn("basic"),
+    hours: () => noErrorIn("basic") && !issues.some((i) => i.level === "error" && i.field.includes("차시 합계")),
+    intro: () => noErrorIn("intro"),
+    textbook: () => !!doc.application.textbookType,
+    teacher: () => doc.application.teacherPlans.length > 0,
+    standards: () => noErrorIn("content", "coreIdeas", "standards"),
+    plan: () => noErrorIn("plan", "assessment"),
+  };
+  return checklistFor(doc.basic.type).map((item) => ({
+    id: item.id,
+    area: item.area,
+    label: item.label(kind),
+    auto: !!item.auto,
+    ok: item.auto ? (auto[item.auto]?.() ?? false) : !!doc.checklist[item.id],
+  }));
+}

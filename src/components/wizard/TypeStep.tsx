@@ -27,7 +27,7 @@ const OPTIONS: { type: DesignType; title: string; points: string[] }[] = [
   },
 ];
 
-export function TypeStep({ value, onNext }: { value: DesignType; onNext: (t: DesignType) => void }) {
+export function TypeStep({ value, onNext, onLoadSample }: { value: DesignType; onNext: (t: DesignType) => void; onLoadSample?: () => void }) {
   const [type, setType] = useState<DesignType>(value);
   return (
     <Card className="space-y-4">
@@ -52,6 +52,14 @@ export function TypeStep({ value, onNext }: { value: DesignType; onNext: (t: Des
         ))}
       </div>
       <NavButtons onNext={() => onNext(type)} />
+      {onLoadSample && (
+        <p className="border-t border-gray-100 pt-3 text-sm text-gray-500">
+          완성된 예시를 먼저 보고 싶다면{" "}
+          <button type="button" onClick={onLoadSample} className="font-semibold text-brand-600 underline">
+            예시 불러오기 (광양중동초 「지구마을 첫걸음」 과목)
+          </button>
+        </p>
+      )}
     </Card>
   );
 }

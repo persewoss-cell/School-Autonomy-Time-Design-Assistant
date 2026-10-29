@@ -80,7 +80,7 @@ export interface Intro {
 
 /** ⑦ 단원 지도계획 — 차시 번호는 코드가 hours로 계산한다 */
 export const lessonSchema = z.object({
-  hours: z.number().int().min(1).max(10),
+  hours: z.number().int().min(1).max(32),
   topic: z.string().min(1),
   goal: z.string().min(1),
   activities: z.array(z.string().min(1)).min(1),
@@ -144,6 +144,10 @@ export interface Application {
   startYear: string;
   teacherPlans: string[];
   etc: string;
+  /** 계획서·신청서의 개설 필요성/목표/내용 칸 (비우면 앞 단계 내용으로 자동 작성) */
+  necessity: string;
+  goalSummary: string;
+  contentSummary: string;
 }
 
 /** 설계 문서 전체 */
@@ -201,6 +205,9 @@ export function emptyDesign(): DesignDoc {
       startYear: "2027",
       teacherPlans: [TEACHER_PLANS[0]],
       etc: "",
+      necessity: "",
+      goalSummary: "",
+      contentSummary: "",
     },
     checklist: {},
   };

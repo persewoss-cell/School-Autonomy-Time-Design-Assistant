@@ -41,7 +41,8 @@ export function TopicStep({
 
   return (
     <Card className="space-y-5">
-      <h1 className="text-xl font-bold">주제와 내용</h1>
+      <h1 className="text-xl font-bold">[전단계] 주제 관련 활동 내용 선정</h1>
+      <p className="text-sm text-gray-600">주제와 꼭 다룰 내용, 하고 싶은 활동을 정리해요. 여기 적은 내용이 이후 모든 단계의 AI 프롬프트에 들어가요.</p>
       <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
         학생 이름 등 개인정보는 적지 마세요.
       </p>
@@ -65,7 +66,7 @@ export function TopicStep({
       </div>
 
       {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      <NavButtons onBack={onBack} onNext={submit} nextLabel="AI 프롬프트 만들기" />
+      <NavButtons onBack={onBack} onNext={submit} nextLabel="다음: 내용 체계" />
     </Card>
   );
 }

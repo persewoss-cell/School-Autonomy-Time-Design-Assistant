@@ -1,0 +1,302 @@
+"use client";
+
+import { CATEGORIES, CATEGORY_KEYS, newId, type Area, type DesignDoc, type Standard } from "@/domain/types";
+import { codeMap, defaultAbbrev, standardCategories } from "@/domain/codes";
+import { contentSystemPrompt, coreIdeasPrompt, introPrompt, standardsPrompt, teachingPrompt } from "@/prompts/steps";
+import { checkContentSystem, checkCoreIdeas, checkIntro, checkStandards, checkTeaching } from "@/validation/design";
+import { AiAssist } from "./AiAssist";
+import { Card, Chips, Field, ListEditor, NavButtons, StepHeader, StepIssues, inputClass, toggle } from "../ui";
+
+export interface StepProps {
+  doc: DesignDoc;
+  setDoc: (fn: (d: DesignDoc) => void) => void;
+  onBack: () => void;
+  onNext: () => void;
+  onParseFail?: (step: string, error: string) => void;
+}
+
+const emptyArea = (): Area => ({ name: "", knowledge: [""], process: [""], values: [""] });
+const clean = (xs: string[]) => xs.map((s) => s.trim()).filter(Boolean);
+
+// ───────────── ③ 내용 체계 (PPT 44~46쪽) ─────────────
+export function ContentStep({ doc, setDoc, onBack, onNext, onParseFail }: StepProps) {
+  return (
+    <div className="space-y-4">
+      <StepHeader
+        title="내용 체계표 작성"
+        tips={[
+          "내용 체계: 교육과정의 범위와 수준으로 무엇을 가르치고 배울지를 제시한 것",
+          "영역별로 구분하여 작성 (명사형, 영역 2~3개 권장)",
+          "지식·이해: 명사형  예) (X) 평화의 중요성 알기 → (O) 평화의 중요성",
+          "과정·기능: '~하기'  예) 탐구하기, 자료수집하기, 비교·분석하기, 발표하기, 제작하기",
+          "가치·태도: 명사형  예) 태도, 흥미, 인식, 자세, 실천, 배려, 존중, 호기심, 어울림",
+          "학습 내용들을 포괄하도록 작성하고, 특정 브랜드나 지역명은 쓰지 않아요",
+        ]}
+      />
+      <AiAssist
+        doc={doc}
+        step={contentSystemPrompt}
+        hasContent={doc.areas.some((a) => a.name.trim())}
+        onParseFail={(e) => onParseFail?.("content", e)}
+        onApply={(areas) => setDoc((d) => void (d.areas = areas))}
+      />
+      {doc.areas.map((a, i) => (
+        <Card key={i} className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="shrink-0 text-sm font-bold text-brand-600">({i + 1}) 영역</span>
+            <input
+              className={`${inputClass} font-semibold`}
+              value={a.name}
+              placeholder="영역 이름 (명사형, 예: 평화와 존중의 지구촌)"
+              onChange={(e) => setDoc((d) => void (d.areas[i].name = e.target.value))}
+            />
+            <button
+              type="button"
+              className="shrink-0 text-sm text-gray-400 hover:text-red-600"
+              onClick={() =>
+                confirm("이 영역을 삭제할까요? 이 영역의 성취기준도 함께 삭제됩니다.") &&
+                setDoc((d) => {
+                  d.areas.splice(i, 1);
+                  d.standards = d.standards.filter((s) => s.areaIndex !== i).map((s) => (s.areaIndex > i ? { ...s, areaIndex: s.areaIndex - 1 } : s));
+                })
+              }
+            >
+              영역 삭제
+            </button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {CATEGORY_KEYS.map((c) => (
+              <div key={c} className="space-y-1">
+                <p className="text-sm font-semibold">{CATEGORIES[c]}</p>
+                <ListEditor
+                  items={a[c]}
+                  onChange={(items) => setDoc((d) => void (d.areas[i][c] = items))}
+                  placeholder={c === "process" ? "~하기" : c === "knowledge" ? "명사형" : "~태도, ~의지"}
+                />
+              </div>
+            ))}
+          </div>
+        </Card>
+      ))}
+      <button
+        type="button"
+        className="w-full rounded-xl border-2 border-dashed border-gray-300 py-3 text-sm text-gray-500 hover:border-brand-500 hover:text-brand-600"
+        onClick={() => setDoc((d) => void d.areas.push(emptyArea()))}
+      >
+        + 영역 추가
+      </button>
+      <StepIssues issues={checkContentSystem(doc.areas.map((a) => ({ ...a, knowledge: clean(a.knowledge), process: clean(a.process), values: clean(a.values) })))} />
+      <NavButtons onBack={onBack} onNext={onNext} />
+    </div>
+  );
+}
+
+// ───────────── ④ 핵심아이디어 (PPT 47쪽) ─────────────
+export function CoreIdeasStep({ doc, setDoc, onBack, onNext, onParseFail }: StepProps) {
+  return (
+    <div className="space-y-4">
+      <StepHeader
+        title="핵심아이디어 작성"
+        tips={[
+          "학습을 통해 일반화할 수 있는 내용을 핵심적으로 진술한 것 (학습의 초점, 깊이 있는 학습의 토대)",
+          "주요 개념과 관련 개념을 연결하고, 학생들이 탐구를 통하여 발견해야 하는 진술문 형태로 작성",
+          "영역의 수 ≒ 핵심아이디어의 수",
+          "당위적 표현(~해야 한다)과 낱말 풀이식 진술은 피해요. 좋은 예) 문화는 예술을 통하여 가치와 신념이 표현된다.",
+        ]}
+      >
+        <div className="rounded-lg bg-gray-50 p-3 text-sm">
+          <p className="mb-1 font-semibold">확정한 영역</p>
+          {doc.areas.map((a, i) => (
+            <p key={i}>
+              ({i + 1}) {a.name}
+            </p>
+          ))}
+        </div>
+      </StepHeader>
+      <AiAssist
+        doc={doc}
+        step={coreIdeasPrompt}
+        hasContent={doc.coreIdeas.some((s) => s.trim())}
+        onParseFail={(e) => onParseFail?.("coreIdeas", e)}
+        onApply={(ideas) => setDoc((d) => void (d.coreIdeas = ideas))}
+      />
+      <Card>
+        <ListEditor items={doc.coreIdeas} onChange={(items) => setDoc((d) => void (d.coreIdeas = items))} placeholder="~다." multiline addLabel="+ 핵심아이디어 추가" />
+      </Card>
+      <StepIssues issues={checkCoreIdeas(doc.coreIdeas, doc.areas.length)} />
+      <NavButtons onBack={onBack} onNext={onNext} />
+    </div>
+  );
+}
+
+// ───────────── ⑤ 성취기준 (PPT 48~49쪽) ─────────────
+export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: StepProps) {
+  const abbrev = doc.abbrev || defaultAbbrev(doc.basic.name);
+  const codes = codeMap({ ...doc, abbrev });
+  const allElements = (a: Area) => [...clean(a.knowledge), ...clean(a.process), ...clean(a.values)];
+
+  return (
+    <div className="space-y-4">
+      <StepHeader
+        title="성취기준 작성"
+        tips={[
+          "성취기준: 학습을 통해 학생에게 궁극적으로 기대하는 결과 혹은 도달점",
+          "영역별로 2가지 이상 개발",
+          "[지식·이해], [과정·기능], [가치·태도] 중 두 가지 이상 범주를 결합하여 진술 (지식·이해만으로는 지양)",
+          doc.basic.type === "activity"
+            ? "활동은 기존 교과 성취기준을 재구조화할 수 있어요 (그대로 옮겨 쓰기는 안 돼요)"
+            : "과목은 새로운 성취기준을 개발해요",
+          "코드 번호는 자동으로 붙어요: [편성학년][편성교과 첫 글자][과목명 약어][영역 순서]-[영역 내 순서]",
+        ]}
+      >
+        <Field label="성취기준 코드에 쓸 과목명 약어 (2~3자)" hint={`예: 지구촌, 함께 걷는 우리 → 지구촌  ·  코드 예: [${doc.basic.grade}${doc.basic.subjectGroup.charAt(0)}${abbrev}01-01]`}>
+          <input className={`${inputClass} max-w-40`} value={doc.abbrev} placeholder={defaultAbbrev(doc.basic.name)} onChange={(e) => setDoc((d) => void (d.abbrev = e.target.value.trim()))} />
+        </Field>
+      </StepHeader>
+      <AiAssist
+        doc={{ ...doc, abbrev }}
+        step={standardsPrompt}
+        hasContent={doc.standards.length > 0}
+        onParseFail={(e) => onParseFail?.("standards", e)}
+        onApply={(standards) =>
+          setDoc((d) => {
+            d.abbrev = d.abbrev || abbrev;
+            d.standards = standards;
+          })
+        }
+      />
+      {doc.areas.map((a, ai) => (
+        <Card key={ai} className="space-y-3">
+          <h2 className="font-bold">
+            ({ai + 1}) {a.name}
+          </h2>
+          {doc.standards
+            .filter((s) => s.areaIndex === ai)
+            .map((s) => {
+              const idx = doc.standards.findIndex((x) => x.id === s.id);
+              const cats = standardCategories(doc.areas, s);
+              const set = (fn: (st: Standard) => void) => setDoc((d) => fn(d.standards[idx]));
+              return (
+                <div key={s.id} className="space-y-2 rounded-xl border border-gray-200 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-mono text-sm font-bold text-brand-700">
+                      {codes.get(s.id)}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      결합 범주: {cats.length ? cats.map((c) => CATEGORIES[c]).join(" + ") : "없음"}
+                      <button
+                        type="button"
+                        className="ml-3 text-gray-400 hover:text-red-600"
+                        onClick={() => setDoc((d) => void (d.standards = d.standards.filter((x) => x.id !== s.id)))}
+                      >
+                        삭제
+                      </button>
+                    </span>
+                  </div>
+                  <textarea rows={2} className={inputClass} value={s.text} placeholder="~을 이해하고, ~할 수 있다." onChange={(e) => set((st) => void (st.text = e.target.value))} />
+                  <p className="text-xs text-gray-500">이 성취기준이 다루는 내용 요소 (눌러서 고르기)</p>
+                  <Chips
+                    options={allElements(a)}
+                    selected={s.elements}
+                    onToggle={(o) => set((st) => void (st.elements = toggle(st.elements, o)))}
+                  />
+                </div>
+              );
+            })}
+          <button
+            type="button"
+            className="text-sm font-semibold text-brand-600 hover:underline"
+            onClick={() => setDoc((d) => void d.standards.push({ id: newId(), areaIndex: ai, text: "", elements: [] }))}
+          >
+            + 이 영역에 성취기준 추가
+          </button>
+        </Card>
+      ))}
+      <StepIssues issues={checkStandards({ ...doc, abbrev })} />
+      <NavButtons
+        onBack={onBack}
+        onNext={() => {
+          if (!doc.abbrev) setDoc((d) => void (d.abbrev = abbrev));
+          onNext();
+        }}
+      />
+    </div>
+  );
+}
+
+// ───────────── ⑥ 필요성(성격) 및 목표 (PPT 50쪽) ─────────────
+export function IntroStep({ doc, setDoc, onBack, onNext, onParseFail }: StepProps) {
+  const subject = doc.basic.type === "subject";
+  return (
+    <div className="space-y-4">
+      <StepHeader
+        title={subject ? "성격 및 목표 작성" : "필요성 및 목표 작성"}
+        tips={
+          subject
+            ? [
+                "성격: 과목의 고유 성격 + 과목의 필요성 및 역할 + 기르고자 하는 역량",
+                "총론의 '추구하는 인간상', '초등학교 교육목표'와 연계해 구체적으로",
+                "목표: 총괄 목표 + 세부 목표 3가지(지식·이해, 과정·기능, 가치·태도)",
+              ]
+            : [
+                "필요성: 사회현상 및 시대적 요구 + 학생들이 해당 활동을 배워야 하는 까닭 + 기르고자 하는 학생상 혹은 역량",
+                "목표: 학생이 도달해야 할 도달점 — 총괄 목표 + 세부 목표 3가지(지식·이해, 과정·기능, 가치·태도)",
+              ]
+        }
+      />
+      <AiAssist
+        doc={doc}
+        step={introPrompt}
+        hasContent={!!doc.intro.rationale.trim()}
+        onParseFail={(e) => onParseFail?.("intro", e)}
+        onApply={(intro) => setDoc((d) => void (d.intro = intro))}
+      />
+      <Card className="space-y-4">
+        <Field label={subject ? "성격" : "필요성"} hint="문단은 줄바꿈으로 나눠요">
+          <textarea rows={8} className={inputClass} value={doc.intro.rationale} onChange={(e) => setDoc((d) => void (d.intro.rationale = e.target.value))} />
+        </Field>
+        <Field label="총괄 목표">
+          <textarea rows={3} className={inputClass} value={doc.intro.overallGoal} onChange={(e) => setDoc((d) => void (d.intro.overallGoal = e.target.value))} />
+        </Field>
+        {["지식·이해", "과정·기능", "가치·태도"].map((c, i) => (
+          <Field key={c} label={`세부 목표 (${i + 1}) ${c}`}>
+            <input className={inputClass} value={doc.intro.detailGoals[i]} onChange={(e) => setDoc((d) => void (d.intro.detailGoals[i] = e.target.value))} />
+          </Field>
+        ))}
+      </Card>
+      <StepIssues issues={checkIntro(doc)} />
+      <NavButtons onBack={onBack} onNext={onNext} />
+    </div>
+  );
+}
+
+// ───────────── (과목) 교수·학습 및 평가의 방향과 방법 ─────────────
+export function TeachingStep({ doc, setDoc, onBack, onNext, onParseFail }: StepProps) {
+  const parts = [
+    ["teachingDirection", "교수·학습의 방향", "과목 목표 달성을 위한 교수·학습의 원칙과 중점 (학생 맞춤형 수업, 다양한 학습자 고려 등)"],
+    ["teachingMethods", "교수·학습의 방법", "방향에 따라 활용할 교수·학습 방법이나 활용 상의 유의 사항"],
+    ["assessDirection", "평가의 방향", "과목 목표를 달성하고 학습을 지원하기 위한 평가의 원칙과 중점 (과정 중심 평가 등)"],
+    ["assessMethods", "평가의 방법", "평가 방법, 평가상의 유의점, 디지털·AI 도구 활용 시 유의점 등"],
+  ] as const;
+  return (
+    <div className="space-y-4">
+      <StepHeader title="교수·학습 및 평가의 방향과 방법 (과목)" tips={["과목 교육과정 문서(서식4)에 들어가는 항목이에요.", "각 항목은 '~한다.'로 끝나는 문장으로 써요."]} />
+      <AiAssist
+        doc={doc}
+        step={teachingPrompt}
+        hasContent={Object.values(doc.teaching).some((l) => l.length > 0)}
+        onParseFail={(e) => onParseFail?.("teaching", e)}
+        onApply={(t) => setDoc((d) => void (d.teaching = t))}
+      />
+      {parts.map(([key, label, hint]) => (
+        <Card key={key} className="space-y-2">
+          <h2 className="font-bold">{label}</h2>
+          <p className="text-xs text-gray-500">{hint}</p>
+          <ListEditor items={doc.teaching[key]} onChange={(items) => setDoc((d) => void (d.teaching[key] = items))} multiline placeholder="~한다." />
+        </Card>
+      ))}
+      <StepIssues issues={checkTeaching(doc)} />
+      <NavButtons onBack={onBack} onNext={onNext} />
+    </div>
+  );
+}

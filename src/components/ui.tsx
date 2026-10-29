@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { Issue } from "@/validation/types";
 
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -59,13 +62,36 @@ export function NavButtons({
   );
 }
 
+/** 단계 제목과 작성 요령 */
+export function StepHeader({ title, tips, children }: { title: string; tips?: string[]; children?: React.ReactNode }) {
+  return (
+    <Card className="space-y-2">
+      <h1 className="text-xl font-bold">{title}</h1>
+      {tips && (
+        <ul className="list-disc space-y-0.5 pl-5 text-sm text-gray-600">
+          {tips.map((t) => (
+            <li key={t}>{t}</li>
+          ))}
+        </ul>
+      )}
+      {children}
+    </Card>
+  );
+}
+
 /** 검증 결과 목록: 어느 항목이 / 왜 / 어떻게 고치는지 */
-export function IssueList({ issues }: { issues: Issue[] }) {
+export function IssueList({
+  issues,
+  onGo,
+  stepLabel,
+}: {
+  issues: Issue[];
+  onGo?: (i: Issue) => void;
+  stepLabel?: (i: Issue) => string;
+}) {
   if (issues.length === 0) {
     return (
-      <p className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
-        ✓ 지금까지 입력한 내용에서 지침 위반 사항이 없습니다.
-      </p>
+      <p className="rounded-lg bg-green-50 p-3 text-sm text-green-700">✓ 지침 위반 사항이 없습니다.</p>
     );
   }
   return (
@@ -77,9 +103,17 @@ export function IssueList({ issues }: { issues: Issue[] }) {
             i.level === "error" ? "border-red-500 bg-red-50" : "border-amber-400 bg-amber-50"
           }`}
         >
-          <p className="font-semibold">
-            {i.level === "error" ? "오류" : "확인 필요"} · {i.field}
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <p className="font-semibold">
+              {i.level === "error" ? "오류" : "확인 필요"} · {stepLabel ? `${stepLabel(i)} · ` : ""}
+              {i.field}
+            </p>
+            {onGo && i.step && (
+              <button type="button" onClick={() => onGo(i)} className="shrink-0 text-xs font-semibold text-brand-700 underline">
+                고치러 가기
+              </button>
+            )}
+          </div>
           <p className="text-gray-700">{i.message}</p>
           <p className="text-gray-500">→ {i.fix}</p>
         </li>
@@ -87,3 +121,136 @@ export function IssueList({ issues }: { issues: Issue[] }) {
     </ul>
   );
 }
+
+/** 점검 결과 카드 (단계 아래에 붙임) */
+export function StepIssues({ issues }: { issues: Issue[] }) {
+  const errors = issues.filter((i) => i.level === "error").length;
+  return (
+    <Card className="space-y-3">
+      <h2 className="font-bold">
+        자동 점검 결과{" "}
+        {issues.length > 0 && (
+          <span className="text-sm font-normal text-gray-500">
+            (오류 {errors} · 확인 필요 {issues.length - errors})
+          </span>
+        )}
+      </h2>
+      <IssueList issues={issues} />
+    </Card>
+  );
+}
+
+/** 문자열 목록 편집 (한 칸에 한 항목) */
+export function ListEditor({
+  items,
+  onChange,
+  placeholder,
+  addLabel = "+ 추가",
+  multiline = false,
+}: {
+  items: string[];
+  onChange: (items: string[]) => void;
+  placeholder?: string;
+  addLabel?: string;
+  multiline?: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      {items.map((v, i) => (
+        <div key={i} className="flex gap-2">
+          {multiline ? (
+            <textarea
+              rows={2}
+              className={inputClass}
+              value={v}
+              placeholder={placeholder}
+              onChange={(e) => onChange(items.map((x, j) => (j === i ? e.target.value : x)))}
+            />
+          ) : (
+            <input
+              className={inputClass}
+              value={v}
+              placeholder={placeholder}
+              onChange={(e) => onChange(items.map((x, j) => (j === i ? e.target.value : x)))}
+            />
+          )}
+          <button
+            type="button"
+            aria-label="삭제"
+            className="shrink-0 px-2 text-gray-400 hover:text-red-600"
+            onClick={() => onChange(items.filter((_, j) => j !== i))}
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <button type="button" className="text-sm font-semibold text-brand-600 hover:underline" onClick={() => onChange([...items, ""])}>
+        {addLabel}
+      </button>
+    </div>
+  );
+}
+
+/** 복사 상자 */
+export function CopyBox({ text, label, rows = 8 }: { text: string; label: string; rows?: number }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      alert("복사하지 못했습니다. 상자 안을 눌러 전체 선택(Ctrl+A) 후 복사(Ctrl+C)해 주세요.");
+    }
+  };
+  return (
+    <div className="space-y-2">
+      <textarea
+        readOnly
+        rows={rows}
+        className={`${inputClass} bg-gray-50 font-mono text-xs`}
+        value={text}
+        onFocus={(e) => e.currentTarget.select()}
+      />
+      <button type="button" onClick={copy} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
+        {copied ? "✓ 복사했어요" : label}
+      </button>
+    </div>
+  );
+}
+
+/** 선택 칩 (여러 개 고르기) */
+export function Chips({
+  options,
+  selected,
+  onToggle,
+  render = (o) => o,
+}: {
+  options: string[];
+  selected: string[];
+  onToggle: (o: string) => void;
+  render?: (o: string) => React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {options.map((o) => {
+        const on = selected.includes(o);
+        return (
+          <button
+            key={o}
+            type="button"
+            onClick={() => onToggle(o)}
+            className={`rounded-full border px-2.5 py-1 text-xs ${
+              on ? "border-brand-500 bg-brand-50 font-semibold text-brand-700" : "border-gray-300 text-gray-500 hover:border-brand-500"
+            }`}
+          >
+            {on ? "✓ " : ""}
+            {render(o)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export const toggle = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);

@@ -161,6 +161,9 @@ export function sampleSubject(): DesignDoc {
       startYear: "2027",
       teacherPlans: ["(1안) 담임교사가 운영"],
       etc: "",
+      necessity: "",
+      goalSummary: "",
+      contentSummary: "",
     },
     checklist: {},
   };
