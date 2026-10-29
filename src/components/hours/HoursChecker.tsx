@@ -12,6 +12,8 @@ import {
   type FourSemesters,
   type SemesterIndex,
 } from "@/validation/allocation";
+import { Packer } from "docx";
+import { buildAllocationDocx } from "@/export/allocationDocx";
 import { Card, IssueList } from "../ui";
 
 const STORE_KEY = "sat-hours-v1";
@@ -324,6 +326,23 @@ export function HoursChecker() {
       <Card className="space-y-3">
         <h2 className="font-bold">③ 점검 결과 {errorCount > 0 && <span className="text-red-600">({errorCount}건)</span>}</h2>
         <IssueList issues={r.issues} />
+        <button
+          type="button"
+          className="rounded-lg border-2 border-brand-600 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50"
+          onClick={async () => {
+            const url = URL.createObjectURL(await Packer.toBlob(buildAllocationDocx(a)));
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${info.label}_교육과정_편성표.docx`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+          }}
+        >
+          📄 편성표 내려받기 (.docx)
+        </button>
+        <p className="text-xs text-gray-500">계획서·신청서의 붙임 &lsquo;( )학년 교육과정 편성표&rsquo;로 쓸 수 있어요.</p>
       </Card>
     </div>
   );

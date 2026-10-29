@@ -1,0 +1,286 @@
+"use client";
+
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Packer } from "docx";
+import type { DesignDoc } from "@/domain/types";
+import { buildDesignDocx, docxFileName } from "@/export/docx";
+import { validateDesign } from "@/validation/design";
+import { api } from "@/lib/api";
+import { DocPreview } from "../wizard/FinalSteps";
+import { Card, IssueList, inputClass } from "../ui";
+import { fmtDate, StatusBadge, type DesignRow } from "../account/MyDesigns";
+
+function useLoad<T>(path: string) {
+  const [data, setData] = useState<T | null>(null);
+  const [error, setError] = useState("");
+  const reload = useCallback(() => {
+    api<T>(path).then(setData).catch((e) => setError(e.message));
+  }, [path]);
+  useEffect(reload, [reload]);
+  return { data, error, reload };
+}
+
+function Stat({ label, value, sub }: { label: string; value: number | string; sub?: string }) {
+  return (
+    <Card className="!p-4">
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className="text-2xl font-bold">{value}</p>
+      {sub && <p className="text-xs text-gray-400">{sub}</p>}
+    </Card>
+  );
+}
+
+function Breakdown({ title, data }: { title: string; data: Record<string, number> }) {
+  const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
+  const max = Math.max(1, ...entries.map(([, v]) => v));
+  return (
+    <Card className="space-y-2">
+      <h2 className="font-bold">{title}</h2>
+      {entries.length === 0 ? (
+        <p className="text-sm text-gray-400">아직 없음</p>
+      ) : (
+        entries.map(([k, v]) => (
+          <div key={k} className="flex items-center gap-2 text-sm">
+            <span className="w-28 shrink-0 truncate text-gray-600">{k}</span>
+            <span className="h-3 rounded bg-brand-500" style={{ width: `${(v / max) * 60}%` }} />
+            <span className="text-gray-500">{v}</span>
+          </div>
+        ))
+      )}
+    </Card>
+  );
+}
+
+interface Stats {
+  users: { total: number; pending: number };
+  designs: { total: number; complete: number; byType: Record<string, number>; byGrade: Record<string, number>; bySchool: Record<string, number> };
+  week: { saves: number; downloads: number; logins: number; parseFails: number; parseFailByStep: Record<string, number> };
+}
+
+export function AdminDashboard() {
+  const { data, error } = useLoad<Stats>("/api/admin/stats");
+  if (error) return <p className="text-red-700">{error}</p>;
+  if (!data) return <p className="text-gray-500">불러오는 중…</p>;
+  return (
+    <div className="space-y-4">
+      {data.users.pending > 0 && (
+        <Link href="/admin/users" className="block rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+          승인을 기다리는 가입 신청이 {data.users.pending}건 있어요 → 사용자 화면에서 승인하기
+        </Link>
+      )}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Stat label="사용자" value={data.users.total} sub={`승인 대기 ${data.users.pending}`} />
+        <Stat label="설계" value={data.designs.total} sub={`완성(오류 0) ${data.designs.complete}`} />
+        <Stat label="최근 7일 저장" value={data.week.saves} sub={`로그인 ${data.week.logins}`} />
+        <Stat label="최근 7일 내려받기" value={data.week.downloads} sub={`AI 답 읽기 실패 ${data.week.parseFails}`} />
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <Breakdown title="유형별 설계" data={data.designs.byType} />
+        <Breakdown title="학년별 설계" data={data.designs.byGrade} />
+        <Breakdown title="학교별 설계" data={data.designs.bySchool} />
+        <Breakdown title="AI 답 읽기 실패 단계 (최근 7일)" data={data.week.parseFailByStep} />
+      </div>
+    </div>
+  );
+}
+
+interface UserRow {
+  id: string;
+  email: string;
+  name: string;
+  schoolName: string;
+  role: "teacher" | "admin";
+  status: "pending" | "active" | "blocked";
+  createdAt: string;
+  lastLoginAt: string | null;
+  designCount: number;
+}
+const STATUS_LABEL = { pending: "승인 대기", active: "사용 중", blocked: "중지" } as const;
+
+export function AdminUsers() {
+  const { data, error, reload } = useLoad<{ users: UserRow[] }>("/api/admin/users");
+  const update = async (u: UserRow, patch: Partial<Pick<UserRow, "status" | "role">>) => {
+    await api(`/api/admin/users/${u.id}`, { method: "PATCH", body: patch }).catch((e) => alert(e.message));
+    reload();
+  };
+  if (error) return <p className="text-red-700">{error}</p>;
+  if (!data) return <p className="text-gray-500">불러오는 중…</p>;
+  return (
+    <Card className="overflow-x-auto">
+      <table className="w-full min-w-[760px] text-sm">
+        <thead className="text-left text-xs text-gray-500">
+          <tr>
+            <th className="p-2">이름 / 이메일</th>
+            <th className="p-2">학교</th>
+            <th className="p-2">상태</th>
+            <th className="p-2">권한</th>
+            <th className="p-2">설계</th>
+            <th className="p-2">가입 / 최근 로그인</th>
+            <th className="p-2">관리</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {data.users.map((u) => (
+            <tr key={u.id}>
+              <td className="p-2"><b>{u.name}</b><br /><span className="text-gray-500">{u.email}</span></td>
+              <td className="p-2">{u.schoolName}</td>
+              <td className="p-2">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${u.status === "active" ? "bg-green-100 text-green-700" : u.status === "pending" ? "bg-amber-100 text-amber-700" : "bg-gray-200 text-gray-600"}`}>
+                  {STATUS_LABEL[u.status]}
+                </span>
+              </td>
+              <td className="p-2">{u.role === "admin" ? "관리자" : "교사"}</td>
+              <td className="p-2">{u.designCount}</td>
+              <td className="p-2 text-xs text-gray-500">{fmtDate(u.createdAt)}<br />{fmtDate(u.lastLoginAt)}</td>
+              <td className="space-x-2 p-2 text-xs">
+                {u.status !== "active" && <button type="button" className="font-semibold text-brand-600" onClick={() => update(u, { status: "active" })}>승인</button>}
+                {u.status === "active" && <button type="button" className="text-gray-500 hover:text-red-600" onClick={() => confirm(`${u.name} 계정을 중지할까요?`) && update(u, { status: "blocked" })}>중지</button>}
+                <button type="button" className="text-gray-500 hover:text-brand-600" onClick={() => confirm("권한을 바꿀까요?") && update(u, { role: u.role === "admin" ? "teacher" : "admin" })}>
+                  {u.role === "admin" ? "교사로" : "관리자로"}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  );
+}
+
+export function AdminDesigns() {
+  const { data, error } = useLoad<{ designs: (DesignRow & { owner: string })[] }>("/api/admin/designs");
+  const [q, setQ] = useState("");
+  const [type, setType] = useState("");
+  const rows = useMemo(
+    () =>
+      (data?.designs ?? []).filter(
+        (d) => (!type || d.type === type) && (!q || `${d.name} ${d.schoolName} ${d.owner}`.toLowerCase().includes(q.toLowerCase())),
+      ),
+    [data, q, type],
+  );
+  if (error) return <p className="text-red-700">{error}</p>;
+  if (!data) return <p className="text-gray-500">불러오는 중…</p>;
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        <input className={`${inputClass} max-w-xs`} placeholder="이름·학교·작성자 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+        <select className={`${inputClass} max-w-40`} value={type} onChange={(e) => setType(e.target.value)}>
+          <option value="">전체 유형</option>
+          <option value="activity">활동</option>
+          <option value="subject">과목</option>
+        </select>
+        <span className="self-center text-sm text-gray-500">{rows.length}건</span>
+      </div>
+      <Card className="overflow-x-auto">
+        <table className="w-full min-w-[720px] text-sm">
+          <thead className="text-left text-xs text-gray-500">
+            <tr>
+              <th className="p-2">이름</th>
+              <th className="p-2">유형·대상</th>
+              <th className="p-2">학교</th>
+              <th className="p-2">작성자</th>
+              <th className="p-2">상태</th>
+              <th className="p-2">마지막 저장</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {rows.map((d) => (
+              <tr key={d.id}>
+                <td className="p-2"><Link href={`/admin/designs/${d.id}`} className="font-semibold text-brand-700 hover:underline">{d.name || "(이름 없음)"}</Link></td>
+                <td className="p-2">{d.type === "subject" ? "과목" : "활동"} · {d.grade}-{d.semester}</td>
+                <td className="p-2">{d.schoolName}</td>
+                <td className="p-2 text-gray-600">{d.owner}</td>
+                <td className="p-2"><StatusBadge errors={d.errorCount} warnings={d.warningCount} /></td>
+                <td className="p-2 text-xs text-gray-500">{fmtDate(d.updatedAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
+/** 관리자: 설계 하나 읽기 전용으로 보기 + 내려받기 */
+export function AdminDesignView({ id }: { id: string }) {
+  const { data, error } = useLoad<{ design: { doc: DesignDoc } }>(`/api/admin/designs/${id}`);
+  if (error) return <p className="text-red-700">{error}</p>;
+  if (!data) return <p className="text-gray-500">불러오는 중…</p>;
+  const doc = data.design.doc;
+  const download = async () => {
+    const url = URL.createObjectURL(await Packer.toBlob(buildDesignDocx(doc)));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = docxFileName(doc);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  return (
+    <div className="space-y-4">
+      <Card className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs text-gray-500">{doc.basic.type === "subject" ? "과목" : "활동"} · {doc.basic.grade}학년 {doc.basic.semester}학기 · {doc.basic.hours}시간 · {doc.application.schoolName}</p>
+          <p className="text-xl font-bold">{doc.basic.name}</p>
+        </div>
+        <button type="button" onClick={download} className="rounded-lg bg-brand-600 px-4 py-2 font-semibold text-white hover:bg-brand-700">📄 문서 내려받기</button>
+      </Card>
+      <Card className="space-y-2">
+        <h2 className="font-bold">지침 점검 결과</h2>
+        <IssueList issues={validateDesign(doc)} />
+      </Card>
+      <DocPreview doc={doc} />
+    </div>
+  );
+}
+
+interface LogRow { id: string; kind: string; email?: string; detail?: string; designId?: string; createdAt: string }
+const KIND_LABEL: Record<string, string> = {
+  signup: "가입",
+  login: "로그인",
+  login_fail: "로그인 실패",
+  save: "저장",
+  delete: "삭제",
+  download: "내려받기",
+  parse_fail: "AI 답 읽기 실패",
+};
+
+export function AdminLogs() {
+  const { data, error } = useLoad<{ logs: LogRow[] }>("/api/admin/logs");
+  const [kind, setKind] = useState("");
+  if (error) return <p className="text-red-700">{error}</p>;
+  if (!data) return <p className="text-gray-500">불러오는 중…</p>;
+  const rows = data.logs.filter((l) => !kind || l.kind === kind);
+  return (
+    <div className="space-y-3">
+      <select className={`${inputClass} max-w-48`} value={kind} onChange={(e) => setKind(e.target.value)}>
+        <option value="">전체 기록</option>
+        {Object.entries(KIND_LABEL).map(([k, v]) => (
+          <option key={k} value={k}>{v}</option>
+        ))}
+      </select>
+      <Card className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead className="text-left text-xs text-gray-500">
+            <tr><th className="p-2">시각</th><th className="p-2">종류</th><th className="p-2">사용자</th><th className="p-2">내용</th></tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {rows.map((l) => (
+              <tr key={l.id}>
+                <td className="p-2 text-xs text-gray-500">{fmtDate(l.createdAt)}</td>
+                <td className="p-2">{KIND_LABEL[l.kind] ?? l.kind}</td>
+                <td className="p-2 text-gray-600">{l.email ?? "-"}</td>
+                <td className="p-2 text-gray-600">
+                  {l.detail}
+                  {l.designId && <Link href={`/admin/designs/${l.designId}`} className="ml-2 text-xs text-brand-600">설계 보기</Link>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}

@@ -34,7 +34,7 @@ function stepsFor(doc: DesignDoc): { key: StepKey; label: string }[] {
   ];
 }
 
-const DRAFT_KEY = "sat-design-v3";
+export const DRAFT_KEY = "sat-design-v3";
 
 export interface WizardProps {
   /** 저장된 설계를 열 때 */

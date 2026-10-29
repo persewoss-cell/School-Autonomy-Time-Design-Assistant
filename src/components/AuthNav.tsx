@@ -1,0 +1,35 @@
+"use client";
+
+import Link from "next/link";
+import { api } from "@/lib/api";
+import { useMe } from "./useMe";
+
+export function AuthNav() {
+  const me = useMe();
+  const logout = async () => {
+    await api("/api/auth/logout", { method: "POST" }).catch(() => {});
+    window.location.href = "/";
+  };
+  const link = "hover:text-brand-700";
+  return (
+    <nav className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
+      <Link href="/designs/new" className={link}>새 설계</Link>
+      <Link href="/hours" className={link}>시수 점검</Link>
+      {me?.user && <Link href="/designs" className={link}>내 설계</Link>}
+      {me?.user?.role === "admin" && <Link href="/admin" className={`${link} font-semibold text-brand-700`}>관리자</Link>}
+      {me?.enabled && !me.user && (
+        <>
+          <Link href="/login" className={link}>로그인</Link>
+          <Link href="/signup" className="rounded-lg bg-brand-600 px-3 py-1 text-white hover:bg-brand-700">회원가입</Link>
+        </>
+      )}
+      {me?.user && (
+        <span className="flex items-center gap-2">
+          <span className="text-gray-400">{me.user.name}</span>
+          <button type="button" onClick={logout} className="text-gray-400 hover:text-red-600">로그아웃</button>
+        </span>
+      )}
+      {me && !me.enabled && <Link href="/status" className={link}>설정 확인</Link>}
+    </nav>
+  );
+}

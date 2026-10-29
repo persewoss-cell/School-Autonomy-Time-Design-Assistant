@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 
 interface Health {
-  db: "not_configured" | "ok" | "error";
+  db: "not_configured" | "ok" | "error" | "memory";
   dbError?: string;
+  authSecret: "ok" | "short" | "missing";
+  adminEmails: number;
 }
 
 function Row({ ok, title, desc }: { ok: boolean | null; title: string; desc: string }) {
@@ -39,10 +41,22 @@ export default function StatusPage() {
           desc={
             h?.db === "ok"
               ? "연결 성공"
-              : h?.db === "error"
-                ? `연결 실패: ${h.dbError ?? ""} (주소·비밀번호·Atlas의 Network Access 설정을 확인하세요)`
-                : "아직 없음 → 저장 기능은 5단계에서 연결합니다."
+              : h?.db === "memory"
+                ? "시험용 메모리 저장 중 — 서버가 다시 켜지면 모든 데이터가 사라집니다. 실제 운영에는 MongoDB Atlas 주소를 넣으세요."
+                : h?.db === "error"
+                  ? `연결 실패: ${h.dbError ?? ""} (주소·비밀번호·Atlas의 Network Access 설정을 확인하세요)`
+                  : "아직 없음 → 로그인·저장·관리자 기능이 꺼져 있습니다. (설계와 문서 내려받기는 사용 가능)"
           }
+        />
+        <Row
+          ok={h ? h.authSecret === "ok" : null}
+          title="로그인 비밀키 (AUTH_SECRET)"
+          desc={h?.authSecret === "ok" ? "설정됨" : h?.authSecret === "short" ? "너무 짧습니다. 32자 이상 무작위 문자열을 넣으세요." : "아직 없음 → 32자 이상 무작위 문자열을 넣으세요."}
+        />
+        <Row
+          ok={h ? h.adminEmails > 0 : null}
+          title="관리자 이메일 (ADMIN_EMAILS)"
+          desc={h && h.adminEmails > 0 ? `${h.adminEmails}개 설정됨 — 이 이메일로 가입하면 바로 관리자가 됩니다.` : "아직 없음 → 관리자가 될 이메일을 넣으세요. (여러 개는 쉼표로 구분)"}
         />
       </ul>
     </div>

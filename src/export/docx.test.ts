@@ -36,3 +36,18 @@ describe("docx 만들기", () => {
     expect(docxFileName(sampleSubject())).toBe("지구마을 첫걸음_학교자율시간_과목_3학년2학기.docx");
   });
 });
+
+describe("편성표 docx", () => {
+  it("과목·활동과 이상유무가 들어간다", async () => {
+    const { buildAllocationDocx } = await import("./allocationDocx");
+    const { defaultAllocation } = await import("@/validation/allocation");
+    const a = defaultAllocation("5-6");
+    a.courses = [{ name: "나도 인문작가", subjectKey: "국어", semester: 0, hours: 32 }];
+    const buf = await Packer.toBuffer(buildAllocationDocx(a));
+    const { default: JSZip } = await import("jszip");
+    const text = (await (await JSZip.loadAsync(buf)).file("word/document.xml")!.async("string")).replace(/<[^>]+>/g, "");
+    expect(text).toContain("5~6학년 교육과정 편성표");
+    expect(text).toContain("나도 인문작가");
+    expect(text).toContain("점검필요"); // 교과를 줄이지 않아 총시수 초과
+  });
+});
