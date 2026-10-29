@@ -1,3 +1,18 @@
+/** 설계 단계 이름 (검증 결과를 누르면 그 단계로 이동) */
+export type StepKey =
+  | "type"
+  | "basic"
+  | "topic"
+  | "content"
+  | "coreIdeas"
+  | "standards"
+  | "intro"
+  | "plan"
+  | "assessment"
+  | "teaching"
+  | "application"
+  | "final";
+
 /** 검증 결과 한 건. 사용자에게 "어느 항목이 / 왜 / 어떻게 고치면 되는지" 보여 준다. */
 export interface Issue {
   level: "error" | "warning";
@@ -7,4 +22,6 @@ export interface Issue {
   message: string;
   /** 어떻게 고치면 되는지 */
   fix: string;
+  /** 고칠 단계 */
+  step?: StepKey;
 }

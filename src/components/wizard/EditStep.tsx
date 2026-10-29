@@ -113,7 +113,7 @@ export function EditStep({
       <button
         type="button"
         className="w-full rounded-xl border-2 border-dashed border-gray-300 py-3 text-sm text-gray-500 hover:border-brand-500 hover:text-brand-600"
-        onClick={() => mutate((p) => p.units.push({ unitName: "새 단원", lessons: [emptyLesson()] }))}
+        onClick={() => mutate((p) => p.units.push({ unitName: "새 단원", standardIds: [], lessons: [emptyLesson()] }))}
       >
         + 단원 추가
       </button>

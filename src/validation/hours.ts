@@ -13,7 +13,7 @@ export function totalLessonHours(units: Unit[]): number {
 }
 
 /** 차시 번호 붙이기: 1차시짜리는 "1/29", 2차시 이상은 "2~3/29" */
-export function lessonLabels(units: Unit[], total: number): string[][] {
+export function lessonLabels(units: { lessons: { hours: number }[] }[], total: number): string[][] {
   let next = 1;
   return units.map((u) =>
     u.lessons.map((l) => {

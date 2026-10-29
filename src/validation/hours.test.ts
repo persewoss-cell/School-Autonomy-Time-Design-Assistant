@@ -51,8 +51,8 @@ describe("checkPlanHours", () => {
     title: "안",
     concept: "특징",
     units: [
-      { unitName: "1단원", lessons: [lesson(1), lesson(2, "[과정중심평가] 발표")] },
-      { unitName: "2단원", lessons: [lesson(3)] },
+      { unitName: "1단원", standardIds: [], lessons: [lesson(1), lesson(2, "[과정중심평가] 발표")] },
+      { unitName: "2단원", standardIds: [], lessons: [lesson(3)] },
     ],
   };
   it("차시 합계가 운영 시수와 같으면 문제 없음", () => {
@@ -64,7 +64,7 @@ describe("checkPlanHours", () => {
     expect(issues[0].fix).toContain("2시간 늘려");
   });
   it("과정중심평가가 없으면 경고", () => {
-    const noAssess: Plan = { ...plan, units: [{ unitName: "1", lessons: [lesson(6)] }] };
+    const noAssess: Plan = { ...plan, units: [{ unitName: "1", standardIds: [], lessons: [lesson(6)] }] };
     expect(checkPlanHours(noAssess, { hours: 6 }).some((i) => i.field === "과정중심평가")).toBe(true);
   });
 });

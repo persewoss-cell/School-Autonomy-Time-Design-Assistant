@@ -42,7 +42,7 @@ export function makeDemoPlans(basic: BasicInfo, input: TopicInput): Plan[] {
           k += 1;
         }
         lessons[lessons.length - 1].assessment = `[과정중심평가] ${unitNames[ui]} 결과를 정리하여 발표하기`;
-        return { unitName: unitNames[ui], lessons };
+        return { unitName: unitNames[ui], standardIds: [], lessons };
       }),
     };
   });
