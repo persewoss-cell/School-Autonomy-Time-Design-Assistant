@@ -1,0 +1,42 @@
+{
+  "_source": "학교자율시간 시수 편성 점검표(엑셀) — 학교자율시간점검(3~4학년), 학교자율시간점검(5~6학년) 시트. 기준시수는 학년군(2개 학년) 합계.",
+  "weeksPerYear": 34,
+  "minHoursPerCourse": 10,
+  "maxCoursesPerSemester": 3,
+  "rangeRate": 0.2,
+  "bands": {
+    "3-4": {
+      "label": "3~4학년",
+      "grades": [3, 4],
+      "subjects": [
+        { "key": "국어", "group": "국어", "baseHours": 408 },
+        { "key": "사회", "group": "사회/도덕", "baseHours": 204 },
+        { "key": "도덕", "group": "사회/도덕", "baseHours": 68 },
+        { "key": "수학", "group": "수학", "baseHours": 272 },
+        { "key": "과학", "group": "과학", "baseHours": 204 },
+        { "key": "체육", "group": "체육", "baseHours": 204, "noReduction": true },
+        { "key": "음악", "group": "음악", "baseHours": 136, "noReduction": true },
+        { "key": "미술", "group": "미술", "baseHours": 136, "noReduction": true },
+        { "key": "영어", "group": "영어", "baseHours": 136 }
+      ],
+      "creativeBaseHours": 204
+    },
+    "5-6": {
+      "label": "5~6학년",
+      "grades": [5, 6],
+      "subjects": [
+        { "key": "국어", "group": "국어", "baseHours": 408 },
+        { "key": "사회", "group": "사회/도덕", "baseHours": 204 },
+        { "key": "도덕", "group": "사회/도덕", "baseHours": 68 },
+        { "key": "수학", "group": "수학", "baseHours": 272 },
+        { "key": "과학", "group": "과학/실과", "baseHours": 204 },
+        { "key": "실과", "group": "과학/실과", "baseHours": 136 },
+        { "key": "체육", "group": "체육", "baseHours": 204, "noReduction": true },
+        { "key": "음악", "group": "음악/미술", "baseHours": 136, "noReduction": true },
+        { "key": "미술", "group": "음악/미술", "baseHours": 136, "noReduction": true },
+        { "key": "영어", "group": "영어", "baseHours": 204 }
+      ],
+      "creativeBaseHours": 204
+    }
+  }
+}
