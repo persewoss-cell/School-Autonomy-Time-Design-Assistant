@@ -8,26 +8,30 @@ export function PlansStep({
   basic,
   plans,
   demo,
+  notes,
   onBack,
   onSelect,
 }: {
   basic: BasicInfo;
   plans: Plan[];
   demo: boolean;
+  notes: string[];
   onBack: () => void;
   onSelect: (p: Plan) => void;
 }) {
   return (
     <div className="space-y-4">
       <Card>
-        <h1 className="text-xl font-bold">AI 추천 지도계획 3안</h1>
+        <h1 className="text-xl font-bold">지도계획 3안 비교</h1>
         <p className="text-sm text-gray-600">마음에 드는 안을 고르세요. 고른 뒤에 차시와 내용을 자유롭게 고칠 수 있어요.</p>
         {demo && (
           <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-            지금은 <b>체험 모드</b>입니다. Claude API 키가 설정되지 않아 입력 내용을 끼워 넣은 예시를 보여 줍니다.
-            키를 설정하면 실제 AI가 추천합니다.
+            지금은 <b>예시 3안</b>입니다. 입력 내용을 끼워 넣은 연습용이므로, 실제 설계는 이전 단계에서 AI에게 물어본 답을 붙여 넣으세요.
           </p>
         )}
+        {notes.map((n) => (
+          <p key={n} className="mt-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">{n}</p>
+        ))}
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -64,7 +68,9 @@ export function PlansStep({
                   </div>
                 ))}
               </div>
-              {errors.length > 0 && <p className="text-xs text-red-600">{errors[0].message}</p>}
+              {errors.length > 0 && (
+                <p className="text-xs text-red-600">{errors[0].message} 고르신 뒤 다음 화면에서 고칠 수 있어요.</p>
+              )}
               <button
                 type="button"
                 onClick={() => onSelect(p)}

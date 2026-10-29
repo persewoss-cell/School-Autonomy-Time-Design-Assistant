@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { topicInputSchema, type BasicInfo, type Plan, type TopicInput } from "@/domain/types";
+import { topicInputSchema, type TopicInput } from "@/domain/types";
 import { Card, Field, NavButtons, inputClass } from "../ui";
 
 const toLines = (s: string) =>
@@ -11,25 +11,22 @@ const toLines = (s: string) =>
     .filter(Boolean);
 
 export function TopicStep({
-  basic,
   value,
   onBack,
   onNext,
 }: {
-  basic: BasicInfo;
   value: TopicInput;
   onBack: () => void;
-  onNext: (input: TopicInput, plans: Plan[], demo: boolean) => void;
+  onNext: (input: TopicInput) => void;
 }) {
   const [topic, setTopic] = useState(value.topic);
   const [required, setRequired] = useState(value.requiredContents.join("\n"));
   const [desired, setDesired] = useState(value.desiredActivities.join("\n"));
   const [context, setContext] = useState(value.schoolContext);
   const [resources, setResources] = useState(value.resources);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const submit = async () => {
+  const submit = () => {
     const parsed = topicInputSchema.safeParse({
       topic,
       requiredContents: toLines(required),
@@ -39,21 +36,7 @@ export function TopicStep({
     });
     if (!parsed.success) return setError(parsed.error.issues[0]?.message ?? "입력값을 확인해 주세요.");
     setError("");
-    setLoading(true);
-    try {
-      const res = await fetch("/api/recommend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ basic, input: parsed.data }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "추천을 받지 못했습니다.");
-      onNext(parsed.data, data.plans, data.demo);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "추천을 받지 못했습니다.");
-    } finally {
-      setLoading(false);
-    }
+    onNext(parsed.data);
   };
 
   return (
@@ -82,12 +65,7 @@ export function TopicStep({
       </div>
 
       {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      {loading && (
-        <p className="rounded-lg bg-brand-50 p-3 text-sm text-brand-700">
-          AI가 지도계획 3안을 만들고 있어요. 1~2분 정도 걸릴 수 있어요…
-        </p>
-      )}
-      <NavButtons onBack={onBack} onNext={submit} nextLabel={loading ? "추천 받는 중…" : "AI 추천 받기"} nextDisabled={loading} />
+      <NavButtons onBack={onBack} onNext={submit} nextLabel="AI 프롬프트 만들기" />
     </Card>
   );
 }

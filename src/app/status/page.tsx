@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 
 interface Health {
-  ai: "demo" | "configured";
-  model: string;
   db: "not_configured" | "ok" | "error";
   dbError?: string;
 }
@@ -35,15 +33,6 @@ export default function StatusPage() {
       <h1 className="text-2xl font-bold">설정 확인</h1>
       <p className="text-gray-600">서버에 환경 변수가 제대로 들어갔는지 확인하는 화면입니다.</p>
       <ul className="space-y-3">
-        <Row
-          ok={h ? h.ai === "configured" : null}
-          title="Claude API 키 (ANTHROPIC_API_KEY)"
-          desc={
-            h?.ai === "configured"
-              ? `설정됨 · 사용 모델: ${h.model}`
-              : "아직 없음 → 체험 모드로 예시 3안을 보여 줍니다. 키를 넣으면 실제 AI가 추천합니다."
-          }
-        />
         <Row
           ok={h ? h.db === "ok" : null}
           title="MongoDB 연결 (MONGODB_URI)"

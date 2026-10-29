@@ -1,7 +1,7 @@
 import type { BasicInfo, Lesson, Plan, TopicInput } from "@/domain/types";
 
 /**
- * 체험 모드(API 키 없음)용 예시 3안. 입력한 주제·필수 내용·원하는 활동을 끼워 넣어
+ * "예시 3안으로 체험하기"용 예시. 입력한 주제·필수 내용·원하는 활동을 끼워 넣어
  * 화면 흐름을 확인할 수 있게 한다. 차시 합계는 항상 운영 시수와 같다.
  */
 export function makeDemoPlans(basic: BasicInfo, input: TopicInput): Plan[] {

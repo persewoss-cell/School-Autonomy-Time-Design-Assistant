@@ -6,18 +6,22 @@ import { semesterHours } from "@/validation/hours";
 import { TypeStep } from "./TypeStep";
 import { BasicStep } from "./BasicStep";
 import { TopicStep } from "./TopicStep";
+import { AskAiStep } from "./AskAiStep";
 import { PlansStep } from "./PlansStep";
 import { EditStep } from "./EditStep";
 
-const STEP_NAMES = ["유형 선택", "기본 정보", "주제와 내용", "AI 추천 3안", "고르고 고치기"];
-const DRAFT_KEY = "sat-draft-v1";
+const STEP_NAMES = ["유형 선택", "기본 정보", "주제와 내용", "AI에게 묻기", "3안 비교", "고르고 고치기"];
+const DRAFT_KEY = "sat-draft-v2";
 
 export interface WizardState {
   step: number;
   basic: BasicInfo;
   input: TopicInput;
+  /** 교사가 붙여 넣은 AI의 답 원문 */
+  aiAnswer: string;
   plans: Plan[];
   demo: boolean;
+  notes: string[];
   selected: Plan | null;
 }
 
@@ -34,8 +38,10 @@ const initialState: WizardState = {
     operationMode: "지속형",
   },
   input: { topic: "", requiredContents: [], desiredActivities: [], schoolContext: "", resources: "" },
+  aiAnswer: "",
   plans: [],
   demo: false,
+  notes: [],
   selected: null,
 };
 
@@ -120,33 +126,46 @@ export function Wizard() {
       )}
       {state.step === 2 && (
         <TopicStep
-          basic={state.basic}
           value={state.input}
           onBack={() => go(1)}
-          onNext={(input, plans, demo) => {
-            update({ input, plans, demo, selected: null });
+          onNext={(input) => {
+            update({ input });
             go(3);
           }}
         />
       )}
       {state.step === 3 && (
-        <PlansStep
+        <AskAiStep
           basic={state.basic}
-          plans={state.plans}
-          demo={state.demo}
+          input={state.input}
+          answer={state.aiAnswer}
+          onAnswerChange={(aiAnswer) => update({ aiAnswer })}
           onBack={() => go(2)}
-          onSelect={(plan) => {
-            update({ selected: structuredClone(plan) });
+          onNext={(plans, demo, notes) => {
+            update({ plans, demo, notes, selected: null });
             go(4);
           }}
         />
       )}
-      {state.step === 4 && state.selected && (
+      {state.step === 4 && (
+        <PlansStep
+          basic={state.basic}
+          plans={state.plans}
+          demo={state.demo}
+          notes={state.notes}
+          onBack={() => go(3)}
+          onSelect={(plan) => {
+            update({ selected: structuredClone(plan) });
+            go(5);
+          }}
+        />
+      )}
+      {state.step === 5 && state.selected && (
         <EditStep
           basic={state.basic}
           plan={state.selected}
           onChange={(selected) => update({ selected })}
-          onBack={() => go(3)}
+          onBack={() => go(4)}
         />
       )}
     </div>
