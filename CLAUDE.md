@@ -61,7 +61,23 @@
 - UI 문구는 한국어로 쓴다. 앱 제목: **학교자율시간 설계 도우미 앱**
 - 지침에 없는 규칙을 임의로 만들지 않는다. 지침이 애매하면 경고(warning)로 처리하고 사용자에게 묻는다.
 
-## 자주 쓰는 명령어 (1단계 이후 채워짐)
+## 코드 지도
+
+| 폴더 | 내용 |
+|---|---|
+| `src/domain/` | 설계 문서 타입(`types.ts`), 성취기준 코드 계산(`codes.ts`), 체크리스트(`checklist.ts`), 예시(`sample.ts`) |
+| `src/validation/` | 검증 규칙: 시수(`hours.ts`, `allocation.ts` = 시수 점검 엑셀), 단계별 점검(`design.ts`) |
+| `src/prompts/` | 단계별 복사용 프롬프트 + 붙여 넣은 답 읽기(`steps.ts`, `common.ts`) |
+| `src/export/` | .docx 만들기 (서식1·2·3·4·6·7, 편성표) |
+| `src/server/` | 저장소(MongoDB/메모리), 로그인·저장·권한 서비스, 세션 |
+| `src/components/wizard/` | 설계 단계 화면 (PPT 순서) |
+| `src/app/` | 페이지와 API (`/api/auth`, `/api/designs`, `/api/admin`, `/api/logs`) |
+
+- 설계 단계 순서(문서 작성 부분)는 2027 연수 PPT를 따른다: [전단계] → 내용 체계 → 핵심아이디어 → 성취기준 → 필요성·목표 → 단원 지도계획 → 평가 계획
+- 시수 계산은 '학교자율시간 시수 편성 점검표' 엑셀 계산식이 기준이다 (`data/rules/curriculum-hours.json`).
+- 시험용 저장소: `MONGODB_URI=memory` (서버 재시작 시 사라짐).
+
+## 자주 쓰는 명령어
 
 ```bash
 npm install      # 필요한 라이브러리 설치

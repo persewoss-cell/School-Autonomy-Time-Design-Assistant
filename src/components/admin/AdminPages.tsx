@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import { DocPreview } from "../wizard/FinalSteps";
 import { Card, IssueList, inputClass } from "../ui";
 import { fmtDate, StatusBadge, type DesignRow } from "../account/MyDesigns";
+import { useMe } from "../useMe";
 
 function useLoad<T>(path: string) {
   const [data, setData] = useState<T | null>(null);
@@ -99,6 +100,7 @@ interface UserRow {
 const STATUS_LABEL = { pending: "승인 대기", active: "사용 중", blocked: "중지" } as const;
 
 export function AdminUsers() {
+  const me = useMe();
   const { data, error, reload } = useLoad<{ users: UserRow[] }>("/api/admin/users");
   const update = async (u: UserRow, patch: Partial<Pick<UserRow, "status" | "role">>) => {
     await api(`/api/admin/users/${u.id}`, { method: "PATCH", body: patch }).catch((e) => alert(e.message));
@@ -134,11 +136,13 @@ export function AdminUsers() {
               <td className="p-2">{u.designCount}</td>
               <td className="p-2 text-xs text-gray-500">{fmtDate(u.createdAt)}<br />{fmtDate(u.lastLoginAt)}</td>
               <td className="space-x-2 p-2 text-xs">
+                {u.id === me?.user?.id ? <span className="text-gray-400">(나)</span> : <>
                 {u.status !== "active" && <button type="button" className="font-semibold text-brand-600" onClick={() => update(u, { status: "active" })}>승인</button>}
                 {u.status === "active" && <button type="button" className="text-gray-500 hover:text-red-600" onClick={() => confirm(`${u.name} 계정을 중지할까요?`) && update(u, { status: "blocked" })}>중지</button>}
                 <button type="button" className="text-gray-500 hover:text-brand-600" onClick={() => confirm("권한을 바꿀까요?") && update(u, { role: u.role === "admin" ? "teacher" : "admin" })}>
                   {u.role === "admin" ? "교사로" : "관리자로"}
                 </button>
+                </>}
               </td>
             </tr>
           ))}
