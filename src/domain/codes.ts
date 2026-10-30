@@ -41,3 +41,9 @@ export function standardCategories(areas: Area[], std: Standard): Category[] {
   }
   return [...set];
 }
+
+/** 같은 범주의 내용 요소가 2개 이상 함께 묶였는지 (성취기준은 서로 다른 범주끼리 묶는다) */
+export function hasSameCategory(areas: Area[], elements: string[]): boolean {
+  const cats = elements.map((e) => categoryOf(areas, e)).filter((c): c is Category => c !== null);
+  return new Set(cats).size < cats.length;
+}

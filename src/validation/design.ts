@@ -1,5 +1,6 @@
-import { CATEGORIES, DESIGN_TYPES, standardNeedsRewrite, type Area, type DesignDoc } from "@/domain/types";
-import { codeMap, standardCategories } from "@/domain/codes";
+import { CATEGORIES, CATEGORY_KEYS, DESIGN_TYPES, standardNeedsRewrite, type Area, type DesignDoc } from "@/domain/types";
+import { categoryOf, codeMap } from "@/domain/codes";
+import { splitProblem } from "@/domain/standardCounts";
 import { checklistFor } from "@/domain/checklist";
 import { checkBasicHours, checkPlanHours } from "./hours";
 import type { Issue, StepKey } from "./types";
@@ -37,6 +38,15 @@ export function checkContentSystem(areas: Area[]): Issue[] {
     const where = `${i + 1}영역${a.name ? `(${a.name})` : ""}`;
     if (!a.name.trim()) {
       issues.push({ level: "error", field: `${i + 1}영역 이름`, message: "영역 이름이 비어 있습니다.", fix: "영역 이름을 명사형으로 적어 주세요." });
+    }
+    const problem = CATEGORY_KEYS.every((c) => a[c].some((e) => e.trim())) ? splitProblem(a) : null;
+    if (problem) {
+      issues.push({
+        level: "error",
+        field: where,
+        message: `${problem} 성취기준은 서로 다른 범주의 내용 요소를 2~3개씩 묶어야 합니다.`,
+        fix: "많은 범주의 내용 요소를 합치거나 줄이고, 적은 범주의 내용 요소를 늘려 주세요.",
+      });
     }
     (["knowledge", "process", "values"] as const).forEach((c) => {
       const items = a[c].map((e) => e.trim()).filter(Boolean);
@@ -206,10 +216,19 @@ export function checkStandards(doc: Pick<DesignDoc, "basic" | "abbrev" | "areas"
       });
     } else if (s.elements.length > 3) {
       issues.push({
-        level: "warning",
+        level: "error",
         field: code,
-        message: `내용 요소가 ${s.elements.length}개 연결되어 있습니다. 성취기준 하나에 내용 요소 2~3개를 묶는 것을 권장합니다.`,
-        fix: "내용 요소를 2~3개가 되도록 조정해 주세요.",
+        message: `내용 요소가 ${s.elements.length}개 연결되어 있습니다. 성취기준 하나에는 서로 다른 범주의 내용 요소를 2개 또는 3개 묶습니다.`,
+        fix: "내용 요소를 2개 또는 3개가 되도록 조정해 주세요.",
+      });
+    }
+    const sameCats = CATEGORY_KEYS.filter((c) => s.elements.filter((e) => categoryOf(doc.areas, e) === c).length > 1);
+    if (sameCats.length) {
+      issues.push({
+        level: "error",
+        field: code,
+        message: `같은 범주(${sameCats.map((c) => CATEGORIES[c]).join(", ")})의 내용 요소를 함께 묶었습니다. 성취기준은 서로 다른 범주의 내용 요소끼리 묶습니다.`,
+        fix: "2개면 서로 다른 두 범주에서 하나씩, 3개면 지식·이해 + 과정·기능 + 가치·태도에서 하나씩 골라 주세요.",
       });
     }
     if (standardNeedsRewrite(s)) {
@@ -218,18 +237,6 @@ export function checkStandards(doc: Pick<DesignDoc, "basic" | "abbrev" | "areas"
         field: code,
         message: "문장을 쓴 뒤 연결된 내용 요소가 바뀌었습니다. 문장이 바뀐 내용 요소를 담고 있는지 확인해야 합니다.",
         fix: "성취기준 화면의 '바뀐 성취기준 문장 고치기'로 AI에게 받거나, 문장을 직접 고쳐 주세요.",
-      });
-    }
-    const cats = standardCategories(doc.areas, s);
-    if (cats.length < 2) {
-      issues.push({
-        level: "warning",
-        field: code,
-        message:
-          cats[0] === "knowledge"
-            ? "[지식·이해] 범주만으로 진술하는 것은 지양합니다."
-            : "세 범주(지식·이해 / 과정·기능 / 가치·태도) 중 두 가지 이상을 결합해 진술하는 것을 권장합니다.",
-        fix: "다른 범주의 내용 요소를 함께 연결하고 문장에 반영해 주세요.",
       });
     }
   }

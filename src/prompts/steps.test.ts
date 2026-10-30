@@ -188,33 +188,54 @@ describe("영역 수·영역명과 학년 수준", () => {
 });
 
 describe("영역별 성취기준 수", () => {
-  const area = (n: number) => ({ name: "a", knowledge: Array.from({ length: n }, (_, i) => `요소${i}`), process: [], values: [] });
-  it("범위: 내용 요소를 2~3개씩 겹치지 않게 나누면 최소 ⌈n÷3⌉, 최대 ⌊n÷2⌋", async () => {
+  const area = (k: number, p: number, v: number) => ({
+    name: "a",
+    knowledge: Array.from({ length: k }, (_, i) => `지식${i}`),
+    process: Array.from({ length: p }, (_, i) => `과정${i}하기`),
+    values: Array.from({ length: v }, (_, i) => `태도${i}`),
+  });
+  it("범위: 서로 다른 범주끼리 2~3개씩 → 최소 max(⌈n÷3⌉, 가장 많은 범주 수), 최대 ⌊n÷2⌋", async () => {
     const { standardCountRange } = await import("@/domain/standardCounts");
-    expect([4, 5, 6, 7, 9, 10, 3].map((n) => standardCountRange(area(n)))).toEqual([
-      { min: 2, max: 2 },
+    expect([area(1, 1, 1), area(2, 2, 1), area(2, 2, 2), area(3, 2, 2), area(3, 3, 3), area(4, 3, 3), area(1, 2, 1)].map(standardCountRange)).toEqual([
+      { min: 1, max: 1 },
       { min: 2, max: 2 },
       { min: 2, max: 3 },
       { min: 3, max: 3 },
       { min: 3, max: 4 },
       { min: 4, max: 5 },
-      { min: 1, max: 1 },
+      { min: 2, max: 2 },
     ]);
   });
-  it("추천은 범위 안: 5개→2, 9개→4, 10개→4, 3개→1", async () => {
+  it("한 범주가 나머지 둘을 합한 것보다 많으면 묶을 수 없음", async () => {
+    const { splitProblem } = await import("@/domain/standardCounts");
+    expect(splitProblem(area(4, 1, 1))).toContain("지식·이해 내용 요소(4개)");
+    expect(splitProblem(area(3, 2, 1))).toBeNull();
+  });
+  it("묶을 범주 조합: 3개짜리는 세 범주, 2개짜리는 서로 다른 두 범주", async () => {
+    const { categorySplit } = await import("@/domain/standardCounts");
+    expect(categorySplit(area(2, 2, 2), 2)).toEqual([["knowledge", "process", "values"], ["knowledge", "process", "values"]]);
+    expect(categorySplit(area(2, 2, 2), 3)).toEqual([["process", "values"], ["knowledge", "values"], ["knowledge", "process"]]);
+    expect(categorySplit(area(2, 2, 1), 2)).toEqual([["knowledge", "process"], ["knowledge", "process", "values"]]);
+    expect(categorySplit(area(4, 1, 1), 3)).toBeNull();
+    // 범주별로 정확히 내용 요소 수만큼 쓰임
+    const sp = categorySplit(area(4, 3, 3), 5)!;
+    expect(sp.flat().filter((c) => c === "knowledge")).toHaveLength(4);
+    expect(sp.every((cs) => cs.length >= 2 && new Set(cs).size === cs.length)).toBe(true);
+  });
+  it("추천은 범위 안", async () => {
     const { recommendedStandardCount } = await import("@/domain/standardCounts");
-    expect([5, 9, 10, 3].map((n) => recommendedStandardCount(area(n)))).toEqual([2, 4, 4, 1]);
+    expect([area(2, 2, 1), area(3, 3, 3), area(4, 3, 3), area(1, 1, 1)].map(recommendedStandardCount)).toEqual([2, 4, 4, 1]);
   });
   it("범위를 벗어난 값은 범위 안으로", async () => {
     const { standardCountsFor } = await import("@/domain/standardCounts");
-    expect(standardCountsFor({ areas: [area(5), area(9)], standardCounts: [5, 1] })).toEqual([2, 3]);
+    expect(standardCountsFor({ areas: [area(2, 2, 1), area(3, 3, 3)], standardCounts: [5, 1] })).toEqual([2, 3]);
   });
   it("정한 개수가 프롬프트에 들어가고, 다르게 오면 알림", () => {
     const d = sampleSubject();
     d.areas[0].knowledge.push("세계 공동체의 구성원");
     d.standardCounts = [3, null];
     const p = standardsPrompt.build(d);
-    expect(p).toContain("- (1) 세계시민의 이해: 성취기준 3개 (성취기준별 내용 요소 수: 2개, 2개, 2개)");
+    expect(p).toContain("- (1) 세계시민의 이해: 성취기준 3개 — 묶을 범주: ① 지식·이해 + 가치·태도  ② 지식·이해 + 과정·기능  ③ 지식·이해 + 과정·기능");
     expect(p).toContain("- (2) 문화 다양성과 존중: 성취기준 2개");
     const r = standardsPrompt.parse(wrap({ standards: [{ area: 1, text: "가.", elements: ["세계와 연결된 나의 삶"] }, { area: 2, text: "나.", elements: ["세계의 다양한 문화"] }, { area: 2, text: "다.", elements: ["세계의 다양한 문화"] }] }), d);
     expect(r.ok).toBe(true);
@@ -226,12 +247,14 @@ describe("영역별 성취기준 수", () => {
 });
 
 describe("성취기준 내용 요소 최소 2개와 문장 고치기", () => {
-  it("성취기준별 내용 요소 수를 정확히 안내 (6개·3개 → 2,2,2 / 7개·3개 → 3,2,2)", async () => {
-    const { elementSplit } = await import("@/domain/standardCounts");
-    expect(elementSplit(6, 3)).toEqual([2, 2, 2]);
-    expect(elementSplit(7, 3)).toEqual([3, 2, 2]);
-    expect(elementSplit(6, 2)).toEqual([3, 3]);
-    expect(standardsPrompt.build(sampleSubject())).toContain("성취기준 2개 (성취기준별 내용 요소 수: 3개, 2개)");
+  it("프롬프트에 묶을 범주와 '같은 범주끼리 묶지 않기' 규칙이 들어간다", () => {
+    const p = standardsPrompt.build(sampleSubject());
+    expect(p).toContain("성취기준 2개 — 묶을 범주: ① 지식·이해 + 과정·기능  ② 지식·이해 + 과정·기능 + 가치·태도");
+    expect(p).toContain("같은 범주의 내용 요소 2개를 함께 묶지 않습니다");
+  });
+  it("같은 범주끼리 묶은 답은 알림", () => {
+    const r = standardsPrompt.parse(wrap({ standards: [{ area: 1, text: "가.", elements: ["세계와 연결된 나의 삶", "세계 문제 해결을 위한 협력의 필요성"] }] }), doc);
+    expect(r.ok && r.notes.join()).toContain("같은 범주의 내용 요소를 함께 묶은");
   });
   it("내용 요소가 2개 미만인 성취기준은 알림", () => {
     const r = standardsPrompt.parse(wrap({ standards: [{ area: 1, text: "하나뿐인 성취기준이다.", elements: ["세계와 연결된 나의 삶"] }] }), doc);

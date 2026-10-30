@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { CATEGORIES, newId, planSchema, standardNeedsRewrite, type Area, type AssessmentRow, type DesignDoc, type Intro, type Plan, type Standard, type Teaching } from "@/domain/types";
-import { categoryOf, codeMap } from "@/domain/codes";
-import { elementCount, elementSplit, standardCountsFor } from "@/domain/standardCounts";
+import { categoryOf, codeMap, hasSameCategory } from "@/domain/codes";
+import { categorySplit, splitProblem, standardCountsFor } from "@/domain/standardCounts";
 import { COMMON_RULES, contextBlock, formatBlock, parseAiJson, toList, type AiParse } from "./common";
+
+const CIRCLED = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"];
 
 /**
  * 설계 단계별 프롬프트와 답 읽기. 순서는 2027 연수 PPT의 문서 작성 순서를 따른다.
@@ -163,14 +165,22 @@ ${doc.coreIdeas.map((s) => `- ${s}`).join("\n")}
 ## 할 일
 위 내용 체계로 성취기준을 써 주세요. 영역마다 아래 개수를 **정확히** 지킵니다.
 ${standardCountsFor(doc)
-  .map((n, i) => `- (${i + 1}) ${doc.areas[i].name}: 성취기준 ${n}개 (성취기준별 내용 요소 수: ${elementSplit(elementCount(doc.areas[i]), n).map((x) => `${x}개`).join(", ")})`)
+  .map((n, i) => {
+    const split = categorySplit(doc.areas[i], n);
+    return `- (${i + 1}) ${doc.areas[i].name}: 성취기준 ${n}개 — ${
+      split ? `묶을 범주: ${split.map((cs, j) => `${CIRCLED[j] ?? `${j + 1})`} ${cs.map((c) => CATEGORIES[c]).join(" + ")}`).join("  ")}` : `(내용 체계를 고쳐야 합니다: ${splitProblem(doc.areas[i]) ?? "범주별 내용 요소 수를 확인하세요."})`
+    }`;
+  })
   .join("\n")}
 
 ## 성취기준 작성 규칙
 1. 성취기준은 학습을 통해 학생이 할 수 있어야 할 결과 혹은 도달점으로 진술합니다.
-2. 지식·이해 / 과정·기능 / 가치·태도 세 범주 중 두 가지 이상을 결합해 한 문장으로 씁니다. 지식·이해 하나만으로 쓰지 않습니다.
+2. 성취기준 하나는 **서로 다른 범주**의 내용 요소를 묶어 한 문장으로 씁니다. **같은 범주의 내용 요소 2개를 함께 묶지 않습니다.** (예: 지식·이해 + 지식·이해 ✕)
+   - 2개를 묶으면 서로 다른 두 범주에서 하나씩 (예: 지식·이해 + 과정·기능)
+   - 3개를 묶으면 지식·이해 + 과정·기능 + 가치·태도 세 범주에서 하나씩
+   - 위에 적은 '묶을 범주'를 지킵니다.
    예: 코딩 로봇의 기본 요소와 사용법[지식·이해]을 익히고, 창의적인 작품을 만든다.[과정·기능]
-3. elements에는 그 성취기준이 다루는 내용 요소를 그 영역의 내용 체계에서 **글자 그대로 복사해서** 넣습니다. 성취기준 하나에 **반드시 2개 이상, 3개 이하**이며, 위에 적은 '성취기준별 내용 요소 수'를 지킵니다. 내용 체계에 없는 내용 요소는 넣지 않습니다.
+3. elements에는 그 성취기준이 다루는 내용 요소를 그 영역의 내용 체계에서 **글자 그대로 복사해서** 넣습니다. 성취기준 하나에 **반드시 2개 또는 3개**입니다. 내용 체계에 없는 내용 요소는 넣지 않습니다.
    **내용 요소 하나는 성취기준 하나에만** 넣습니다. 같은 내용 요소를 두 성취기준에 겹쳐 쓰지 않고, 그 영역의 내용 요소를 **빠짐없이 모두** 나누어 씁니다.
 4. area에는 영역 번호(1부터)를 씁니다.
 5. 문장은 '~한다.', '~갖는다.', '~기른다.'처럼 끝냅니다. **'~할 수 있다.'로 끝내지 않습니다.** (예: '만들 수 있다.' → '만든다.')
@@ -202,6 +212,7 @@ ${formatBlock(`{
     const usedElements = new Set<string>();
     const repeated = new Set<string>();
     const short = new Set<string>();
+    const sameCat = new Set<string>();
     for (const s of r.data) {
       const areaIndex = s.area - 1;
       if (areaIndex < 0 || areaIndex >= doc.areas.length) {
@@ -220,10 +231,12 @@ ${formatBlock(`{
       });
       normalized.forEach((e) => usedElements.add(e));
       if (normalized.length < 2) short.add(s.text.slice(0, 20));
+      if (hasSameCategory(doc.areas, normalized)) sameCat.add(s.text.slice(0, 20));
       data.push({ id: newId(), areaIndex, text: s.text.replace(/^\[[^\]]+\]\s*/, ""), elements: normalized, textFor: normalized });
     }
     if (data.length === 0) return { ok: false, error: "쓸 수 있는 성취기준이 없습니다. 영역 번호(area)를 확인하세요." };
     if (short.size) notes.push(`내용 요소가 2개 미만인 성취기준이 있습니다: ${[...short].map((t) => `'${t}…'`).join(", ")} — 아래에서 내용 요소를 더 고르고 문장을 고쳐 주세요.`);
+    if (sameCat.size) notes.push(`같은 범주의 내용 요소를 함께 묶은 성취기준이 있습니다: ${[...sameCat].map((t) => `'${t}…'`).join(", ")} — 서로 다른 범주끼리 묶이도록 아래에서 내용 요소를 바꾸고 문장을 고쳐 주세요.`);
     if (repeated.size) notes.push(`여러 성취기준에 겹쳐 들어간 내용 요소는 처음 것에만 남겼습니다: ${[...repeated].join(", ")}`);
     standardCountsFor(doc).forEach((want, i) => {
       const got = data.filter((s) => s.areaIndex === i).length;
@@ -259,7 +272,7 @@ ${targets
 
 ## 작성 규칙
 1. 바뀐 내용 요소를 모두 담고, 그 밖의 내용 요소는 넣지 않습니다.
-2. 지식·이해 / 과정·기능 / 가치·태도 중 두 가지 이상을 결합한 한 문장으로, 학생의 도달점으로 진술합니다.
+2. 바뀐 내용 요소(서로 다른 범주)를 결합한 한 문장으로, 학생의 도달점으로 진술합니다.
 3. 문장은 '~한다.', '~갖는다.', '~기른다.'처럼 끝냅니다. **'~할 수 있다.'로 끝내지 않습니다.** (예: '만들 수 있다.' → '만든다.')
 4. code에는 위의 성취기준 코드를 그대로 씁니다. text에는 코드 번호를 쓰지 않습니다.
 ${COMMON_RULES}

@@ -74,10 +74,19 @@ describe("성취기준", () => {
     const doc = { ...sampleSubject(), abbrev: "지구마을첫" };
     expect(errors(checkStandards(doc)).some((i) => i.field === "성취기준 코드 약어")).toBe(true);
   });
-  it("지식·이해 하나만 연결하면 경고", () => {
+  it("같은 범주의 내용 요소를 함께 묶으면 오류", () => {
     const doc = sampleSubject();
-    doc.standards[0].elements = ["세계와 연결된 나의 삶"];
-    expect(checkStandards(doc).some((i) => i.message.includes("[지식·이해] 범주만"))).toBe(true);
+    doc.standards[0].elements = ["세계와 연결된 나의 삶", "세계 문제 해결을 위한 협력의 필요성"];
+    doc.standards[1].elements = ["세계 어린이의 생활 탐구하기", "세계시민 규칙 정하기", "세계시민 규칙을 실천하려는 의지"];
+    const issues = errors(checkStandards(doc));
+    expect(issues.some((i) => i.field === "[3사지구01-01]" && i.message.includes("같은 범주(지식·이해)"))).toBe(true);
+    expect(issues.some((i) => i.field === "[3사지구01-02]" && i.message.includes("같은 범주(과정·기능)"))).toBe(true);
+  });
+  it("한 범주의 내용 요소가 나머지 두 범주 합보다 많으면 내용 체계 오류", () => {
+    const doc = sampleSubject();
+    doc.areas[1].knowledge.push("문화의 뜻", "문화의 종류", "문화의 변화");
+    expect(errors(checkContentSystem(doc.areas)).some((i) => i.message.includes("서로 다른 범주끼리 묶을 수 없습니다"))).toBe(true);
+    expect(errors(checkContentSystem(sampleSubject().areas))).toHaveLength(0);
   });
   it("한 내용 요소를 두 성취기준에 넣으면 오류", () => {
     const doc = sampleSubject();

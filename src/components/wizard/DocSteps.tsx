@@ -2,8 +2,8 @@
 
 import { useLayoutEffect, useRef } from "react";
 import { CATEGORIES, CATEGORY_KEYS, newId, standardNeedsRewrite, type Area, type DesignDoc, type Standard } from "@/domain/types";
-import { codeMap, defaultAbbrev, standardCategories } from "@/domain/codes";
-import { elementCount, recommendedStandardCount, standardCountRange, standardCountsFor } from "@/domain/standardCounts";
+import { categoryOf, codeMap, defaultAbbrev, hasSameCategory, standardCategories } from "@/domain/codes";
+import { categoryCounts, categorySplit, elementCount, recommendedStandardCount, splitProblem, standardCountRange, standardCountsFor } from "@/domain/standardCounts";
 import { contentSystemPrompt, coreIdeasPrompt, introPrompt, reviseStandardsPrompt, standardsPrompt, teachingPrompt } from "@/prompts/steps";
 import { checkContentSystem, checkCoreIdeas, checkIntro, checkStandards, checkTeaching } from "@/validation/design";
 import { AiAssist } from "./AiAssist";
@@ -220,7 +220,7 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
         tips={[
           "성취기준: 학습을 통해 학생에게 궁극적으로 기대하는 결과 혹은 도달점",
           "영역별로 2가지 이상 개발",
-          "[지식·이해], [과정·기능], [가치·태도] 중 두 가지 이상 범주를 결합하여 진술 (지식·이해만으로는 지양)",
+          "내용 요소는 서로 다른 범주끼리 묶어요: 2개면 서로 다른 두 범주, 3개면 [지식·이해]+[과정·기능]+[가치·태도] (같은 범주끼리 묶기 ✕)",
           "문장 끝은 '~한다.'처럼 써요. '~할 수 있다.'로 끝내지 않아요 (예: 만들 수 있다. → 만든다.)",
           doc.basic.type === "activity"
             ? "활동은 기존 교과 성취기준을 재구조화할 수 있어요 (그대로 옮겨 쓰기는 안 돼요)"
@@ -313,16 +313,30 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
                     }
                   />
                   <p className="text-xs text-gray-500">
-                    이 성취기준이 다루는 내용 요소 2~3개 (눌러서 고르기 · 회색은 다른 성취기준에서 이미 쓴 것)
+                    이 성취기준이 다루는 내용 요소 2~3개, <b>서로 다른 범주</b>에서 하나씩 (눌러서 고르기 · 회색은 고를 수 없는 것, 마우스를 올리면 이유가 보여요)
                     {s.elements.length < 2 && <span className="ml-1 font-semibold text-red-600">— 2개 이상 골라 주세요 (지금 {s.elements.length}개)</span>}
-                    {s.elements.length > 3 && <span className="ml-1 font-semibold text-amber-700">— 3개까지 권장 (지금 {s.elements.length}개)</span>}
+                    {s.elements.length > 3 && <span className="ml-1 font-semibold text-red-600">— 3개까지예요 (지금 {s.elements.length}개)</span>}
+                    {hasSameCategory(doc.areas, s.elements) && <span className="ml-1 font-semibold text-red-600">— 같은 범주끼리 묶였어요</span>}
                   </p>
                   <Chips
                     options={allElements(a)}
+                    render={(o) => {
+                      const c = categoryOf(doc.areas, o);
+                      return (
+                        <>
+                          {c && <span className="mr-1 opacity-60">[{CATEGORIES[c].slice(0, 2)}]</span>}
+                          {o}
+                        </>
+                      );
+                    }}
                     selected={s.elements}
                     disabled={(o) => {
                       const other = doc.standards.find((x) => x.id !== s.id && x.elements.includes(o));
-                      return other ? `${codes.get(other.id)}에서 사용 중` : false;
+                      if (other) return `${codes.get(other.id)}에서 사용 중`;
+                      const c = categoryOf(doc.areas, o);
+                      if (c && s.elements.some((e) => categoryOf(doc.areas, e) === c)) return `이미 ${CATEGORIES[c]} 내용 요소를 골랐어요 (서로 다른 범주끼리 묶어요)`;
+                      if (s.elements.length >= 3) return "3개까지 묶을 수 있어요";
+                      return false;
                     }}
                     onToggle={(o) =>
                       set((st) => {
@@ -376,13 +390,16 @@ function StandardCountPicker({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">)
         )}
       </div>
       <p className="text-sm text-gray-600">
-        성취기준 하나는 내용 요소 2~3개를 묶고, 내용 요소 하나는 성취기준 하나에만 들어가요. 그래서 내용 요소 수에 따라 고를 수 있는 개수가 정해져요.
+        성취기준 하나는 서로 다른 범주의 내용 요소 2~3개를 묶고, 내용 요소 하나는 성취기준 하나에만 들어가요. 그래서 범주별 내용 요소 수에 따라 고를 수 있는 개수가 정해져요.
         정한 개수는 AI 프롬프트에 그대로 들어가요.
       </p>
       <div className="divide-y divide-gray-100">
         {doc.areas.map((a, i) => {
           const rec = recommendedStandardCount(a);
           const { min, max } = standardCountRange(a);
+          const cc = categoryCounts(a);
+          const problem = splitProblem(a);
+          const split = categorySplit(a, counts[i]);
           return (
             <div key={i} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <div className="text-sm">
@@ -390,8 +407,14 @@ function StandardCountPicker({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">)
                   ({i + 1}) {a.name}
                 </b>
                 <span className="ml-2 text-gray-500">
-                  내용 요소 {elementCount(a)}개 → {min === max ? `${min}개만 가능` : `${min}~${max}개 가능`} (추천 {rec}개)
+                  내용 요소 {elementCount(a)}개 (지식·이해 {cc.knowledge} · 과정·기능 {cc.process} · 가치·태도 {cc.values}) →{" "}
+                  {problem ? "묶을 수 없음" : `${min === max ? `${min}개만 가능` : `${min}~${max}개 가능`} (추천 ${rec}개)`}
                 </span>
+                {problem ? (
+                  <p className="text-xs font-semibold text-red-600">⚠ {problem} 내용 체계 단계에서 내용 요소를 고쳐 주세요.</p>
+                ) : (
+                  split && <p className="text-xs text-gray-500">묶는 범주: {split.map((cs) => cs.map((c) => CATEGORIES[c]).join("+")).join(" / ")}</p>
+                )}
               </div>
               <div className="flex items-center gap-1">
                 <button type="button" aria-label="줄이기" disabled={counts[i] <= min} onClick={() => set(i, counts[i] - 1)} className="h-8 w-8 rounded-lg border border-gray-300 text-lg leading-none disabled:opacity-30">
