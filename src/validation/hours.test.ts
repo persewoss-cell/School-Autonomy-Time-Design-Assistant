@@ -14,6 +14,8 @@ const lesson = (hours: number, assessment = "") => ({
   goal: "알아봅시다.",
   activities: ["활동"],
   assessment,
+  assessFor: "",
+  inputActivities: [],
   note: "",
 });
 
@@ -62,10 +64,6 @@ describe("checkPlanHours", () => {
     const issues = checkPlanHours(plan, { hours: 8 });
     expect(issues[0].level).toBe("error");
     expect(issues[0].fix).toContain("2시간 늘려");
-  });
-  it("과정중심평가가 없으면 경고", () => {
-    const noAssess: Plan = { ...plan, units: [{ unitName: "1", standardIds: [], lessons: [lesson(6)] }] };
-    expect(checkPlanHours(noAssess, { hours: 6 }).some((i) => i.field === "과정중심평가")).toBe(true);
   });
 });
 

@@ -79,15 +79,6 @@ export function checkPlanHours(plan: Plan, basic: Pick<BasicInfo, "hours">): Iss
       });
     }
   });
-  const hasAssessment = plan.units.some((u) => u.lessons.some((l) => l.assessment.trim() !== ""));
-  if (!hasAssessment) {
-    issues.push({
-      level: "warning",
-      field: "과정중심평가",
-      message: "단원 지도계획에 [과정중심평가] 표시가 없습니다. 지침상 평가 계획의 평가 내용은 단원 지도계획에 반드시 포함해야 합니다.",
-      fix: "평가할 차시의 '평가' 칸에 평가 내용을 적어 주세요.",
-    });
-  }
   return issues;
 }
 

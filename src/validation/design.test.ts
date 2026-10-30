@@ -146,6 +146,34 @@ describe("단원 지도계획·평가 계획", () => {
     doc.assessments[1].standardIds = ["s3"];
     expect(errors(checkAssessments(doc))).toEqual([]);
   });
+  it("예시 문서의 단원 지도계획은 오류 없음", () => {
+    expect(errors(checkUnitPlan(sampleSubject()))).toEqual([]);
+  });
+  it("전단계 활동이 빠지면 오류", () => {
+    const doc = sampleSubject();
+    for (const u of doc.plan.selected!.units) for (const l of u.lessons) l.inputActivities = l.inputActivities.filter((a) => a !== "문화 존중 역할극");
+    expect(errors(checkUnitPlan(doc)).some((i) => i.field === "전단계 활동" && i.message.includes("'문화 존중 역할극'"))).toBe(true);
+  });
+  it("과정중심평가는 성취기준마다 정확히 1개", () => {
+    const doc = sampleSubject();
+    const lessons = doc.plan.selected!.units[0].lessons;
+    lessons[0].assessFor = "s1";
+    lessons[0].assessment = "한 번 더 평가";
+    lessons[6].assessFor = "";
+    lessons[6].assessment = "";
+    const issues = errors(checkUnitPlan(doc));
+    expect(issues.some((i) => i.field === "[3사지구01-01]" && i.message.includes("2개"))).toBe(true);
+    expect(issues.some((i) => i.field === "[3사지구01-02]" && i.message.includes("과정중심평가가 없습니다"))).toBe(true);
+  });
+  it("평가 성취기준을 정하지 않거나, 다른 단원의 성취기준을 평가하면 오류", () => {
+    const doc = sampleSubject();
+    const lessons = doc.plan.selected!.units[0].lessons;
+    lessons[0].assessment = "평가 내용만 있음";
+    lessons[2].assessFor = "s3";
+    const issues = errors(checkUnitPlan(doc));
+    expect(issues.some((i) => i.message.includes("어느 성취기준을 평가하는지"))).toBe(true);
+    expect(issues.some((i) => i.message.includes("이 단원에 배치하지 않은 성취기준"))).toBe(true);
+  });
   it("평가 내용이 단원 지도계획에 없으면 오류", () => {
     const doc = sampleSubject();
     for (const l of doc.plan.selected!.units[1].lessons) l.assessment = "";

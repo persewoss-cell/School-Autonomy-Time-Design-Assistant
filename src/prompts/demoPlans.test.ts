@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { makeDemoPlans } from "./demoPlans";
 import { totalLessonHours } from "@/validation/hours";
 import { sampleSubject } from "@/domain/sample";
+import { checkUnitPlan } from "@/validation/design";
 
 describe("makeDemoPlans", () => {
   it("3안을 만들고 각 안의 차시 합계가 운영 시수와 같다", () => {
@@ -16,5 +17,12 @@ describe("makeDemoPlans", () => {
     const p = makeDemoPlans(sampleSubject())[0];
     expect(p.units.map((u) => u.unitName)).toEqual(["세계시민의 이해", "문화 다양성과 존중"]);
     expect(p.units[1].standardIds).toEqual(["s3", "s4"]);
+  });
+  it("전단계 활동을 모두 넣고, 과정중심평가를 성취기준마다 1개씩", () => {
+    const doc = sampleSubject();
+    for (const p of makeDemoPlans(doc)) {
+      const issues = checkUnitPlan({ ...doc, plan: { ...doc.plan, selected: p } }).filter((i) => i.level === "error");
+      expect(issues).toEqual([]);
+    }
   });
 });

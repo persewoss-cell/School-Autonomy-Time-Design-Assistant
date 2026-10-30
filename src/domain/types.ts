@@ -98,7 +98,12 @@ export const lessonSchema = z.object({
   topic: z.string().min(1),
   goal: z.string().min(1),
   activities: z.array(z.string().min(1)).min(1),
+  /** [과정중심평가] 평가 내용 (평가하지 않는 차시는 "") */
   assessment: z.string(),
+  /** 이 차시에서 평가하는 성취기준 id (성취기준마다 과정중심평가 1개) */
+  assessFor: z.string().default(""),
+  /** 이 차시에서 하는 [전단계] '하고 싶은 활동' (문구 그대로) */
+  inputActivities: z.array(z.string()).default([]),
   note: z.string(),
 });
 export type Lesson = z.infer<typeof lessonSchema>;

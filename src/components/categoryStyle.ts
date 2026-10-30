@@ -1,14 +1,14 @@
 import type { Category } from "@/domain/types";
 
-/** 내용 체계 범주별 색 (지식·이해 파랑, 과정·기능 초록, 가치·태도 보라). 내용 체계 표와 성취기준 내용 요소 칩에서 같이 씀 */
+/** 내용 체계 범주별 색 (지식·이해 빨강, 과정·기능 초록, 가치·태도 보라). 내용 체계 표와 성취기준 내용 요소 칩에서 같이 씀 */
 export const CATEGORY_STYLE: Record<Category, { head: string; cell: string; box: string; chipOn: string; chipOff: string; badge: string }> = {
   knowledge: {
-    head: "bg-sky-100 text-sky-900",
-    cell: "bg-sky-50/70",
-    box: "border-sky-200 bg-white hover:border-sky-300",
-    chipOn: "border-sky-500 bg-sky-100 font-semibold text-sky-800",
-    chipOff: "border-sky-200 bg-sky-50 text-sky-700 hover:border-sky-400",
-    badge: "bg-sky-100 text-sky-800",
+    head: "bg-rose-100 text-rose-900",
+    cell: "bg-rose-50/70",
+    box: "border-rose-200 bg-white hover:border-rose-300",
+    chipOn: "border-rose-500 bg-rose-100 font-semibold text-rose-800",
+    chipOff: "border-rose-200 bg-rose-50 text-rose-700 hover:border-rose-400",
+    badge: "bg-rose-100 text-rose-800",
   },
   process: {
     head: "bg-emerald-100 text-emerald-900",

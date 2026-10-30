@@ -2,6 +2,7 @@ import { z } from "zod";
 import { CATEGORIES, newId, planSchema, standardNeedsRewrite, type Area, type AssessmentRow, type DesignDoc, type Intro, type Plan, type Standard, type Teaching } from "@/domain/types";
 import { categoryOf, codeMap, hasSameCategory } from "@/domain/codes";
 import { categorySplit, splitProblem, standardCountsFor } from "@/domain/standardCounts";
+import { planCoverage } from "@/validation/design";
 import { COMMON_RULES, contextBlock, formatBlock, parseAiJson, toList, type AiParse } from "./common";
 
 const CIRCLED = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"];
@@ -372,6 +373,9 @@ ${areasBlock(doc.areas)}
 ## 성취기준 (코드 그대로 사용)
 ${standardsBlock(doc)}
 
+## 전단계에서 교사가 적은 활동 (번호) — 모두 꼭 넣기
+${doc.input.desiredActivities.length ? doc.input.desiredActivities.map((a, i) => `${i + 1}. ${a}`).join("\n") : "(없음)"}
+
 ## 할 일
 위 정보로 학교자율시간 ${kindOf(doc)}의 '단원 지도계획' 초안을 서로 다른 3가지 안으로 만들어 주세요.
 
@@ -383,8 +387,12 @@ ${standardsBlock(doc)}
 5. 학습주제(topic)는 짧은 개괄식으로 씁니다.
 6. 학습 목표(goal)는 '~해 봅시다.'로 끝나는 한 문장으로 씁니다.
 7. 세부 활동(activities)은 2~4개, 학습 순서대로, 각각 '~하기'로 끝나는 구절로 씁니다.
-8. '꼭 들어가야 할 내용'은 모든 안에 넣고, '하고 싶은 활동'은 가능한 한 반영합니다.
-9. 단원마다 과정중심평가를 하는 차시를 1개 이상 두고, 그 차시의 assessment에 평가 내용을 씁니다. (다음 단계 평가 계획의 평가 내용이 반드시 단원 지도계획에 들어가야 합니다) 평가하지 않는 차시는 "".
+8. 단원 지도계획은 실제로 학생을 가르치는 계획입니다. '꼭 들어가야 할 내용'과 위의 **'전단계에서 교사가 적은 활동'은 모든 안에 빠짐없이** 넣습니다.
+   그 활동을 하는 차시의 fromActivities에 활동 번호를 넣습니다. (예: [2]) 활동이 여러 차시에 걸치면 그 차시마다 넣고, 관계없는 차시는 [].
+9. 과정중심평가는 **성취기준 하나에 정확히 1개**입니다. 성취기준이 ${doc.standards.length}개이므로 한 안에 과정중심평가 차시가 정확히 ${doc.standards.length}개입니다.
+   - 평가하는 차시의 assessStandard에 그 성취기준 코드 1개를, assessment에 평가 내용을 씁니다.
+   - 그 성취기준을 배치한 단원 안에서, **그 성취기준의 내용(내용 요소)을 실제로 배우고 활동하는 차시**에 둡니다.
+   - 평가하지 않는 차시는 assessStandard와 assessment를 ""로 둡니다. (다음 단계 평가 계획은 이 과정중심평가로 씁니다)
 10. note(비고)에는 마을학교 연계, 코티칭, 원어민 연계 등을 쓰고, 없으면 "".
 11. ${doc.basic.grade}학년 수준에 맞는 활동을 제안합니다.
 ${COMMON_RULES}
@@ -404,6 +412,8 @@ ${formatBlock(`{
               "topic": "학습주제",
               "goal": "~에 대해 알아봅시다.",
               "activities": ["~ 조사하기", "~ 발표하기"],
+              "fromActivities": [],
+              "assessStandard": "",
               "assessment": "",
               "note": ""
             }
@@ -420,6 +430,11 @@ ${formatBlock(`{
       goal: z.string().trim().default(""),
       activities: list.default([]),
       assessment: z.string().nullish().transform((v) => v?.trim().replace(/^\[과정중심평가\]\s*/, "") ?? ""),
+      assessStandard: z.string().nullish().transform((v) => v?.trim() ?? ""),
+      fromActivities: z
+        .union([z.array(z.union([z.number(), z.string()])), z.number(), z.string()])
+        .nullish()
+        .transform((v) => (v == null ? [] : Array.isArray(v) ? v : [v])),
       note: z.string().nullish().transform((v) => v?.trim() ?? ""),
     });
     const loosePlan = z.object({
@@ -443,35 +458,52 @@ ${formatBlock(`{
     // 코드 → id. 목록에 없는 성취기준 코드는 걸러 낸다.
     const byCode = new Map([...codeMap(doc)].map(([id, code]) => [code.replace(/\s/g, ""), id]));
     const unknown = new Set<string>();
+    const toId = (c: string) => {
+      const code = (c.match(/\[[^\]]+\]/)?.[0] ?? `[${c.replace(/[[\]]/g, "")}]`).replace(/\s/g, "");
+      const id = byCode.get(code);
+      if (!id) unknown.add(c);
+      return id;
+    };
+    // 활동 번호(1부터) 또는 활동 문구 → 전단계 활동 문구
+    const wants = doc.input.desiredActivities;
+    const toActivity = (v: number | string) => {
+      const n = typeof v === "number" ? v : /^\d+$/.test(v.trim()) ? Number(v.trim()) : NaN;
+      if (Number.isInteger(n)) return wants[n - 1];
+      const norm = (t: string) => t.replace(/\s+/g, "");
+      return wants.find((w) => norm(w) === norm(String(v)));
+    };
     const data: Plan[] = plans.map((p) =>
       planSchema.parse({
         title: p.title,
         concept: p.concept || p.title,
         units: p.units.map((u) => ({
           unitName: u.unitName,
-          standardIds: [
-            ...new Set(
-              u.standards.flatMap((c) => {
-                const code = (c.match(/\[[^\]]+\]/)?.[0] ?? `[${c.replace(/[[\]]/g, "")}]`).replace(/\s/g, "");
-                const id = byCode.get(code);
-                if (!id) unknown.add(c);
-                return id ? [id] : [];
-              }),
-            ),
-          ],
-          lessons: u.lessons.map((l) => ({
+          standardIds: [...new Set(u.standards.flatMap((c) => toId(c) ?? []))],
+          lessons: u.lessons.map(({ assessStandard, fromActivities, ...l }) => ({
             ...l,
             goal: l.goal || `${l.topic}을(를) 해 봅시다.`,
             activities: l.activities.length ? l.activities : [l.topic],
+            assessFor: (assessStandard && toId(assessStandard)) || "",
+            inputActivities: [...new Set(fromActivities.map(toActivity).filter((a): a is string => !!a))],
           })),
         })),
       }),
     );
     if (unknown.size) notes.push(`목록에 없는 성취기준 코드를 뺐습니다: ${[...unknown].join(", ")}`);
+    const codes = codeMap(doc);
+    data.forEach((p, i) => {
+      const c = planCoverage(doc, p);
+      const missing = c.activities.filter((a) => !a.done).map((a) => a.text);
+      if (missing.length) notes.push(`${i + 1}안: 전단계 활동이 빠졌습니다 — ${missing.join(", ")}`);
+      const wrong = doc.standards.filter((s) => (c.assessed.get(s.id) ?? 0) !== 1).map((s) => codes.get(s.id));
+      if (wrong.length) notes.push(`${i + 1}안: 과정중심평가가 1개가 아닌 성취기준이 있습니다 — ${wrong.join(", ")}`);
+    });
     return { ok: true, data, notes };
   },
   reminder: (doc) => `- plans에는 3개의 안이 있어야 하고, 각 안의 hours 합계는 정확히 ${doc.basic.hours}이어야 합니다.
-- 각 단원의 standards에는 성취기준 코드를 목록에서 그대로 넣습니다.`,
+- 각 단원의 standards에는 성취기준 코드를 목록에서 그대로 넣습니다.
+- 각 차시에 fromActivities(전단계 활동 번호 목록), assessStandard(평가하는 성취기준 코드 또는 ""), assessment가 있어야 합니다.
+- 전단계 활동은 모두 들어가야 하고, 과정중심평가는 성취기준마다 정확히 1개입니다.`,
 };
 
 // ───────────────────────── ⑧ 평가 계획 ─────────────────────────
@@ -502,7 +534,7 @@ function assessLessons(doc: DesignDoc): string {
     .flatMap((u) =>
       u.lessons
         .filter((l) => l.assessment.trim())
-        .map((l) => `- [${u.unitName}] ${l.topic}: [과정중심평가] ${l.assessment} (관련 성취기준: ${u.standardIds.map((id) => codes.get(id)).join(", ")})`),
+        .map((l) => `- ${codes.get(l.assessFor) ?? "(성취기준 미정)"} [${u.unitName}] ${l.topic}: [과정중심평가] ${l.assessment}`),
     )
     .join("\n");
 }
@@ -520,7 +552,7 @@ ${assessLessons(doc)}
 위 과정중심평가를 바탕으로 '평가 계획'을 써 주세요.
 
 ## 작성 규칙
-1. ${doc.basic.type === "subject" ? "모든 성취기준이 평가 계획 어딘가에 들어가야 합니다. (과목은 모든 성취기준에 대한 성취수준 작성)" : "성취기준별로 평가 계획을 씁니다."} 두 성취기준을 하나로 묶어 평가할 수 있습니다.
+1. 위 과정중심평가 하나에 평가 계획 한 줄씩, 그 성취기준 1개로 씁니다. (성취기준마다 과정중심평가가 1개씩 있습니다)${doc.basic.type === "subject" ? " 과목은 모든 성취기준에 대한 성취수준을 씁니다." : ""}
 2. standards에는 성취기준 코드를 위 목록에서 그대로 넣습니다.
 3. month(시기)는 평가 내용에 알맞은 월을 씁니다. (${doc.basic.semester === 1 ? "1학기: 3~7월" : "2학기: 9~12월"}, 예: "9월")
 4. focus(수업·평가 방법, 연계의 주안점)는 이렇게 씁니다:

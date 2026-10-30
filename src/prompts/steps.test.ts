@@ -110,6 +110,41 @@ describe("단원 지도계획 — 목록 밖 성취기준 코드 걸러 내기",
       expect(r.notes.join()).toContain("1개 안만");
     }
   });
+  it("평가 성취기준 코드와 전단계 활동 번호를 읽고, 빠진 것을 알린다", () => {
+    const r = planPrompt.parse(
+      wrap({
+        plans: [
+          {
+            title: "가",
+            units: [
+              {
+                unitName: "단원",
+                standards: ["[3사지구01-01]"],
+                lessons: [
+                  { hours: 29, topic: "주제", activities: ["하기"], fromActivities: [1, "문화 존중 역할극", 9], assessStandard: "[3사지구01-01]", assessment: "발표" },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+      doc,
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const l = r.data[0].units[0].lessons[0];
+      expect(l.assessFor).toBe("s1");
+      expect(l.inputActivities).toEqual(["세계시민 여권 만들기", "문화 존중 역할극"]);
+      expect(r.notes.join()).toContain("전단계 활동이 빠졌습니다 — 언어 어울림(이중언어) 발표회");
+      expect(r.notes.join()).toContain("[3사지구01-02]");
+    }
+  });
+  it("프롬프트에 전단계 활동 번호와 성취기준당 과정중심평가 1개 규칙이 들어간다", () => {
+    const p = planPrompt.build(doc);
+    expect(p).toContain("1. 세계시민 여권 만들기");
+    expect(p).toContain("성취기준 하나에 정확히 1개");
+    expect(p).toContain("과정중심평가 차시가 정확히 4개");
+  });
   it("프롬프트에 성취기준 코드와 시수가 들어간다", () => {
     const p = planPrompt.build(doc);
     expect(p).toContain("[3사지구02-02]");

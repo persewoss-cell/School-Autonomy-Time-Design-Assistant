@@ -37,18 +37,37 @@ export function makeDemoPlans(doc: Pick<DesignDoc, "basic" | "input" | "areas" |
             goal: ui % 2 === 0 ? `${item}에 대해 알아봅시다.` : `${item} 활동에 참여해 봅시다.`,
             activities: [`${item} 관련 자료 ${s.verb}`, "알게 된 점을 친구와 이야기하기"],
             assessment: "",
+            assessFor: "",
+            inputActivities: [],
             note: ui === 1 && k === 0 && input.resources ? "지역 자원 연계" : "",
           });
           left -= size;
           k += 1;
         }
-        if (lessons.length) lessons[lessons.length - 1].assessment = `${unitNames[ui]} 결과를 정리하여 발표하기`;
+        // 과정중심평가: 이 단원의 성취기준마다 1개씩, 뒤쪽 차시부터
+        const unitStandards = doc.standards.filter((st) => st.areaIndex === ui);
+        unitStandards.forEach((st, j) => {
+          const l = lessons[Math.max(0, lessons.length - unitStandards.length + j)];
+          if (!l || l.assessFor) return;
+          l.assessFor = st.id;
+          l.assessment = `${st.elements.join(", ") || unitNames[ui]} 관련 활동 결과를 정리하여 발표하기`;
+        });
         return {
           unitName: unitNames[ui],
-          standardIds: doc.standards.filter((st) => st.areaIndex === ui).map((st) => st.id),
+          standardIds: unitStandards.map((st) => st.id),
           lessons,
         };
       }),
     };
+  }).map((plan) => {
+    // 전단계 활동은 모두 어느 차시엔가 넣는다
+    const all = plan.units.flatMap((u) => u.lessons);
+    input.desiredActivities.forEach((a, i) => {
+      const l = all[i % all.length];
+      if (!l) return;
+      l.inputActivities.push(a);
+      l.activities.unshift(a);
+    });
+    return plan;
   });
 }

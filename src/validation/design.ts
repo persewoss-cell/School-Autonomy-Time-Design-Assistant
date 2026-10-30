@@ -1,8 +1,8 @@
-import { CATEGORIES, CATEGORY_KEYS, DESIGN_TYPES, standardNeedsRewrite, type Area, type DesignDoc } from "@/domain/types";
+import { CATEGORIES, CATEGORY_KEYS, DESIGN_TYPES, standardNeedsRewrite, type Area, type DesignDoc, type Plan } from "@/domain/types";
 import { categoryOf, codeMap } from "@/domain/codes";
 import { splitProblem } from "@/domain/standardCounts";
 import { checklistFor } from "@/domain/checklist";
-import { checkBasicHours, checkPlanHours } from "./hours";
+import { checkBasicHours, checkPlanHours, lessonLabels } from "./hours";
 import type { Issue, StepKey } from "./types";
 
 /**
@@ -273,7 +273,23 @@ export function checkIntro(doc: Pick<DesignDoc, "basic" | "intro">): Issue[] {
 }
 
 /** ⑦ 단원 지도계획: 시수 + 성취기준 배치 */
-export function checkUnitPlan(doc: Pick<DesignDoc, "basic" | "abbrev" | "standards" | "plan">): Issue[] {
+/**
+ * 단원 지도계획이 [전단계] 활동과 과정중심평가를 얼마나 담았는지.
+ * - activities: '하고 싶은 활동'마다 연결한 차시가 있는지
+ * - assessed: 성취기준 id → 과정중심평가를 배정한 차시 수 (성취기준마다 정확히 1개여야 함)
+ */
+export function planCoverage(doc: Pick<DesignDoc, "input">, plan: Plan) {
+  const lessons = plan.units.flatMap((u) => u.lessons);
+  const linked = new Set(lessons.flatMap((l) => l.inputActivities ?? []));
+  const assessed = new Map<string, number>();
+  for (const l of lessons) if (l.assessFor) assessed.set(l.assessFor, (assessed.get(l.assessFor) ?? 0) + 1);
+  return {
+    activities: doc.input.desiredActivities.map((text) => ({ text, done: linked.has(text) })),
+    assessed,
+  };
+}
+
+export function checkUnitPlan(doc: Pick<DesignDoc, "basic" | "abbrev" | "standards" | "plan" | "input">): Issue[] {
   const plan = doc.plan.selected;
   if (!plan) {
     return tag("plan", [{ level: "error", field: "단원 지도계획", message: "단원 지도계획을 아직 정하지 않았습니다.", fix: "3안 중 하나를 골라 주세요." }]);
@@ -286,13 +302,64 @@ export function checkUnitPlan(doc: Pick<DesignDoc, "basic" | "abbrev" | "standar
       issues.push({ level: "error", field: `${i + 1}단원(${u.unitName}) 성취기준`, message: "이 단원에 배치한 성취기준이 없습니다.", fix: "단원에 맞는 성취기준을 골라 주세요." });
     }
   });
+  const coverage = planCoverage(doc, plan);
+  // [전단계]에서 적은 활동은 실제 수업이므로 모두 들어가야 한다 (사용자 결정, 2026-10-30)
+  for (const a of coverage.activities) {
+    if (!a.done) {
+      issues.push({
+        level: "error",
+        field: "전단계 활동",
+        message: `'${a.text}' 활동이 단원 지도계획에 없습니다. 전단계에서 적은 활동은 실제로 가르칠 내용이라 반드시 넣어야 합니다.`,
+        fix: "이 활동을 하는 차시를 만들고, 그 차시의 '전단계 활동'에서 이 활동을 눌러 연결해 주세요.",
+      });
+    }
+  }
+  // 과정중심평가: 성취기준마다 1개, 그 성취기준을 배치한 단원의 차시에 (사용자 결정, 2026-10-30)
+  const labels = lessonLabels(plan.units, doc.basic.hours);
+  plan.units.forEach((u, ui) =>
+    u.lessons.forEach((l, li) => {
+      const f = `${ui + 1}단원 ${labels[ui]?.[li] ?? ""} ${l.topic}`.trim();
+      const target = l.assessFor && codes.has(l.assessFor) ? l.assessFor : "";
+      if (l.assessment.trim() && !target) {
+        issues.push({ level: "error", field: f, message: "과정중심평가가 어느 성취기준을 평가하는지 정하지 않았습니다.", fix: "평가 칸 옆에서 평가할 성취기준을 골라 주세요." });
+      }
+      if (target && !l.assessment.trim()) {
+        issues.push({ level: "error", field: f, message: `${codes.get(target)} 과정중심평가의 평가 내용이 비어 있습니다.`, fix: "이 차시에서 무엇을 평가하는지 적어 주세요." });
+      }
+      if (target && !u.standardIds.includes(target)) {
+        issues.push({
+          level: "error",
+          field: f,
+          message: `${codes.get(target)}은(는) 이 단원에 배치하지 않은 성취기준입니다. 과정중심평가는 그 성취기준을 배우는 차시에 둡니다.`,
+          fix: "그 성취기준을 다루는 단원의 차시로 평가를 옮겨 주세요.",
+        });
+      }
+    }),
+  );
   for (const s of doc.standards) {
+    const code = codes.get(s.id) ?? "성취기준";
     if (!used.has(s.id)) {
       issues.push({
         level: "error",
-        field: codes.get(s.id) ?? "성취기준",
+        field: code,
         message: "이 성취기준이 어느 단원에도 배치되지 않았습니다.",
         fix: "알맞은 단원에 성취기준을 배치해 주세요.",
+      });
+    }
+    const n = coverage.assessed.get(s.id) ?? 0;
+    if (n === 0) {
+      issues.push({
+        level: "error",
+        field: code,
+        message: "이 성취기준의 과정중심평가가 없습니다. 성취기준마다 과정중심평가를 1개씩 배정합니다.",
+        fix: "이 성취기준의 내용을 다루는 차시를 골라 평가할 성취기준과 평가 내용을 적어 주세요.",
+      });
+    } else if (n > 1) {
+      issues.push({
+        level: "error",
+        field: code,
+        message: `이 성취기준의 과정중심평가가 ${n}개입니다. 성취기준마다 1개만 배정합니다.`,
+        fix: "가장 알맞은 차시 하나만 남기고 나머지 차시의 평가를 지워 주세요.",
       });
     }
   }
@@ -322,13 +389,13 @@ export function checkAssessments(doc: Pick<DesignDoc, "basic" | "abbrev" | "stan
     // 평가 계획의 평가 내용은 단원 지도계획에 반드시 포함 (예시 문서 메모, PPT 51쪽)
     const plan = doc.plan.selected;
     if (plan) {
-      const units = plan.units.filter((u) => u.standardIds.some((id) => a.standardIds.includes(id)));
-      if (units.length > 0 && !units.some((u) => u.lessons.some((l) => l.assessment.trim()))) {
+      const assessed = new Set(plan.units.flatMap((u) => u.lessons.filter((l) => l.assessment.trim()).map((l) => l.assessFor)));
+      if (a.standardIds.some((id) => codes.has(id) && !assessed.has(id))) {
         issues.push({
           level: "error",
           field: f,
           message: "이 평가 내용이 단원 지도계획에 들어 있지 않습니다. 평가 계획의 평가 내용은 단원 지도계획에 반드시 포함해야 합니다.",
-          fix: "단원 지도계획에서 평가할 차시의 '[과정중심평가]' 칸에 평가 내용을 적어 주세요.",
+          fix: "단원 지도계획에서 이 성취기준을 평가할 차시를 골라 '[과정중심평가]' 칸에 평가 내용을 적어 주세요.",
         });
       }
     }
