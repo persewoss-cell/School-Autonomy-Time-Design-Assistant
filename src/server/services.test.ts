@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { sampleSubject } from "@/domain/sample";
 import { memoryRepo } from "./repo";
 import {
+  listMyDesigns,
   adminStats,
   changePassword,
   deleteDesign,
@@ -116,6 +117,13 @@ describe("설계 저장·권한", () => {
     const again = await saveDesign(repo, t, doc, record.id);
     expect(again.record.errorCount).toBe(1);
     expect((await repo.designs.listByOwner(t.id)).length).toBe(1);
+  });
+  it("내 설계 목록에 운영 시수가 있고, 예전 저장본은 문서에서 채움", async () => {
+    const { repo, t } = await setup();
+    const { record } = await saveDesign(repo, t, sampleSubject());
+    expect(record.hours).toBe(29);
+    await repo.designs.update(record.id, { hours: undefined });
+    expect((await listMyDesigns(repo, t))[0].hours).toBe(29);
   });
   it("다른 교사는 열기·고치기·삭제 불가, 관리자는 열기만 가능", async () => {
     const { repo, admin, t } = await setup();

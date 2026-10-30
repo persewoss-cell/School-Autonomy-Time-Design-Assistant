@@ -18,6 +18,7 @@ export function AiAssist<T>({
   title = "AI에게 초안 받기",
   defaultOpen,
   onParseFail,
+  onReset,
 }: {
   doc: DesignDoc;
   step: StepPrompt<T>;
@@ -27,11 +28,14 @@ export function AiAssist<T>({
   title?: string;
   defaultOpen?: boolean;
   onParseFail?: (error: string) => void;
+  /** 'AI 답변 초기화': 이 단계에서 AI가 만든 결과를 지운다 */
+  onReset?: () => void;
 }) {
   const [open, setOpen] = useState(defaultOpen ?? !hasContent);
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState("");
   const [notes, setNotes] = useState<string[]>([]);
+  const [follow, setFollow] = useState<{ title: string; prompt: string } | null>(null);
 
   const read = () => {
     const r = step.parse(answer, doc);
@@ -40,19 +44,39 @@ export function AiAssist<T>({
       onParseFail?.(r.error);
       return;
     }
-    if (hasContent && !confirm("지금 작성된 내용을 AI의 답으로 바꿀까요?")) return;
+    if (hasContent && !confirm("이 단계에 작성된 기존 내용을 삭제하고, 새 AI 답으로 덮어쓸까요?")) return;
     setError("");
     setNotes(r.notes);
+    setFollow(step.followUp?.(r.data, doc) ?? null);
     setAnswer("");
     onApply(r.data, r.notes);
   };
 
+  const reset = () => {
+    if (!onReset || !confirm("이 단계에서 AI 답으로 만든 내용을 모두 지울까요?\n지운 내용은 되돌릴 수 없어요.")) return;
+    setNotes([]);
+    setFollow(null);
+    setError("");
+    onReset();
+  };
+
   return (
     <Card className="space-y-3 border-2 border-dashed border-brand-100">
-      <button type="button" onClick={() => setOpen(!open)} className="flex w-full items-center justify-between text-left">
-        <span className="font-bold text-brand-700">🤖 {title}</span>
-        <span className="text-sm text-gray-400">{open ? "접기 ▲" : "펼치기 ▼"}</span>
-      </button>
+      <div className="flex items-center justify-between gap-2">
+        <button type="button" onClick={() => setOpen(!open)} className="flex flex-1 items-center justify-between gap-2 text-left">
+          <span className="font-bold text-brand-700">🤖 {title}</span>
+          <span className="text-sm text-gray-400">{open ? "접기 ▲" : "펼치기 ▼"}</span>
+        </button>
+        {onReset && hasContent && (
+          <button
+            type="button"
+            onClick={reset}
+            className="shrink-0 rounded-lg border border-red-100 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-100"
+          >
+            AI 답변 초기화
+          </button>
+        )}
+      </div>
       {notes.length > 0 && (
         <ul className="space-y-1">
           {notes.map((n) => (
@@ -62,13 +86,22 @@ export function AiAssist<T>({
           ))}
         </ul>
       )}
+      {follow && (
+        <div className="space-y-2 rounded-lg bg-amber-50 p-3 text-sm">
+          <p className="font-semibold text-amber-800">⚠ {follow.title}</p>
+          <p className="text-gray-700">
+            아래 요청을 복사해 <b>같은 AI 대화창</b>에 보내고, 새 답을 아래 칸에 붙여 넣어 <b>AI 답 반영하기</b>를 누르세요.
+          </p>
+          <CopyBox text={follow.prompt} label="고치기 요청 복사" rows={5} />
+        </div>
+      )}
       {open && (
         <div className="space-y-4">
           <ol className="list-decimal space-y-1 pl-5 text-sm text-gray-700">
             <li>
               <b>프롬프트 복사</b>를 누르고, 평소 쓰는 AI(ChatGPT, Claude, Gemini, 뤼튼 등)에 붙여 넣어 보냅니다.
             </li>
-            <li>AI의 답을 전부 복사해 아래 칸에 붙여 넣고 <b>답 읽기</b>를 누릅니다.</li>
+            <li>AI의 답을 전부 복사해 아래 칸에 붙여 넣고 <b>AI 답 반영하기</b>를 누릅니다. (이미 내용이 있으면 덮어쓸지 물어봐요)</li>
             <li>읽어 온 내용은 아래에서 자유롭게 고칠 수 있어요. AI 없이 직접 써도 됩니다.</li>
           </ol>
           <p className="text-xs text-amber-700">AI에게 학생 이름 등 개인정보는 보내지 마세요.</p>
@@ -95,7 +128,7 @@ export function AiAssist<T>({
             disabled={!answer.trim()}
             className="rounded-lg border-2 border-brand-600 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50 disabled:border-gray-300 disabled:text-gray-300"
           >
-            답 읽기
+            AI 답 반영하기
           </button>
         </div>
       )}

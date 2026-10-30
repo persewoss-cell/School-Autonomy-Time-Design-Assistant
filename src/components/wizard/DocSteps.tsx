@@ -42,6 +42,7 @@ export function ContentStep({ doc, setDoc, onBack, onNext, onParseFail }: StepPr
         hasContent={doc.areas.some((a) => a.name.trim())}
         onParseFail={(e) => onParseFail?.("content", e)}
         onApply={(areas) => setDoc((d) => void (d.areas = areas))}
+        onReset={() => setDoc((d) => void (d.areas = []))}
       />
       <ContentTable doc={doc} setDoc={setDoc} />
       <StepIssues issues={checkContentSystem(doc.areas.map((a) => ({ ...a, knowledge: clean(a.knowledge), process: clean(a.process), values: clean(a.values) })))} />
@@ -200,6 +201,7 @@ export function CoreIdeasStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
         hasContent={doc.coreIdeas.some((s) => s.trim())}
         onParseFail={(e) => onParseFail?.("coreIdeas", e)}
         onApply={(ideas) => setDoc((d) => void (d.coreIdeas = ideas))}
+        onReset={() => setDoc((d) => void (d.coreIdeas = []))}
       />
       <Card>
         <ListEditor items={doc.coreIdeas} onChange={(items) => setDoc((d) => void (d.coreIdeas = items))} placeholder="~다." multiline addLabel="+ 핵심아이디어 추가" />
@@ -269,6 +271,7 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
             d.standards = standards;
           })
         }
+        onReset={() => setDoc((d) => void (d.standards = []))}
       />
       {doc.areas.map((a, ai) => (
         <Card key={ai} className="space-y-3">
@@ -473,9 +476,10 @@ export function IntroStep({ doc, setDoc, onBack, onNext, onParseFail }: StepProp
       <AiAssist
         doc={doc}
         step={introPrompt}
-        hasContent={!!doc.intro.rationale.trim()}
+        hasContent={!!(doc.intro.rationale.trim() || doc.intro.overallGoal.trim() || doc.intro.detailGoals.some((g) => g.trim()))}
         onParseFail={(e) => onParseFail?.("intro", e)}
         onApply={(intro) => setDoc((d) => void (d.intro = intro))}
+        onReset={() => setDoc((d) => void (d.intro = { rationale: "", overallGoal: "", detailGoals: ["", "", ""] }))}
       />
       <Card className="space-y-4">
         <Field label={subject ? "성격" : "필요성"} hint="문단은 줄바꿈으로 나눠요">
@@ -513,6 +517,7 @@ export function TeachingStep({ doc, setDoc, onBack, onNext, onParseFail }: StepP
         hasContent={Object.values(doc.teaching).some((l) => l.length > 0)}
         onParseFail={(e) => onParseFail?.("teaching", e)}
         onApply={(t) => setDoc((d) => void (d.teaching = t))}
+        onReset={() => setDoc((d) => void (d.teaching = { teachingDirection: [], teachingMethods: [], assessDirection: [], assessMethods: [] }))}
       />
       {parts.map(([key, label, hint]) => (
         <Card key={key} className="space-y-2">

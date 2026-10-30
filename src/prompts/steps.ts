@@ -20,6 +20,8 @@ export interface StepPrompt<T> {
   parse: (text: string, doc: DesignDoc) => AiParse<T>;
   /** 읽기 실패 시 수정 요청에 덧붙일 말 */
   reminder: (doc: DesignDoc) => string;
+  /** 읽었지만 고쳐야 할 점이 있으면 같은 AI에게 보낼 고치기 요청 (없으면 null) */
+  followUp?: (data: T, doc: DesignDoc) => { title: string; prompt: string } | null;
 }
 
 const kindOf = (doc: DesignDoc) => (doc.basic.type === "subject" ? "과목" : "활동");
@@ -396,6 +398,7 @@ ${doc.planRequest?.notes.trim() || "(없음)"}
 2. 한 안의 모든 차시(hours)를 더한 값은 반드시 정확히 ${doc.basic.hours}이어야 합니다. 답하기 전에 직접 더해서 확인하세요.
 3. 단원은 내용 체계의 영역 순서대로 하나씩 만듭니다. (단원 ${doc.areas.length}개) 단원명은 영역명을 그대로 쓰거나, 영역을 포함하는 의미로 재구성합니다.
    각 단원의 차시 합계는 위 '단원별 차시'와 **정확히** 같아야 합니다.
+   단원마다 unitHours에 정한 차시를 적고, 그 단원 lessons의 hours를 **하나씩 더해** unitHours와 같은지 확인한 뒤 답합니다. 다르면 차시를 합치거나 나누어 맞춥니다.
 4. 각 단원의 standards에는 그 단원에서 다루는 성취기준 코드를 위 목록에서 **그대로** 넣습니다. 모든 성취기준이 어느 단원엔가 들어가야 하고, 목록에 없는 코드는 쓰지 않습니다.
 5. 학습주제(topic)는 짧은 개괄식으로 씁니다.
 6. 학습 목표(goal)는 '~해 봅시다.'로 끝나는 한 문장으로 씁니다.
@@ -418,6 +421,7 @@ ${formatBlock(`{
       "units": [
         {
           "unitName": "단원명",
+          "unitHours": ${unitHoursFor(doc)[0] ?? doc.basic.hours},
           "standards": ["${standardsBlock(doc).split(" ")[0] || "[성취기준 코드]"}"],
           "lessons": [
             {
@@ -518,8 +522,31 @@ ${formatBlock(`{
     });
     return { ok: true, data, notes };
   },
+  followUp: (plans, doc) => {
+    const want = unitHoursFor(doc);
+    const lines = plans.flatMap((p, i) => {
+      const got = p.units.map((u) => u.lessons.reduce((sum, l) => sum + l.hours, 0));
+      const total = got.reduce((a, b) => a + b, 0);
+      if (got.length === want.length && got.every((h, k) => h === want[k]) && total === doc.basic.hours) return [];
+      const units = got.map((h, k) => `${k + 1}단원 ${h}차시${want[k] === undefined ? "(필요 없는 단원)" : h === want[k] ? " ✓" : ` → ${want[k]}차시로`}`);
+      const missing = want.slice(got.length).map((h, k) => `${got.length + k + 1}단원 없음 → ${h}차시로 만들기`);
+      return [`- ${i + 1}안(${p.title}): ${[...units, ...missing].join(", ")} / 합계 ${total}차시${total === doc.basic.hours ? "" : ` → ${doc.basic.hours}차시로`}`];
+    });
+    if (!lines.length) return null;
+    return {
+      title: "AI가 정한 단원별 차시를 지키지 않았어요. 고르기 전에 차시를 맞춰 달라고 요청하세요.",
+      prompt: `방금 답한 단원 지도계획의 차시가 정한 값과 다릅니다.
+${lines.join("\n")}
+
+정한 단원별 차시: ${want.map((h, k) => `${k + 1}단원 ${h}차시`).join(", ")} (합계 ${doc.basic.hours}차시)
+
+학습주제·활동·과정중심평가·전단계 활동 연결 등 내용은 최대한 그대로 두고, 차시(hours)만 고쳐 단원별 차시를 정확히 맞춰 주세요.
+필요하면 차시를 합치거나 나누세요. 답하기 전에 단원마다 lessons의 hours를 하나씩 더해 unitHours와 같은지 확인하세요.
+3안 모두, 앞과 같은 JSON 형식(\`\`\`json 코드 블록 하나)으로 다시 답해 주세요.`,
+    };
+  },
   reminder: (doc) => `- plans에는 3개의 안이 있어야 하고, 각 안의 hours 합계는 정확히 ${doc.basic.hours}이어야 합니다.
-- 단원별 차시 합계: ${unitHoursFor(doc).map((h, i) => `${i + 1}단원 ${h}차시`).join(", ")}
+- 단원별 차시 합계: ${unitHoursFor(doc).map((h, i) => `${i + 1}단원 ${h}차시`).join(", ")} (lessons의 hours를 하나씩 더해 확인)
 - 각 단원의 standards에는 성취기준 코드를 목록에서 그대로 넣습니다.
 - 각 차시에 fromActivities(전단계 활동 번호 목록), assessStandard(평가하는 성취기준 코드 또는 ""), assessment가 있어야 합니다.
 - 전단계 활동은 모두 들어가야 하고, 과정중심평가는 성취기준마다 정확히 1개입니다.`,

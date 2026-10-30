@@ -323,3 +323,21 @@ describe("단원 지도계획 요청 사항", () => {
     expect(p).toContain("모둠 활동 위주로");
   });
 });
+
+describe("단원 지도계획 차시 고치기 요청", () => {
+  it("정한 단원별 차시와 다르면 고치기 요청을 만들고, 맞으면 null", () => {
+    const d = sampleSubject();
+    d.planRequest = { unitHours: [14, 15], mustInclude: [], notes: "" };
+    const plan = structuredClone(d.plan.selected!);
+    plan.units[0].lessons[0].hours += 2; // 예시안 13·16차시 → 1단원 15차시
+    const f = planPrompt.followUp!([plan], d);
+    expect(f?.prompt).toContain("1단원 15차시 → 14차시로");
+    expect(f?.prompt).toContain("2단원 16차시 → 15차시로");
+    expect(f?.prompt).toContain("합계 31차시 → 29차시로");
+    d.planRequest = { unitHours: [13, 16], mustInclude: [], notes: "" };
+    expect(planPrompt.followUp!([d.plan.selected!], d)).toBeNull();
+  });
+  it("프롬프트에 unitHours 확인 규칙", () => {
+    expect(planPrompt.build(sampleSubject())).toContain("unitHours");
+  });
+});

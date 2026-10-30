@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 import {
   DESIGN_TYPES,
   GRADES,
@@ -11,29 +12,60 @@ import {
   type BasicInfo,
   type Grade,
 } from "@/domain/types";
-import { checkBasicHours, semesterHours } from "@/validation/hours";
+import { checkBasicHours, checkSemesterBudget, semesterHours } from "@/validation/hours";
 import { bandInfo, bandOfGrade } from "@/validation/allocation";
 import { Card, Field, IssueList, NavButtons, inputClass } from "../ui";
 
+interface SavedDesign {
+  id: string;
+  name: string;
+  type: "subject" | "activity";
+  grade: number;
+  semester: number;
+  hours?: number;
+  schoolYear?: string;
+}
+
+/** 로그인했으면 우리 학교가 저장한 설계 목록 (아니면 빈 목록) */
+function useSavedDesigns(): SavedDesign[] {
+  const [list, setList] = useState<SavedDesign[]>([]);
+  useEffect(() => {
+    api<{ designs: SavedDesign[] }>("/api/designs")
+      .then((r) => setList(r.designs))
+      .catch(() => setList([]));
+  }, []);
+  return list;
+}
+
 export function BasicStep({
   value,
+  designId,
+  schoolYear,
   onBack,
   onNext,
 }: {
   value: BasicInfo;
+  /** 지금 설계의 저장 id (같은 학기 합계에서 뺌) */
+  designId?: string;
+  schoolYear: string;
   onBack: () => void;
   onNext: (b: BasicInfo) => void;
 }) {
   const [b, setB] = useState<BasicInfo>(value);
+  const saved = useSavedDesigns();
+  const others = saved
+    .filter((d) => d.id !== designId && d.grade === b.grade && d.semester === b.semester && (d.schoolYear || "2027") === (schoolYear || "2027"))
+    .map((d) => ({ name: `${d.name} (${d.type === "subject" ? "과목" : "활동"})`, hours: d.hours ?? 0 }));
   const [errors, setErrors] = useState<string[]>([]);
   const kind = DESIGN_TYPES[b.type];
   const set = <K extends keyof BasicInfo>(k: K, v: BasicInfo[K]) => setB((s) => ({ ...s, [k]: v }));
 
-  const issues = checkBasicHours(b);
+  // 같은 학기에 다른 설계가 있으면 '혼자 운영한다면 …' 안내 대신 학기 합계로 알려 준다
+  const issues = [...checkSemesterBudget(b, others), ...checkBasicHours(b).filter((i) => !(others.length && i.level === "warning"))];
   const submit = () => {
     const r = basicInfoSchema.safeParse(b);
     if (!r.success) return setErrors(r.error.issues.map((i) => i.message));
-    if (issues.some((i) => i.level === "error")) return setErrors(["운영 시수 오류를 먼저 고쳐 주세요."]);
+    if (issues.some((i) => i.level === "error")) return setErrors(["시수 점검의 오류를 먼저 고쳐 주세요."]);
     setErrors([]);
     onNext(r.data);
   };
@@ -125,6 +157,12 @@ export function BasicStep({
 
       <div>
         <p className="mb-2 text-sm font-semibold">시수 점검</p>
+        {others.length > 0 && (
+          <p className="mb-2 rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+            우리 학교 {schoolYear || "2027"}학년도 {b.grade}학년 {b.semester}학기에 이미 만든 설계: {others.map((o) => `${o.name} ${o.hours}차시`).join(", ")} → 합계{" "}
+            {others.reduce((s, o) => s + o.hours, 0)}차시 / {semesterHours(b.grade)}차시
+          </p>
+        )}
         <IssueList issues={issues} />
       </div>
 

@@ -7,6 +7,7 @@ import {
   lessonLabels,
   semesterHours,
   checkUnitHours,
+  checkSemesterBudget,
 } from "./hours";
 
 const lesson = (hours: number, assessment = "") => ({
@@ -114,5 +115,32 @@ describe("단원별 차시", () => {
     const issues = checkUnitHours(32, [{ name: "가", hours: 0 }, { name: "나", hours: 29 }]);
     expect(issues.some((i) => i.field === "1단원(가)")).toBe(true);
     expect(issues.some((i) => i.field === "단원별 차시 합계" && i.message.includes("3차시 적습니다"))).toBe(true);
+  });
+});
+
+describe("같은 학기 다른 설계를 생각한 시수 (checkSemesterBudget)", () => {
+  const b = (grade: 3 | 5, hours: number) => ({ grade, semester: 1 as const, hours });
+  it("3학년 10차시 과목 + 19차시 활동 = 29 → 문제 없음", () => {
+    expect(checkSemesterBudget(b(3, 19), [{ name: "과목", hours: 10 }])).toEqual([]);
+  });
+  it("이미 32차시를 편성한 학기에는 더 못 만듦", () => {
+    const issues = checkSemesterBudget(b(5, 10), [{ name: "활동", hours: 32 }]);
+    expect(issues[0].message).toContain("더 만들 수 없습니다");
+  });
+  it("10+10 다음에 10을 만들면 2차시가 남아 오류, 12면 통과", () => {
+    const others = [{ name: "가", hours: 10 }, { name: "나", hours: 10 }];
+    expect(checkSemesterBudget(b(5, 10), others)[0].message).toContain("2차시가 남는데");
+    expect(checkSemesterBudget(b(5, 12), others)).toEqual([]);
+  });
+  it("남은 차시보다 많으면 오류", () => {
+    expect(checkSemesterBudget(b(5, 20), [{ name: "가", hours: 20 }])[0].message).toContain("12차시만 남았습니다");
+  });
+  it("처음 만드는 설계도 남는 차시가 1~9면 오류 (예: 3학년 25차시 → 4차시 남음)", () => {
+    expect(checkSemesterBudget(b(3, 25), [])[0].message).toContain("4차시가 남는데");
+    expect(checkSemesterBudget(b(3, 19), [])).toEqual([]);
+  });
+  it("학기당 최대 3개", () => {
+    const others = [{ name: "가", hours: 10 }, { name: "나", hours: 10 }, { name: "다", hours: 10 }];
+    expect(checkSemesterBudget(b(5, 2), others)[0].message).toContain("최대 3개");
   });
 });

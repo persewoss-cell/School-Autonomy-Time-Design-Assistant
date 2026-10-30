@@ -1,5 +1,5 @@
 import { getRepo, handle, json, requireUser } from "@/server/context";
-import { saveDesign } from "@/server/services";
+import { listMyDesigns, saveDesign } from "@/server/services";
 
 export const dynamic = "force-dynamic";
 
@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const GET = handle(async () => {
   const repo = await getRepo();
   const user = await requireUser(repo);
-  return json({ designs: await repo.designs.listByOwner(user.id) });
+  return json({ designs: await listMyDesigns(repo, user) });
 });
 
 /** 새 설계 저장 */

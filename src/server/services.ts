@@ -149,6 +149,7 @@ function recordFields(doc: DesignDoc, fallbackSchool: string) {
     type: doc.basic.type,
     grade: doc.basic.grade,
     semester: doc.basic.semester,
+    hours: doc.basic.hours,
     schoolName: doc.application.schoolName.trim() || fallbackSchool,
     schoolYear: doc.application.startYear.trim() || "2027",
     errorCount: issues.filter((i) => i.level === "error").length,
@@ -190,6 +191,18 @@ export async function saveDesign(repo: Repo, user: User, rawDoc: unknown, id?: s
       : null;
   const { doc: _doc, ...summary } = record;
   return { record: summary, duplicate };
+}
+
+/** 내 설계 목록 (예전 저장본은 운영 시수를 문서에서 채움) */
+export async function listMyDesigns(repo: Repo, user: User): Promise<DesignSummary[]> {
+  const list = await repo.designs.listByOwner(user.id);
+  return Promise.all(
+    list.map(async (d) => {
+      if (typeof d.hours === "number") return d;
+      const full = await repo.designs.get(d.id);
+      return { ...d, hours: full?.doc.basic.hours ?? 0 };
+    }),
+  );
 }
 
 /** 설계 열기: 본인 것 또는 관리자 */

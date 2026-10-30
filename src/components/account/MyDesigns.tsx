@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import type { DesignDoc } from "@/domain/types";
 import { api } from "@/lib/api";
 import { stepsFor } from "../wizard/Wizard";
+import { semesterHours } from "@/validation/hours";
+import type { Grade } from "@/domain/types";
 import { Card } from "../ui";
 import { useMe } from "../useMe";
 
@@ -15,6 +17,8 @@ export interface DesignRow {
   type: "subject" | "activity";
   grade: number;
   semester: number;
+  hours?: number;
+  schoolYear?: string;
   schoolName: string;
   errorCount: number;
   warningCount: number;
@@ -93,52 +97,107 @@ export function MyDesigns() {
       ) : rows.length === 0 ? (
         <Card><p className="text-gray-600">아직 저장한 설계가 없어요. 새 설계를 시작해 보세요.</p></Card>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {rows.map((r) => (
-            <div
-              key={r.id}
-              role="link"
-              tabIndex={0}
-              onClick={() => router.push(`/designs/${r.id}`)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") router.push(`/designs/${r.id}`);
-              }}
-              className="cursor-pointer space-y-3 rounded-2xl border-2 border-transparent bg-white p-6 shadow-sm transition hover:border-brand-500 hover:shadow-md focus:border-brand-500 focus:outline-none"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-sm text-gray-500">{r.type === "subject" ? "과목" : "활동"} · {r.grade}학년 {r.semester}학기</p>
-                  <p className="text-xl font-bold">{r.name || "(이름 없음)"}</p>
+        <div className="space-y-6">
+          {groupBySemester(rows).map((g) => (
+            <section key={g.key} className="space-y-3">
+              <SemesterHeader group={g} />
+              <div className="grid gap-3 sm:grid-cols-2">
+              {g.rows.map((r) => (
+                <div
+                  key={r.id}
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => router.push(`/designs/${r.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") router.push(`/designs/${r.id}`);
+                  }}
+                  className="cursor-pointer space-y-3 rounded-2xl border-2 border-transparent bg-white p-6 shadow-sm transition hover:border-brand-500 hover:shadow-md focus:border-brand-500 focus:outline-none"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm text-gray-500">
+                        {r.type === "subject" ? "과목" : "활동"} · {r.grade}학년 {r.semester}학기{typeof r.hours === "number" ? ` · ${r.hours}차시` : ""}
+                      </p>
+                      <p className="text-xl font-bold">{r.name || "(이름 없음)"}</p>
+                    </div>
+                    <StatusBadge errors={r.errorCount} warnings={r.warningCount} type={r.type} progress={r.progress} />
+                  </div>
+                  <p className="text-sm text-gray-400">마지막 저장 {fmtDate(r.updatedAt)}</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void duplicate(r.id);
+                      }}
+                      className="rounded-lg border border-brand-100 bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-100"
+                    >
+                      복제
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void remove(r);
+                      }}
+                      className="rounded-lg border border-red-100 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-100"
+                    >
+                      삭제
+                    </button>
+                  </div>
                 </div>
-                <StatusBadge errors={r.errorCount} warnings={r.warningCount} type={r.type} progress={r.progress} />
+              ))}
               </div>
-              <p className="text-sm text-gray-400">마지막 저장 {fmtDate(r.updatedAt)}</p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void duplicate(r.id);
-                  }}
-                  className="rounded-lg border border-brand-100 bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-100"
-                >
-                  복제
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void remove(r);
-                  }}
-                  className="rounded-lg border border-red-100 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-100"
-                >
-                  삭제
-                </button>
-              </div>
-            </div>
+            </section>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+interface SemesterGroup {
+  key: string;
+  schoolYear: string;
+  grade: number;
+  semester: number;
+  rows: DesignRow[];
+}
+
+/** 학년도 → 학년 → 학기 순으로 묶기 */
+function groupBySemester(rows: DesignRow[]): SemesterGroup[] {
+  const map = new Map<string, SemesterGroup>();
+  for (const r of rows) {
+    const schoolYear = r.schoolYear || "2027";
+    const key = `${schoolYear}-${r.grade}-${r.semester}`;
+    if (!map.has(key)) map.set(key, { key, schoolYear, grade: r.grade, semester: r.semester, rows: [] });
+    map.get(key)!.rows.push(r);
+  }
+  return [...map.values()].sort((a, b) => b.schoolYear.localeCompare(a.schoolYear) || a.grade - b.grade || a.semester - b.semester);
+}
+
+/** 학기별 차시 합계: 10 + 19 = 29 / 29차시 */
+function SemesterHeader({ group }: { group: SemesterGroup }) {
+  const max = semesterHours(group.grade as Grade);
+  const sum = group.rows.reduce((s, r) => s + (r.hours ?? 0), 0);
+  const left = max - sum;
+  const status =
+    left === 0
+      ? { cls: "bg-green-100 text-green-800", text: "✓ 한 학기 차시를 모두 편성했어요" }
+      : left < 0
+        ? { cls: "bg-red-100 text-red-700", text: `${-left}차시 넘쳐요 — 설계의 차시를 줄여 주세요` }
+        : left < 10
+          ? { cls: "bg-red-100 text-red-700", text: `${left}차시 남는데 10차시 미만이라 더 만들 수 없어요 — 기존 설계의 차시를 조정해 주세요` }
+          : { cls: "bg-blue-100 text-blue-800", text: `${left}차시 남았어요 (10차시 이상이면 하나 더 만들 수 있어요)` };
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 pb-2">
+      <h2 className="text-lg font-bold">
+        {group.schoolYear}학년도 {group.grade}학년 {group.semester}학기
+      </h2>
+      <span className="text-sm text-gray-600">
+        {group.rows.map((r) => r.hours ?? 0).join(" + ")} = <b>{sum}</b> / {max}차시
+      </span>
+      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${status.cls}`}>{status.text}</span>
     </div>
   );
 }

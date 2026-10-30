@@ -34,6 +34,7 @@ export function AssessmentStep({ doc, setDoc, onBack, onNext, onParseFail }: Ste
         hasContent={doc.assessments.length > 0}
         onParseFail={(e) => onParseFail?.("assessment", e)}
         onApply={(rows) => setDoc((d) => void (d.assessments = rows))}
+        onReset={() => setDoc((d) => void (d.assessments = []))}
       />
       {doc.assessments.map((r, i) => (
         <Card key={i} className="space-y-3">

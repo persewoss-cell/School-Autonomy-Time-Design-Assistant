@@ -37,6 +37,8 @@ export interface DesignRecord {
   type: "subject" | "activity";
   grade: number;
   semester: number;
+  /** 운영 시수 (학년·학기별 합계 계산용. 예전 저장본에는 없을 수 있음) */
+  hours?: number;
   schoolName: string;
   schoolYear: string;
   errorCount: number;

@@ -45,7 +45,8 @@ export function checkBasicHours(basic: Pick<BasicInfo, "grade" | "hours" | "type
       message: `${basic.grade}학년의 한 학기 학교자율시간은 ${max}시간입니다. ${basic.hours}시간은 넘칩니다.`,
       fix: `운영 시수를 ${max}시간 이하로 줄여 주세요.`,
     });
-  } else if (basic.hours < max) {
+  } else if (max - basic.hours >= hours.minHoursPerCourse) {
+    // 남는 차시가 1~9이면 checkSemesterBudget이 오류로 알림
     issues.push({
       level: "warning",
       field: "운영 시수",
@@ -104,6 +105,63 @@ export function checkUnitHours(total: number, units: { name: string; hours: numb
       field: "단원별 차시 합계",
       message: `단원별 차시 합계가 ${sum}차시로, 운영 시수 ${total}차시보다 ${Math.abs(diff)}차시 ${diff > 0 ? "많습니다" : "적습니다"}.`,
       fix: diff > 0 ? `단원 차시를 모두 합쳐 ${diff}차시 줄여 주세요.` : `단원 차시를 모두 합쳐 ${-diff}차시 늘려 주세요.`,
+    });
+  }
+  return issues;
+}
+
+/**
+ * 같은 학교·학년도·학년·학기에 이미 만든 설계를 생각한 이 설계의 운영 시수 검사.
+ * 한 학기 학교자율시간(29/32차시)을 넘으면 안 되고, 하나는 최소 10차시이므로
+ * 이 설계 뒤에 남는 차시가 1~9차시이면 그 차시로는 더 만들 수 없어 오류로 막는다. (사용자 결정, 2026-10-31)
+ */
+export function checkSemesterBudget(
+  basic: Pick<BasicInfo, "grade" | "semester" | "hours">,
+  others: { name: string; hours: number }[],
+): Issue[] {
+  const issues: Issue[] = [];
+  const max = semesterHours(basic.grade);
+  const min = hours.minHoursPerCourse;
+  const where = `${basic.grade}학년 ${basic.semester}학기`;
+  const used = others.reduce((s, o) => s + o.hours, 0);
+  const remaining = max - used;
+  const list = others.map((o) => `「${o.name || "이름 없음"}」 ${o.hours}차시`).join(", ") || "없음";
+  const field = "같은 학기 다른 설계";
+  if (others.length >= hours.maxCoursesPerSemester) {
+    issues.push({
+      level: "error",
+      field,
+      message: `${where}에 이미 ${others.length}개(${list})를 만들었습니다. 한 학기에는 최대 ${hours.maxCoursesPerSemester}개까지 개설할 수 있습니다.`,
+      fix: "다른 학년·학기를 고르거나, 기존 설계를 삭제해 주세요.",
+    });
+    return issues;
+  }
+  if (remaining < min) {
+    issues.push({
+      level: "error",
+      field,
+      message: `${where}에는 이미 ${used}차시(${list})를 편성해 ${max}차시 중 ${Math.max(0, remaining)}차시가 남았습니다. 하나는 최소 ${min}차시이므로 더 만들 수 없습니다.`,
+      fix: "다른 학년·학기를 고르거나, 기존 설계의 차시를 줄이거나 삭제해 주세요.",
+    });
+    return issues;
+  }
+  if (basic.hours > remaining) {
+    issues.push({
+      level: "error",
+      field,
+      message: `${where}에는 이미 ${used}차시(${list})를 편성해 ${remaining}차시만 남았습니다. ${basic.hours}차시는 넘칩니다.`,
+      fix: `운영 시수를 ${remaining}차시 이하로 줄여 주세요.`,
+    });
+    return issues;
+  }
+  const left = remaining - basic.hours;
+  if (left > 0 && left < min) {
+    const smaller = remaining - min >= min ? ` 또는 ${remaining - min}차시 이하(${min}차시 이상 남김)` : "";
+    issues.push({
+      level: "error",
+      field,
+      message: `이렇게 만들면 ${where}에 ${left}차시가 남는데, ${min}차시 미만이라 그 차시로는 과목/활동을 더 만들 수 없습니다. (이미 편성: ${list})`,
+      fix: `운영 시수를 ${remaining}차시(남는 차시 없이)${smaller}로 정해 주세요.`,
     });
   }
   return issues;

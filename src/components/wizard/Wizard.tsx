@@ -283,6 +283,8 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
       {stepKey === "basic" && (
         <BasicStep
           value={doc.basic}
+          designId={designId}
+          schoolYear={doc.application.startYear}
           onBack={props.onBack}
           onNext={(basic) => {
             setDoc((d) => void (d.basic = basic));

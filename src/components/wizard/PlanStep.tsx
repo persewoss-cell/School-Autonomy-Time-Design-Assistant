@@ -46,7 +46,7 @@ export function PlanStep(props: StepProps) {
           <AiAssist
             doc={doc}
             step={planPrompt}
-            hasContent={false}
+            hasContent={doc.plan.candidates.length > 0}
             title="AI에게 단원 지도계획 3안 받기"
             defaultOpen
             onParseFail={(e) => onParseFail?.("plan", e)}
@@ -55,6 +55,7 @@ export function PlanStep(props: StepProps) {
                 d.plan = { candidates: plans, demo: false, notes, selected: null };
               })
             }
+            onReset={() => setDoc((d) => void (d.plan = { candidates: [], demo: false, notes: [], selected: null }))}
           />
         )}
         {doc.plan.candidates.length > 0 && <Candidates {...props} />}
@@ -285,13 +286,25 @@ function EditPlan({ doc, setDoc, onBack, onNext, tips }: StepProps & { tips: str
           <p className={`text-lg font-bold ${total === doc.basic.hours ? "text-green-700" : "text-red-600"}`}>
             차시 합계 {total} / {doc.basic.hours}시간
           </p>
-          <button
-            type="button"
-            className="text-sm text-gray-500 underline"
-            onClick={() => confirm("고친 내용을 버리고 3안 고르기로 돌아갈까요?") && setDoc((d) => void (d.plan.selected = null))}
-          >
-            다른 안 고르기 / AI에게 다시 받기
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="text-sm text-gray-500 underline"
+              onClick={() => confirm("고친 내용을 버리고 3안 고르기로 돌아갈까요?") && setDoc((d) => void (d.plan.selected = null))}
+            >
+              다른 안 고르기 / AI에게 다시 받기
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-red-100 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-100"
+              onClick={() =>
+                confirm("이 단계에서 AI 답으로 만든 내용(3안과 고른 안)을 모두 지울까요?\n지운 내용은 되돌릴 수 없어요.") &&
+                setDoc((d) => void (d.plan = { candidates: [], demo: false, notes: [], selected: null }))
+              }
+            >
+              AI 답변 초기화
+            </button>
+          </div>
         </div>
         <p className="text-xs text-gray-500">차시 번호(예: 2~3/{doc.basic.hours})는 차시 수에 맞춰 자동으로 붙어요.</p>
       </StepHeader>
