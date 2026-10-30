@@ -1,11 +1,16 @@
 import hours from "@data/rules/curriculum-hours.json";
 import type { BasicInfo, Grade, Plan, Unit } from "@/domain/types";
 import type { Issue } from "./types";
-import { bandOfGrade, semesterAutonomyHours } from "./allocation";
+import { bandOfGrade, maxCoursesPerSemester, semesterAutonomyHours } from "./allocation";
 
 /** 학년별 한 학기 학교자율시간 운영 시수 (3·4학년 29, 5·6학년 32) — 시수 점검 엑셀 계산식 기준 */
 export function semesterHours(grade: Grade): number {
   return semesterAutonomyHours(bandOfGrade(grade));
+}
+
+/** 학년별 학기당 최대 개설 수 (3·4학년 2개, 5·6학년 3개) */
+export function maxCourses(grade: Grade): number {
+  return maxCoursesPerSemester(bandOfGrade(grade));
 }
 
 export function totalLessonHours(units: Unit[]): number {
@@ -51,7 +56,7 @@ export function checkBasicHours(basic: Pick<BasicInfo, "grade" | "hours" | "type
       level: "warning",
       field: "운영 시수",
       message: `${basic.grade}학년 한 학기 학교자율시간은 모두 ${max}시간입니다. 이 ${kind}은 ${basic.hours}시간이므로 같은 학기에 다른 과목/활동으로 ${max - basic.hours}시간을 더 편성해야 합니다.`,
-      fix: `이 ${kind}만 운영한다면 ${max}시간으로 맞추고, 여러 개를 운영한다면 합계가 ${max}시간인지 확인하세요. (학기당 최대 ${hours.maxCoursesPerSemester}개)`,
+      fix: `이 ${kind}만 운영한다면 ${max}시간으로 맞추고, 여러 개를 운영한다면 합계가 ${max}시간인지 확인하세요. (${basic.grade}학년은 학기당 최대 ${maxCourses(basic.grade)}개)`,
     });
   }
   return issues;
@@ -127,11 +132,11 @@ export function checkSemesterBudget(
   const remaining = max - used;
   const list = others.map((o) => `「${o.name || "이름 없음"}」 ${o.hours}차시`).join(", ") || "없음";
   const field = "같은 학기 다른 설계";
-  if (others.length >= hours.maxCoursesPerSemester) {
+  if (others.length >= maxCourses(basic.grade)) {
     issues.push({
       level: "error",
       field,
-      message: `${where}에 이미 ${others.length}개(${list})를 만들었습니다. 한 학기에는 최대 ${hours.maxCoursesPerSemester}개까지 개설할 수 있습니다.`,
+      message: `${where}에 이미 ${others.length}개(${list})를 만들었습니다. ${basic.grade}학년은 한 학기에 최대 ${maxCourses(basic.grade)}개까지 개설할 수 있습니다.`,
       fix: "다른 학년·학기를 고르거나, 기존 설계를 삭제해 주세요.",
     });
     return issues;
@@ -174,11 +179,11 @@ export function checkSemesterTotal(
 ): Issue[] {
   const issues: Issue[] = [];
   const max = semesterHours(grade);
-  if (courses.length > hours.maxCoursesPerSemester) {
+  if (courses.length > maxCourses(grade)) {
     issues.push({
       level: "error",
       field: "학기 개설 수",
-      message: `한 학기에 ${courses.length}개를 개설했습니다. 학기당 최대 ${hours.maxCoursesPerSemester}개까지 가능합니다.`,
+      message: `한 학기에 ${courses.length}개를 개설했습니다. ${grade}학년은 학기당 최대 ${maxCourses(grade)}개까지 가능합니다.`,
       fix: "과목/활동 수를 줄이거나 다른 학기로 옮겨 주세요.",
     });
   }

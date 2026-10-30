@@ -8,6 +8,7 @@ import {
   semesterHours,
   checkUnitHours,
   checkSemesterBudget,
+  maxCourses,
 } from "./hours";
 
 const lesson = (hours: number, assessment = "") => ({
@@ -139,8 +140,12 @@ describe("같은 학기 다른 설계를 생각한 시수 (checkSemesterBudget)"
     expect(checkSemesterBudget(b(3, 25), [])[0].message).toContain("4차시가 남는데");
     expect(checkSemesterBudget(b(3, 19), [])).toEqual([]);
   });
-  it("학기당 최대 3개", () => {
+  it("학기당 최대 개수: 5·6학년 3개, 3·4학년 2개 (29시간에 1개당 10시간 이상)", () => {
     const others = [{ name: "가", hours: 10 }, { name: "나", hours: 10 }, { name: "다", hours: 10 }];
     expect(checkSemesterBudget(b(5, 2), others)[0].message).toContain("최대 3개");
+    expect(maxCourses(3)).toBe(2);
+    expect(maxCourses(6)).toBe(3);
+    expect(checkSemesterBudget(b(3, 9), others.slice(0, 2))[0].message).toContain("최대 2개");
+    expect(checkBasicHours({ grade: 3, hours: 15, type: "subject" })[0].fix).toContain("3학년은 학기당 최대 2개");
   });
 });

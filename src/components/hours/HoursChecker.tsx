@@ -29,6 +29,7 @@ import {
   bandInfo,
   autoReduce,
   checkAllocation,
+  maxCoursesPerSemester,
   type AllocationInput,
   type SemesterIndex,
 } from "@/validation/allocation";
@@ -305,7 +306,7 @@ export function HoursChecker() {
         <h2 className="font-bold">① 학교자율시간 과목·활동</h2>
         <p className="text-sm text-gray-600">
           운영하는 학기는 합계가 <b>{r.semesterTarget}시간</b>(1주 분량)이어야 하고, 학년마다 한 학기 이상 운영합니다.
-          한 과목·활동은 10시간 이상, 학기당 3개 이내.
+          한 과목·활동은 10시간 이상, 학기당 {maxCoursesPerSemester(a.band)}개 이내.
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[620px] text-sm">

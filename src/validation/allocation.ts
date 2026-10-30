@@ -128,6 +128,14 @@ export function semesterAutonomyHours(band: BandKey): number {
   return Math.floor(oneWeekHours(total));
 }
 
+/**
+ * 학기당 최대 개설 수: 지침의 '최대 3개'와 '1개당 10시간 이상'을 함께 적용.
+ * 3~4학년은 한 학기 29시간이라 10시간짜리 3개(30시간)가 안 되므로 최대 2개, 5~6학년(32시간)은 3개.
+ */
+export function maxCoursesPerSemester(band: BandKey): number {
+  return Math.min(data.maxCoursesPerSemester, Math.floor(semesterAutonomyHours(band) / data.minHoursPerCourse));
+}
+
 /** 엑셀 기본값으로 채운 입력 (교과 시수는 기준시수를 4학기에 고르게 나눔) */
 export function defaultAllocation(band: BandKey): AllocationInput {
   const b = data.bands[band];
@@ -240,8 +248,9 @@ export function checkAllocation(input: AllocationInput): AllocationResult {
     });
   }
 
-  // 학기별 학교자율시간 (지침: 학기 단위 운영, 학년별 한 학기 이상, 학기당 3개 이내, 1개당 10시간 이상)
+  // 학기별 학교자율시간 (지침: 학기 단위 운영, 학년별 한 학기 이상, 학기당 3개 이내(3~4학년은 10시간 조건 때문에 2개), 1개당 10시간 이상)
   const target = semesterAutonomyHours(input.band);
+  const maxCourses = maxCoursesPerSemester(input.band);
   const bySem = [0, 1, 2, 3].map((s) =>
     input.courses.filter((c) => c.semester === s).reduce((t, c) => t + c.hours, 0),
   ) as FourSemesters;
@@ -256,11 +265,11 @@ export function checkAllocation(input: AllocationInput): AllocationResult {
         fix: h < target ? `${target - h}시간을 더 편성해 주세요.` : `${h - target}시간을 줄여 주세요.`,
       });
     }
-    if (count > data.maxCoursesPerSemester) {
+    if (count > maxCourses) {
       issues.push({
         level: "error",
         field: `${label} 학교자율시간`,
-        message: `${label}에 ${count}개를 개설했습니다. 학기당 최대 ${data.maxCoursesPerSemester}개까지 가능합니다.`,
+        message: `${label}에 ${count}개를 개설했습니다. ${b.label}은 학기당 최대 ${maxCourses}개까지 가능합니다.${maxCourses < data.maxCoursesPerSemester ? ` (한 학기 ${target}시간에 1개당 10시간 이상)` : ""}`,
         fix: "과목/활동 수를 줄여 주세요.",
       });
     }
