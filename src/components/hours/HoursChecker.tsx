@@ -209,42 +209,70 @@ export function HoursChecker() {
         })}
       </div>
 
-      <div className={`rounded-xl p-4 text-sm ${status.complete ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-900"}`}>
+      {/* 학년도 완료 상태 + 완료까지 할 일 (한 상자) */}
+      <div className={`space-y-2 rounded-xl p-4 text-sm ${status.complete && missing.length === 0 ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-900"}`}>
         <p className="font-semibold">
           {status.complete
             ? `✓ ${year}학년도 ${info.label} 시수 점검 완료 — 설계 현황에 '시수점검 완료'로 표시돼요.`
-            : `${year}학년도 ${info.label}: ${grade}학년 화면 ${checkOk(check, designs) ? "이상없음" : "점검 필요"} · ${pair}학년 화면 ${checkOk(pairCheck, designs) ? "이상없음" : pairCheck ? "점검 필요" : "아직 안 함"}`}
+            : `${year}학년도 ${info.label} 시수 점검 완료까지 할 일 (두 학년 화면 ${info.grades.join("·")}학년이 모두 이상없음이어야 해요)`}
         </p>
-        {!status.complete && <p className="mt-1">그 학년도의 두 학년 화면({info.grades.join("·")}학년)이 모두 이상없음이어야 시수 점검 완료예요.</p>}
-      </div>
-
-      {missing.map((m) => (
-        <div key={m.half} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-          <p>
-            <b>
-              {m.year}학년도 {m.grade}학년 설계가 없어요.
-            </b>{" "}
-            {m.fromYear ? `${m.fromYear}학년도 ${m.grade}학년 설계를 가져올까요? (가져온 뒤 고칠 수 있어요)` : "아래 ①에서 직접 입력해 주세요."}
-          </p>
-          <div className="flex gap-2">
-            {m.fromYear && (
-              <button
-                type="button"
-                className="rounded-lg bg-blue-600 px-3 py-1.5 font-semibold text-white hover:bg-blue-700"
-                onClick={() => {
-                  replaceCheck(importDesigns(check, m.half, m.fromYear!, designs));
-                  setSkipped((x) => [...x, `${key}-${m.half}`]);
-                }}
-              >
-                {m.fromYear}학년도 설계 가져오기
-              </button>
+        {(!status.complete || missing.length > 0) && (
+          <ul className="space-y-1.5">
+            {missing.map((m) => (
+              <li key={`m${m.half}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/70 px-3 py-2">
+                <span>
+                  <b>
+                    {m.year}학년도 {m.grade}학년 설계가 없어요.
+                  </b>{" "}
+                  {m.fromYear ? `${m.fromYear}학년도 ${m.grade}학년 설계를 가져올까요? (가져온 뒤 고칠 수 있어요)` : "아래 ①에서 직접 입력해 주세요."}
+                </span>
+                <span className="flex gap-2">
+                  {m.fromYear && (
+                    <button
+                      type="button"
+                      className="rounded-lg bg-brand-600 px-3 py-1 font-semibold text-white hover:bg-brand-700"
+                      onClick={() => {
+                        replaceCheck(importDesigns(check, m.half, m.fromYear!, designs));
+                        setSkipped((x) => [...x, `${key}-${m.half}`]);
+                      }}
+                    >
+                      {m.fromYear}학년도 설계 가져오기
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="rounded-lg border border-gray-300 bg-white px-3 py-1 font-semibold text-gray-700 hover:bg-gray-50"
+                    onClick={() => setSkipped((x) => [...x, `${key}-${m.half}`])}
+                  >
+                    직접 입력할게요
+                  </button>
+                </span>
+              </li>
+            ))}
+            {!checkOk(check, designs) && (
+              <li className="rounded-lg bg-white/70 px-3 py-2">
+                <b>{grade}학년 화면(지금 화면) 점검 필요</b> — 아래 ③ 점검 결과의 오류를 고쳐 주세요.
+              </li>
             )}
-            <button type="button" className="rounded-lg border border-blue-300 bg-white px-3 py-1.5 font-semibold text-blue-700" onClick={() => setSkipped((x) => [...x, `${key}-${m.half}`])}>
-              직접 입력할게요
-            </button>
-          </div>
-        </div>
-      ))}
+            {!checkOk(pairCheck, designs) && (
+              <li className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/70 px-3 py-2">
+                <span>
+                  <b>
+                    {pair}학년 화면 {pairCheck ? "점검 필요" : "아직 안 함"}
+                  </b>
+                </span>
+                <button
+                  type="button"
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-1 font-semibold text-gray-700 hover:bg-gray-50"
+                  onClick={() => void go(pair, year)}
+                >
+                  {pair}학년 화면으로 →
+                </button>
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
 
       {warnings.map((w) => (
         <div key={w.half} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">

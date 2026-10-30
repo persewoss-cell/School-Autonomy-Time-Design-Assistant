@@ -148,14 +148,6 @@ export function MyDesigns() {
               </select>
             </label>
           </div>
-          {shown.length > 0 && (
-            <div className="space-y-1.5 rounded-2xl bg-white p-4 shadow-sm">
-              <p className="text-sm font-semibold text-gray-500">학기별 편성 차시</p>
-              {groupBySemester(shown).map((g) => (
-                <SemesterHeader key={g.key} group={g} />
-              ))}
-            </div>
-          )}
           {shown.length === 0 ? (
             <Card><p className="text-gray-600">조건에 맞는 설계가 없어요.</p></Card>
           ) : (
@@ -172,7 +164,10 @@ export function MyDesigns() {
                   className="flex cursor-pointer flex-col gap-3 rounded-2xl border-2 border-transparent bg-white p-4 shadow-sm transition hover:border-brand-500 hover:shadow-md focus:border-brand-500 focus:outline-none"
                 >
                   <div className="space-y-1">
-                    <StatusBadge errors={r.errorCount} warnings={r.warningCount} type={r.type} progress={r.progress} />
+                    <div className="flex flex-wrap gap-1.5">
+                      <StatusBadge errors={r.errorCount} warnings={r.warningCount} type={r.type} progress={r.progress} />
+                      <SemesterBadge row={r} rows={rows} />
+                    </div>
                     <p className="text-sm text-gray-500">
                       <b className="text-gray-700">{yearOf(r)}학년도</b> · {r.type === "subject" ? "과목" : "활동"} · {r.grade}학년 {r.semester}학기
                       {typeof r.hours === "number" ? ` · ${r.hours}차시` : ""}
@@ -228,48 +223,31 @@ export function MyDesigns() {
 
 const yearOf = (r: DesignRow) => r.schoolYear || "2027";
 
-interface SemesterGroup {
-  key: string;
-  schoolYear: string;
-  grade: number;
-  semester: number;
-  rows: DesignRow[];
+/**
+ * 그 학년도·학년·학기에 만든 설계 차시 합계 (같은 학기의 다른 설계 포함).
+ * 예: 10 + 19 = 29 / 29차시 → 모두 편성 · 부족 · 초과 · 10차시 미만 남음
+ */
+export function semesterFill(row: DesignRow, rows: DesignRow[]) {
+  const same = rows.filter((x) => yearOf(x) === yearOf(row) && x.grade === row.grade && x.semester === row.semester);
+  const max = semesterHours(row.grade as Grade);
+  const sum = same.reduce((t, x) => t + (x.hours ?? 0), 0);
+  return { max, sum, left: max - sum, count: same.length };
 }
 
-/** 학년도 → 학년 → 학기 순으로 묶기 */
-function groupBySemester(rows: DesignRow[]): SemesterGroup[] {
-  const map = new Map<string, SemesterGroup>();
-  for (const r of rows) {
-    const schoolYear = yearOf(r);
-    const key = `${schoolYear}-${r.grade}-${r.semester}`;
-    if (!map.has(key)) map.set(key, { key, schoolYear, grade: r.grade, semester: r.semester, rows: [] });
-    map.get(key)!.rows.push(r);
-  }
-  return [...map.values()].sort((a, b) => b.schoolYear.localeCompare(a.schoolYear) || a.grade - b.grade || a.semester - b.semester);
-}
-
-/** 학기별 차시 합계: 10 + 19 = 29 / 29차시 */
-function SemesterHeader({ group }: { group: SemesterGroup }) {
-  const max = semesterHours(group.grade as Grade);
-  const sum = group.rows.reduce((s, r) => s + (r.hours ?? 0), 0);
-  const left = max - sum;
-  const status =
+function SemesterBadge({ row, rows }: { row: DesignRow; rows: DesignRow[] }) {
+  const { max, sum, left, count } = semesterFill(row, rows);
+  const detail = `${row.grade}학년 ${row.semester}학기 설계 ${count}개 합계 ${sum} / ${max}차시`;
+  const [cls, text] =
     left === 0
-      ? { cls: "bg-green-100 text-green-800", text: "✓ 한 학기 차시를 모두 편성했어요" }
+      ? ["bg-green-100 text-green-700", `✓ ${sum}/${max}차시 편성`]
       : left < 0
-        ? { cls: "bg-red-100 text-red-700", text: `${-left}차시 넘쳐요 — 설계의 차시를 줄여 주세요` }
+        ? ["bg-red-100 text-red-700", `${-left}차시 초과`]
         : left < 10
-          ? { cls: "bg-red-100 text-red-700", text: `${left}차시 남는데 10차시 미만이라 더 만들 수 없어요 — 기존 설계의 차시를 조정해 주세요` }
-          : { cls: "bg-blue-100 text-blue-800", text: `${left}차시 남았어요 (10차시 이상이면 하나 더 만들 수 있어요)` };
+          ? ["bg-red-100 text-red-700", `${left}차시 남음 — 기존 설계 조정 필요`]
+          : ["bg-red-100 text-red-700", `${left}차시 추가 편성 필요`];
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <h2 className="font-bold">
-        {group.schoolYear}학년도 {group.grade}학년 {group.semester}학기
-      </h2>
-      <span className="text-sm text-gray-600">
-        {group.rows.map((r) => r.hours ?? 0).join(" + ")} = <b>{sum}</b> / {max}차시
-      </span>
-      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${status.cls}`}>{status.text}</span>
-    </div>
+    <span title={detail} className={`rounded-full px-2.5 py-1 text-sm font-semibold ${cls}`}>
+      {text}
+    </span>
   );
 }
