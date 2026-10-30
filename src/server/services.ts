@@ -187,7 +187,7 @@ export async function saveDesign(repo: Repo, user: User, rawDoc: unknown, id?: s
   await repo.logs.add({ kind: "save", userId: user.id, school: user.schoolName, designId: record.id, detail: fields.name });
 
   const duplicate =
-    fields.type === "activity" && fields.name
+    fields.name
       ? await repo.designs.findSameActivity(fields.schoolName, fields.schoolYear, fields.name, record.id)
       : null;
   const { doc: _doc, ...summary } = record;

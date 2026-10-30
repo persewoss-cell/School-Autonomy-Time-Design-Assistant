@@ -94,7 +94,7 @@ export interface Repo {
     delete(id: string): Promise<void>;
     listByOwner(ownerId: string): Promise<DesignSummary[]>;
     listAll(): Promise<DesignSummary[]>;
-    /** 같은 학교·같은 학년도에 같은 이름의 활동이 있는지 */
+    /** 같은 학교·같은 학년도에 같은 이름(띄어쓰기 무시)의 과목·활동이 있는지 */
     findSameActivity(schoolName: string, schoolYear: string, name: string, excludeId?: string): Promise<DesignSummary | null>;
     saveVersion(designId: string, doc: DesignDoc): Promise<void>;
   };
@@ -154,7 +154,7 @@ export function memoryRepo(): Repo {
       listAll: async () => designs.map(summary).sort(byUpdated),
       findSameActivity: async (schoolName, schoolYear, name, excludeId) => {
         const d = designs.find(
-          (x) => x.type === "activity" && x.schoolName === schoolName && x.schoolYear === schoolYear && nameKey(x.name) === nameKey(name) && x.id !== excludeId,
+          (x) => x.schoolName === schoolName && x.schoolYear === schoolYear && nameKey(x.name) === nameKey(name) && x.id !== excludeId,
         );
         return d ? summary(d) : null;
       },

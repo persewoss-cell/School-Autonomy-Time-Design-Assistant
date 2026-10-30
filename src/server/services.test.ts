@@ -135,7 +135,7 @@ describe("설계 저장·권한", () => {
     expect((await getDesign(repo, admin, record.id)).name).toBe("지구마을 첫걸음");
     await expect(deleteDesign(repo, admin, record.id)).rejects.toThrow("내 설계만");
   });
-  it("같은 학교·같은 학년도에 같은 활동명이면 알려 줌 (과목은 해당 없음)", async () => {
+  it("같은 학교·같은 학년도에 같은 이름(과목·활동, 띄어쓰기 무시)이면 알려 줌", async () => {
     const { repo, t } = await setup();
     const act = sampleSubject();
     act.basic.type = "activity";
@@ -145,6 +145,10 @@ describe("설계 저장·권한", () => {
     expect(second.duplicate?.id).toBe(first.record.id);
     const other = { ...act, application: { ...act.application, startYear: "2028" } };
     expect((await saveDesign(repo, t, other)).duplicate).toBeNull();
+    // 과목도 교내 활동명과 겹치면 안 됨
+    const subj = sampleSubject();
+    subj.basic.name = act.basic.name.replace(/ /g, "");
+    expect((await saveDesign(repo, t, subj)).duplicate).not.toBeNull();
   });
   it("형식이 틀린 문서는 거부", async () => {
     const { repo, t } = await setup();

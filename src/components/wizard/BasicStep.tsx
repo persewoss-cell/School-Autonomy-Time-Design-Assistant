@@ -14,7 +14,7 @@ import {
 } from "@/domain/types";
 import { checkBasicHours, checkSemesterBudget, semesterHours } from "@/validation/hours";
 import { bandInfo, bandOfGrade } from "@/validation/allocation";
-import { checkActivityName, nameKey } from "@/validation/names";
+import { findSameName, sameNameMessage } from "@/validation/names";
 
 /** 에듀넷 티-클리어 '교육감 승인 과목' 목록 (교사 로그인해야 보임) */
 const APPROVED_SUBJECTS_URL = "https://www.edunet.net/sprApprSbjct/list/11";
@@ -66,18 +66,23 @@ export function BasicStep({
   const set = <K extends keyof BasicInfo>(k: K, v: BasicInfo[K]) => setB((s) => ({ ...s, [k]: v }));
 
   // 같은 학기에 다른 설계가 있으면 '혼자 운영한다면 …' 안내 대신 학기 합계로 알려 준다
-  const sameYearActivities = saved.filter((d) => d.id !== designId && d.type === "activity" && (d.schoolYear || "2027") === year);
-  const nameIssues = b.type === "activity" ? checkActivityName(b.name, sameYearActivities) : [];
+  // 교내 이름 중복: 같은 학년도의 다른 과목·활동과 같은 이름 불가 (띄어쓰기 무시). '다음'을 누른 뒤부터 칸 아래에 표시
+  const sameName = findSameName(
+    b.name,
+    saved.filter((d) => d.id !== designId && (d.schoolYear || "2027") === year),
+  );
+  const [nameTried, setNameTried] = useState(false);
   const issues = [...checkSemesterBudget(b, others), ...checkBasicHours(b).filter((i) => !(others.length && i.level === "warning"))];
   const submit = () => {
     const r = basicInfoSchema.safeParse(b);
     if (!r.success) return setErrors(r.error.issues.map((i) => i.message));
     if (!/^\d{4}$/.test(year)) return setErrors(["운영 학년도를 2027처럼 네 자리 숫자로 적어 주세요."]);
-    if (nameIssues.length) {
-      const msg = `${nameIssues[0].message}\n→ ${nameIssues[0].fix}`;
-      alert(msg);
+    if (sameName) {
+      setNameTried(true);
+      setErrors([]);
+      alert(`입력에 오류가 있어요. ${kind}명 아래 빨간 안내를 확인해 고쳐 주세요.`);
       document.getElementById("design-name")?.focus();
-      return setErrors([msg]);
+      return;
     }
     if (issues.some((i) => i.level === "error")) return setErrors(["시수 점검의 오류를 먼저 고쳐 주세요."]);
     setErrors([]);
@@ -95,7 +100,7 @@ export function BasicStep({
         <div className="flex gap-2">
           <input
             id="design-name"
-            className={`${inputClass} ${nameIssues.length ? "border-red-400" : ""}`}
+            className={`${inputClass} ${nameTried && sameName ? "border-red-400" : ""}`}
             value={b.name}
             onChange={(e) => set("name", e.target.value)}
             placeholder="예: 지구마을 첫걸음"
@@ -111,15 +116,13 @@ export function BasicStep({
             </a>
           )}
         </div>
-        {nameIssues.length > 0 ? (
-          <p className="text-xs font-semibold text-red-600">
-            ⚠ 같은 학년도에 이미 「{sameYearActivities.find((d) => nameKey(d.name) === nameKey(b.name))?.name}」 활동이 있어요. 학년이 달라도 같은 이름은 쓸 수 없어요 (띄어쓰기 무시). 예: 자전거 하이킹3, 자전거 하이킹4
-          </p>
+        {nameTried && sameName ? (
+          <p className="text-xs font-semibold text-red-600">⚠ {sameNameMessage(sameName)}</p>
         ) : (
           <p className="text-xs text-gray-500">
             {b.type === "activity"
-              ? "같은 학교·같은 학년도에는 학년이 달라도 같은 활동명을 쓸 수 없어요 (띄어쓰기는 무시하고 비교). 예: 자전거 하이킹3, 자전거 하이킹4"
-              : "전국 초·중·고 과목명과 겹치면 안 돼요. 버튼 → 에듀넷 티-클리어(교사 로그인 필요)에서 과목명을 검색해 겹치는지 확인하세요."}
+              ? "교내 같은 학년도의 다른 과목·활동과 같은 이름은 쓸 수 없어요 (학년이 달라도, 띄어쓰기 무시). 예: 자전거 하이킹3, 자전거 하이킹4"
+              : "교내 같은 학년도의 다른 과목·활동과 겹치면 안 되고, 전국 과목명과도 겹치면 안 돼요. 버튼 → 에듀넷 티-클리어(교사 로그인 필요)에서 검색해 확인하세요."}
           </p>
         )}
       </div>

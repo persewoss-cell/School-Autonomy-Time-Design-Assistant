@@ -95,8 +95,8 @@ export function mongoRepo(db: Db): Repo {
         (await designs.find({ ownerId }, { projection: summaryProjection }).sort({ updatedAt: -1 }).toArray()).map(toSummary),
       listAll: async () => (await designs.find({}, { projection: summaryProjection }).sort({ updatedAt: -1 }).limit(1000).toArray()).map(toSummary),
       findSameActivity: async (schoolName, schoolYear, name, excludeId) => {
-        // 띄어쓰기는 무시하고 비교 (같은 학교·학년도 활동만 불러와 코드로 비교)
-        const filter: Document = { type: "activity", schoolName, schoolYear };
+        // 띄어쓰기는 무시하고 비교 (같은 학교·학년도 설계만 불러와 코드로 비교)
+        const filter: Document = { schoolName, schoolYear };
         const ex = excludeId ? oid(excludeId) : null;
         if (ex) filter._id = { $ne: ex };
         const list = await designs.find(filter, { projection: summaryProjection }).toArray();

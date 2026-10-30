@@ -15,8 +15,8 @@ interface SaveResponse {
 function warnDuplicate(r: SaveResponse) {
   if (r.duplicate) {
     alert(
-      `저장했습니다. 다만 ${r.duplicate.schoolName}에 ${r.duplicate.schoolYear}학년도 같은 활동명 「${r.duplicate.name}」이(가) 이미 있습니다.\n` +
-        "같은 학교의 같은 학년도에는 같은 활동명을 쓸 수 없어요. (예: 이름 뒤에 학년 숫자를 붙여 구분)",
+      `저장했습니다. 다만 ${r.duplicate.schoolName}에 ${r.duplicate.schoolYear}학년도 같은 이름 「${r.duplicate.name}」이(가) 이미 있습니다.\n` +
+        "같은 학교의 같은 학년도에는 과목·활동 이름이 겹칠 수 없어요. (예: 이름 뒤에 학년 숫자를 붙여 구분)",
     );
   }
 }
