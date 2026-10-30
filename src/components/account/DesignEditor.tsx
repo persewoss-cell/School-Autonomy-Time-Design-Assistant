@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import type { DesignDoc } from "@/domain/types";
 import { api, sendLog } from "@/lib/api";
-import { DRAFT_KEY, Wizard } from "../wizard/Wizard";
+import { Wizard } from "../wizard/Wizard";
 import { Card } from "../ui";
 import { useMe } from "../useMe";
 
@@ -22,47 +21,60 @@ function warnDuplicate(r: SaveResponse) {
   }
 }
 
-/** 새 설계: 로그인했으면 저장 버튼이 생기고, 저장하면 /designs/[id]로 이동 */
+/** 새 설계: 로그인했으면 단계를 넘길 때 자동으로 서버에 저장되고, 첫 저장 뒤 주소가 /designs/[id]로 바뀜 */
 export function NewDesign() {
   const me = useMe();
-  const router = useRouter();
   const loggedIn = !!me?.user;
+  const [designId, setDesignId] = useState<string>();
+  const idRef = useRef<string | undefined>(undefined);
+  const creating = useRef<Promise<SaveResponse> | null>(null);
+  const warned = useRef(false);
+
+  const save = async (doc: DesignDoc, { auto }: { auto: boolean }) => {
+    if (!doc.basic.name.trim() && auto) return; // 이름을 정하기 전(유형 선택 단계)에는 서버에 만들지 않음
+    let r: SaveResponse;
+    if (!idRef.current && !creating.current) {
+      // 처음 저장: 서버에 새로 만들기 (동시에 여러 번 불려도 한 번만 만듦)
+      creating.current = api<SaveResponse>("/api/designs", { method: "POST", body: { doc } });
+      r = await creating.current;
+      idRef.current = r.record.id;
+      setDesignId(r.record.id);
+      window.history.replaceState(null, "", `/designs/${r.record.id}`);
+    } else {
+      if (!idRef.current) await creating.current;
+      r = await api<SaveResponse>(`/api/designs/${idRef.current}`, { method: "PUT", body: { doc } });
+    }
+    if (r.duplicate && (!auto || !warned.current)) {
+      warned.current = true;
+      warnDuplicate(r);
+    }
+  };
+
   return (
     <div className="space-y-3">
       {me?.enabled && !me.user && (
         <p className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
-          로그인하면 설계를 저장하고 나중에 이어서 쓸 수 있어요. 로그인하지 않아도 이 브라우저에 임시로 보관되고, 문서는 내려받을 수 있어요.
+          로그인하면 설계가 서버에 자동 저장되어 다른 컴퓨터에서도 이어서 쓸 수 있어요. 로그인하지 않아도 이 브라우저에 임시로 보관되고, 문서는 내려받을 수 있어요.
         </p>
       )}
       <Wizard
+        designId={designId}
         defaultSchoolName={me?.user?.schoolName}
-        onSave={
-          loggedIn
-            ? async (doc: DesignDoc) => {
-                const r = await api<SaveResponse>("/api/designs", { method: "POST", body: { doc } });
-                warnDuplicate(r);
-                try {
-                  localStorage.removeItem(DRAFT_KEY);
-                } catch {
-                  /* 무시 */
-                }
-                router.replace(`/designs/${r.record.id}`);
-              }
-            : undefined
-        }
-        onParseFail={(step, error) => sendLog("parse_fail", `${step}: ${error}`)}
-        onDownloaded={() => sendLog("download")}
+        onSave={loggedIn ? save : undefined}
+        onParseFail={(step, error) => sendLog("parse_fail", `${step}: ${error}`, designId)}
+        onDownloaded={() => sendLog("download", undefined, designId)}
       />
     </div>
   );
 }
 
-/** 저장된 설계 열기 */
+/** 저장된 설계 열기: 마지막으로 작성하던 단계부터 */
 export function EditDesign({ id }: { id: string }) {
-  const [state, setState] = useState<{ doc?: DesignDoc; mine?: boolean; error?: string }>({});
+  const [state, setState] = useState<{ doc?: DesignDoc; mine?: boolean; updatedAt?: string; error?: string }>({});
+  const warned = useRef(false);
   useEffect(() => {
-    api<{ design: { doc: DesignDoc }; mine: boolean }>(`/api/designs/${id}`)
-      .then((r) => setState({ doc: r.design.doc, mine: r.mine }))
+    api<{ design: { doc: DesignDoc; updatedAt: string }; mine: boolean }>(`/api/designs/${id}`)
+      .then((r) => setState({ doc: r.design.doc, mine: r.mine, updatedAt: r.design.updatedAt }))
       .catch((e) => setState({ error: e.message }));
   }, [id]);
 
@@ -71,10 +83,15 @@ export function EditDesign({ id }: { id: string }) {
   return (
     <Wizard
       initial={state.doc}
+      designId={id}
       onSave={
         state.mine
-          ? async (doc) => {
-              warnDuplicate(await api<SaveResponse>(`/api/designs/${id}`, { method: "PUT", body: { doc } }));
+          ? async (doc, { auto }) => {
+              const r = await api<SaveResponse>(`/api/designs/${id}`, { method: "PUT", body: { doc } });
+              if (r.duplicate && (!auto || !warned.current)) {
+                warned.current = true;
+                warnDuplicate(r);
+              }
             }
           : undefined
       }

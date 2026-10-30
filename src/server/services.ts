@@ -153,6 +153,7 @@ function recordFields(doc: DesignDoc, fallbackSchool: string) {
     schoolYear: doc.application.startYear.trim() || "2027",
     errorCount: issues.filter((i) => i.level === "error").length,
     warningCount: issues.filter((i) => i.level === "warning").length,
+    progress: doc.progress ?? null,
   };
 }
 

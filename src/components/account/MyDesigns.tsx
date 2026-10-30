@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { DesignDoc } from "@/domain/types";
 import { api } from "@/lib/api";
+import { stepsFor } from "../wizard/Wizard";
 import { Card } from "../ui";
 import { useMe } from "../useMe";
 
@@ -16,22 +18,36 @@ export interface DesignRow {
   schoolName: string;
   errorCount: number;
   warningCount: number;
+  progress?: { stepKey: string; maxIndex: number } | null;
   updatedAt: string;
   owner?: string;
 }
 
 export const fmtDate = (s: string | null | undefined) => (s ? new Date(s).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" }) : "-");
 
-export function StatusBadge({ errors, warnings }: { errors: number; warnings: number }) {
+/** 상태 표시: 완성 / 작성 중(지금 단계) / 최종 점검에서 오류 수 */
+export function StatusBadge({ errors, warnings, type, progress }: { errors: number; warnings: number; type?: DesignRow["type"]; progress?: DesignRow["progress"] }) {
+  if (errors > 0 && type && progress && progress.stepKey !== "final") {
+    const steps = stepsFor({ basic: { type } });
+    const i = steps.findIndex((s) => s.key === progress.stepKey);
+    if (i >= 0) {
+      return (
+        <span className="shrink-0 rounded-full bg-blue-100 px-2.5 py-1 text-sm font-semibold text-blue-700">
+          작성 중 · {i + 1}/{steps.length} {steps[i].label}
+        </span>
+      );
+    }
+  }
   return errors === 0 ? (
-    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">완성{warnings ? ` · 확인 ${warnings}` : ""}</span>
+    <span className="shrink-0 rounded-full bg-green-100 px-2.5 py-1 text-sm font-semibold text-green-700">완성{warnings ? ` · 확인 ${warnings}` : ""}</span>
   ) : (
-    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">작성 중 · 오류 {errors}</span>
+    <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-sm font-semibold text-amber-700">점검 필요 · 오류 {errors}</span>
   );
 }
 
 export function MyDesigns() {
   const me = useMe();
+  const router = useRouter();
   const [rows, setRows] = useState<DesignRow[] | null>(null);
   const [error, setError] = useState("");
   const load = useCallback(() => {
@@ -79,21 +95,47 @@ export function MyDesigns() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {rows.map((r) => (
-            <Card key={r.id} className="space-y-2">
+            <div
+              key={r.id}
+              role="link"
+              tabIndex={0}
+              onClick={() => router.push(`/designs/${r.id}`)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") router.push(`/designs/${r.id}`);
+              }}
+              className="cursor-pointer space-y-3 rounded-2xl border-2 border-transparent bg-white p-6 shadow-sm transition hover:border-brand-500 hover:shadow-md focus:border-brand-500 focus:outline-none"
+            >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-xs text-gray-500">{r.type === "subject" ? "과목" : "활동"} · {r.grade}학년 {r.semester}학기</p>
-                  <p className="text-lg font-bold">{r.name || "(이름 없음)"}</p>
+                  <p className="text-sm text-gray-500">{r.type === "subject" ? "과목" : "활동"} · {r.grade}학년 {r.semester}학기</p>
+                  <p className="text-xl font-bold">{r.name || "(이름 없음)"}</p>
                 </div>
-                <StatusBadge errors={r.errorCount} warnings={r.warningCount} />
+                <StatusBadge errors={r.errorCount} warnings={r.warningCount} type={r.type} progress={r.progress} />
               </div>
-              <p className="text-xs text-gray-400">마지막 저장 {fmtDate(r.updatedAt)}</p>
-              <div className="flex gap-3 text-sm">
-                <Link href={`/designs/${r.id}`} className="font-semibold text-brand-600">열기</Link>
-                <button type="button" onClick={() => duplicate(r.id)} className="text-gray-500 hover:text-brand-600">복제</button>
-                <button type="button" onClick={() => remove(r)} className="text-gray-400 hover:text-red-600">삭제</button>
+              <p className="text-sm text-gray-400">마지막 저장 {fmtDate(r.updatedAt)}</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void duplicate(r.id);
+                  }}
+                  className="rounded-lg border border-brand-100 bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-100"
+                >
+                  복제
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void remove(r);
+                  }}
+                  className="rounded-lg border border-red-100 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-100"
+                >
+                  삭제
+                </button>
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       )}

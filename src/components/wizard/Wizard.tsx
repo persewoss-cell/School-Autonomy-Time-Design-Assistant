@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { emptyDesign, type DesignDoc } from "@/domain/types";
 import { sampleSubject } from "@/domain/sample";
 import type { StepKey } from "@/validation/types";
+import { validateDesign } from "@/validation/design";
 import { TypeStep } from "./TypeStep";
 import { BasicStep } from "./BasicStep";
 import { TopicStep } from "./TopicStep";
@@ -16,7 +17,7 @@ import { ApplicationStep, FinalStep } from "./FinalSteps";
  * 설계 단계. 문서 작성 부분은 2027 연수 PPT의 순서를 따른다:
  * [전단계] 활동 내용 선정 → 내용 체계 → 핵심아이디어 → 성취기준 → 필요성(성격) 및 목표 → 단원 지도계획 → 평가 계획
  */
-function stepsFor(doc: DesignDoc): { key: StepKey; label: string }[] {
+export function stepsFor(doc: { basic: Pick<DesignDoc["basic"], "type"> }): { key: StepKey; label: string }[] {
   const subject = doc.basic.type === "subject";
   return [
     { key: "type", label: "유형" },
@@ -35,92 +36,178 @@ function stepsFor(doc: DesignDoc): { key: StepKey; label: string }[] {
 }
 
 export const DRAFT_KEY = "sat-design-v3";
+const draftKeyFor = (designId?: string) => (designId ? `${DRAFT_KEY}:${designId}` : DRAFT_KEY);
+
+interface Draft {
+  doc: DesignDoc;
+  stepKey: StepKey;
+  maxIndex: number;
+  savedAt: number;
+  /** 서버에 아직 저장되지 않은 고침이 있는지 */
+  dirty: boolean;
+}
+
+function readDraft(key: string): Draft | null {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as Draft) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 저장된 진행 위치가 없을 때: 아직 오류가 남은 첫 단계부터 */
+function resumeStep(doc: DesignDoc): StepKey {
+  if (doc.progress?.stepKey) return doc.progress.stepKey as StepKey;
+  const errorSteps = new Set(validateDesign(doc).filter((i) => i.level === "error").map((i) => i.step));
+  return stepsFor(doc).find((s) => errorSteps.has(s.key))?.key ?? "final";
+}
 
 export interface WizardProps {
   /** 저장된 설계를 열 때 */
   initial?: DesignDoc;
-  /** 저장 기능 (로그인 + DB 설정 시) */
-  onSave?: (doc: DesignDoc) => Promise<void>;
+  /** 저장된 설계의 id (브라우저 임시 보관을 설계마다 따로 함) */
+  designId?: string;
+  /** 서버 저장 (로그인 + DB 설정 시). auto: 단계 이동 때 자동 저장 */
+  onSave?: (doc: DesignDoc, opts: { auto: boolean }) => Promise<void>;
   onParseFail?: (step: string, error: string) => void;
   onDownloaded?: (doc: DesignDoc) => void;
-  /** 브라우저 임시 보관 사용 여부 (새 설계일 때만) */
-  useDraft?: boolean;
   /** 로그인한 학교명: 계획서·신청서의 학교명이 비어 있으면 채움 */
   defaultSchoolName?: string;
 }
 
-export function Wizard({ initial, onSave, onParseFail, onDownloaded, useDraft = !initial, defaultSchoolName }: WizardProps) {
+export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, defaultSchoolName }: WizardProps) {
+  const isNew = !initial;
   const [doc, setDocState] = useState<DesignDoc>(() => initial ?? emptyDesign());
-  const [stepKey, setStepKey] = useState<StepKey>(initial ? "final" : "type");
-  const [maxIndex, setMaxIndex] = useState(initial ? 99 : 0);
-  const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [stepKey, setStepKey] = useState<StepKey>(() => (initial ? resumeStep(initial) : "type"));
+  const [maxIndex, setMaxIndex] = useState(() => initial?.progress?.maxIndex ?? (initial ? 99 : 0));
+  const [saved, setSaved] = useState<{ state: "idle" | "saving" | "saved" | "error"; at?: Date; auto?: boolean }>({ state: "idle" });
+  const [restoredNote, setRestoredNote] = useState("");
+  const docRef = useRef(doc);
+  const dirtyRef = useRef(false);
   const loaded = useRef(false);
+  const draftKey = draftKeyFor(designId);
 
-  // 작성 중인 새 설계를 이 브라우저에 임시 보관
+  // 브라우저 임시 보관 불러오기: 새 설계는 항상, 저장된 설계는 서버에 아직 안 올라간 고침이 있을 때만
   useEffect(() => {
-    if (useDraft) {
-      try {
-        const raw = localStorage.getItem(DRAFT_KEY);
-        if (raw) {
-          const s = JSON.parse(raw);
-          setDocState({ ...emptyDesign(), ...s.doc });
-          setStepKey(s.stepKey ?? "type");
-          setMaxIndex(s.maxIndex ?? 0);
-        }
-      } catch {
-        /* 임시 보관을 못 읽어도 새로 시작하면 됨 */
-      }
+    const d = readDraft(draftKey);
+    if (d && (isNew || d.dirty) && !loaded.current) {
+      dirtyRef.current = !!d.dirty;
+      const restored = { ...emptyDesign(), ...d.doc };
+      docRef.current = restored;
+      setDocState(restored);
+      setStepKey(d.stepKey ?? "type");
+      setMaxIndex(d.maxIndex ?? 0);
+      if (!isNew) setRestoredNote("이 브라우저에 임시 저장된 최근 내용을 불러왔어요. (서버에는 다음 단계로 넘어가거나 저장하면 반영돼요)");
     }
     loaded.current = true;
-  }, [useDraft]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 쓰는 내용은 바로바로 이 브라우저에 임시 저장
   useEffect(() => {
-    if (!loaded.current || !useDraft) return;
+    if (!loaded.current) return;
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ doc, stepKey, maxIndex }));
+      localStorage.setItem(draftKey, JSON.stringify({ doc, stepKey, maxIndex, savedAt: Date.now(), dirty: dirtyRef.current } satisfies Draft));
     } catch {
       /* 저장 공간을 못 쓰는 환경이면 무시 */
     }
-  }, [doc, stepKey, maxIndex, useDraft]);
+  }, [doc, stepKey, maxIndex, draftKey]);
+
+  // 새 설계가 처음 서버에 저장되어 id가 생기면, 임시 보관도 그 설계 것으로 옮김
+  const prevKey = useRef(draftKey);
+  useEffect(() => {
+    if (prevKey.current !== draftKey) {
+      try {
+        localStorage.removeItem(prevKey.current);
+      } catch {
+        /* 무시 */
+      }
+      prevKey.current = draftKey;
+    }
+  }, [draftKey]);
+
+  const commit = (next: DesignDoc) => {
+    docRef.current = next;
+    dirtyRef.current = true;
+    setDocState(next);
+  };
+  /** 서버 저장이 끝났고 그 사이 고친 게 없으면 '저장됨'으로 표시 */
+  const markClean = (target: DesignDoc) => {
+    if (docRef.current !== target) return;
+    dirtyRef.current = false;
+    try {
+      const d = readDraft(draftKey);
+      if (d) localStorage.setItem(draftKey, JSON.stringify({ ...d, dirty: false }));
+    } catch {
+      /* 무시 */
+    }
+  };
+  const setDoc = (fn: (d: DesignDoc) => void) => {
+    const next = structuredClone(docRef.current);
+    fn(next);
+    commit(next);
+  };
 
   useEffect(() => {
     if (defaultSchoolName && !doc.application.schoolName.trim()) {
-      setDocState((d) => ({ ...d, application: { ...d.application, schoolName: defaultSchoolName } }));
+      setDoc((d) => void (d.application.schoolName = defaultSchoolName));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultSchoolName, doc.application.schoolName]);
+
+  const runSave = async (target: DesignDoc, auto: boolean) => {
+    if (!onSave) return;
+    setSaved({ state: "saving", auto });
+    try {
+      await onSave(target, { auto });
+      markClean(target);
+      setSaved({ state: "saved", at: new Date(), auto });
+    } catch (e) {
+      setSaved({ state: "error", auto });
+      if (!auto) alert(e instanceof Error ? e.message : "저장하지 못했습니다.");
+    }
+  };
 
   const steps = stepsFor(doc);
   const index = Math.max(0, steps.findIndex((s) => s.key === stepKey));
+  /** 단계 이동: 진행 위치를 문서에 적고, 로그인했으면 서버에 자동 저장 */
   const goIndex = (i: number) => {
-    const next = steps[Math.min(Math.max(i, 0), steps.length - 1)];
-    setStepKey(next.key);
-    setMaxIndex((m) => Math.max(m, i));
+    const list = stepsFor(docRef.current);
+    const to = Math.min(Math.max(i, 0), list.length - 1);
+    const nextMax = Math.max(maxIndex, to);
+    setStepKey(list[to].key);
+    setMaxIndex(nextMax);
+    setRestoredNote("");
+    const next = { ...docRef.current, progress: { stepKey: list[to].key, maxIndex: nextMax } };
+    commit(next);
+    void runSave(next, true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const goTo = (key: StepKey) => goIndex(steps.findIndex((s) => s.key === key));
-  const setDoc = (fn: (d: DesignDoc) => void) =>
-    setDocState((prev) => {
-      const next = structuredClone(prev);
-      fn(next);
-      return next;
-    });
+  const goTo = (key: StepKey) => goIndex(stepsFor(docRef.current).findIndex((s) => s.key === key));
   const reset = () => {
     if (!confirm("작성 중인 내용을 모두 지우고 처음부터 시작할까요?")) return;
-    setDocState(emptyDesign());
+    commit(emptyDesign());
     setStepKey("type");
     setMaxIndex(0);
   };
   const save = onSave
-    ? async () => {
-        setSaved("saving");
-        try {
-          await onSave(doc);
-          setSaved("saved");
-        } catch (e) {
-          setSaved("error");
-          alert(e instanceof Error ? e.message : "저장하지 못했습니다.");
-        }
+    ? () => {
+        const target = { ...docRef.current, progress: { stepKey, maxIndex } };
+        commit(target);
+        return runSave(target, false);
       }
     : undefined;
+  const savedLabel =
+    saved.state === "saving"
+      ? "저장 중…"
+      : saved.state === "error"
+        ? "⚠ 자동 저장 실패 — 💾 저장을 눌러 주세요"
+        : saved.state === "saved" && saved.at
+          ? `✓ ${saved.auto ? "자동 " : ""}저장됨 ${saved.at.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}`
+          : onSave
+            ? "단계를 넘기면 자동 저장돼요"
+            : "이 브라우저에 임시 저장 중";
 
   const props: StepProps = {
     doc,
@@ -138,12 +225,13 @@ export function Wizard({ initial, onSave, onParseFail, onDownloaded, useDraft = 
             {doc.basic.name ? <b className="text-gray-800">{doc.basic.name}</b> : "새 설계"} · {doc.basic.type === "subject" ? "과목" : "활동"} · {doc.basic.grade}학년 {doc.basic.semester}학기
           </p>
           <div className="flex items-center gap-3 text-sm">
+            <span className={`text-xs ${saved.state === "error" ? "text-red-600" : "text-gray-400"}`}>{savedLabel}</span>
             {save && (
               <button type="button" onClick={save} className="rounded-lg border border-brand-500 px-3 py-1 font-semibold text-brand-700 hover:bg-brand-50">
-                {saved === "saving" ? "저장 중…" : saved === "saved" ? "✓ 저장됨" : "💾 저장"}
+                💾 저장
               </button>
             )}
-            {useDraft && (
+            {isNew && !designId && (
               <button type="button" onClick={reset} className="text-gray-400 hover:text-red-600">
                 처음부터 다시
               </button>
@@ -170,6 +258,7 @@ export function Wizard({ initial, onSave, onParseFail, onDownloaded, useDraft = 
             </li>
           ))}
         </ol>
+        {restoredNote && <p className="rounded-lg bg-blue-50 p-2 text-xs text-blue-800">{restoredNote}</p>}
       </div>
 
       {stepKey === "type" && (
@@ -180,10 +269,10 @@ export function Wizard({ initial, onSave, onParseFail, onDownloaded, useDraft = 
             goIndex(1);
           }}
           onLoadSample={
-            useDraft
+            isNew && !designId
               ? () => {
                   if (doc.basic.name && !confirm("작성 중인 내용 대신 예시를 불러올까요?")) return;
-                  setDocState(sampleSubject());
+                  commit(sampleSubject());
                   setStepKey("final");
                   setMaxIndex(99);
                 }
@@ -224,7 +313,7 @@ export function Wizard({ initial, onSave, onParseFail, onDownloaded, useDraft = 
           {...props}
           goTo={goTo}
           stepLabel={(k) => steps.find((s) => s.key === k)?.label ?? ""}
-          onSave={save}
+          onSave={save ? async () => save() : undefined}
           onDownloaded={() => onDownloaded?.(doc)}
         />
       )}

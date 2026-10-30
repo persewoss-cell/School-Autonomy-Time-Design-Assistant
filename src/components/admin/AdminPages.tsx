@@ -250,7 +250,7 @@ export function AdminDesigns() {
                 <td className="p-2">{d.type === "subject" ? "과목" : "활동"} · {d.grade}-{d.semester}</td>
                 <td className="p-2">{d.schoolName}</td>
                 <td className="p-2 text-gray-600">{d.owner}</td>
-                <td className="p-2"><StatusBadge errors={d.errorCount} warnings={d.warningCount} /></td>
+                <td className="p-2"><StatusBadge errors={d.errorCount} warnings={d.warningCount} type={d.type} progress={d.progress} /></td>
                 <td className="p-2 text-xs text-gray-500">{fmtDate(d.updatedAt)}</td>
               </tr>
             ))}

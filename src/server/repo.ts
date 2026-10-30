@@ -41,6 +41,8 @@ export interface DesignRecord {
   schoolYear: string;
   errorCount: number;
   warningCount: number;
+  /** 어디까지 작성했는지 (doc.progress 복사본, 목록 표시용) */
+  progress: { stepKey: string; maxIndex: number } | null;
   createdAt: Date;
   updatedAt: Date;
 }

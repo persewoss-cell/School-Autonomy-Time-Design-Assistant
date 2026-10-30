@@ -176,6 +176,8 @@ export interface DesignDoc {
   application: Application;
   /** 체크리스트(서식6·7) 교사 확인 항목 */
   checklist: Record<string, boolean>;
+  /** 어디까지 작성했는지 (다시 열면 이 단계부터) */
+  progress?: { stepKey: string; maxIndex: number };
 }
 
 export function emptyDesign(): DesignDoc {
