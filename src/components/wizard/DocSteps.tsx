@@ -1,10 +1,10 @@
 "use client";
 
 import { useLayoutEffect, useRef } from "react";
-import { CATEGORIES, CATEGORY_KEYS, newId, type Area, type DesignDoc, type Standard } from "@/domain/types";
+import { CATEGORIES, CATEGORY_KEYS, newId, standardNeedsRewrite, type Area, type DesignDoc, type Standard } from "@/domain/types";
 import { codeMap, defaultAbbrev, standardCategories } from "@/domain/codes";
 import { elementCount, recommendedStandardCount, standardCountRange, standardCountsFor } from "@/domain/standardCounts";
-import { contentSystemPrompt, coreIdeasPrompt, introPrompt, standardsPrompt, teachingPrompt } from "@/prompts/steps";
+import { contentSystemPrompt, coreIdeasPrompt, introPrompt, reviseStandardsPrompt, standardsPrompt, teachingPrompt } from "@/prompts/steps";
 import { checkContentSystem, checkCoreIdeas, checkIntro, checkStandards, checkTeaching } from "@/validation/design";
 import { AiAssist } from "./AiAssist";
 import { Card, Chips, Field, ListEditor, NavButtons, StepHeader, StepIssues, inputClass, toggle } from "../ui";
@@ -232,6 +232,28 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
         </Field>
       </StepHeader>
       <StandardCountPicker doc={doc} setDoc={setDoc} />
+      {doc.standards.some(standardNeedsRewrite) && (
+        <AiAssist
+          key={doc.standards.filter(standardNeedsRewrite).map((s) => s.id).join()}
+          doc={{ ...doc, abbrev }}
+          step={reviseStandardsPrompt}
+          hasContent={false}
+          defaultOpen
+          title={`바뀐 성취기준 문장 고치기 (${doc.standards.filter(standardNeedsRewrite).length}개)`}
+          onParseFail={(e) => onParseFail?.("standards", e)}
+          onApply={(rows) =>
+            setDoc((d) => {
+              for (const r of rows) {
+                const st = d.standards.find((x) => x.id === r.id);
+                if (st) {
+                  st.text = r.text;
+                  st.textFor = [...st.elements];
+                }
+              }
+            })
+          }
+        />
+      )}
       <AiAssist
         doc={{ ...doc, abbrev }}
         step={standardsPrompt}
@@ -256,7 +278,7 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
               const cats = standardCategories(doc.areas, s);
               const set = (fn: (st: Standard) => void) => setDoc((d) => fn(d.standards[idx]));
               return (
-                <div key={s.id} className="space-y-2 rounded-xl border border-gray-200 p-3">
+                <div key={s.id} className={`space-y-2 rounded-xl border p-3 ${standardNeedsRewrite(s) ? "border-amber-400 bg-amber-50/40" : "border-gray-200"}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-mono text-sm font-bold text-brand-700">
                       {codes.get(s.id)}
@@ -272,8 +294,28 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
                       </button>
                     </span>
                   </div>
-                  <textarea rows={2} className={inputClass} value={s.text} placeholder="~을 이해하고, ~할 수 있다." onChange={(e) => set((st) => void (st.text = e.target.value))} />
-                  <p className="text-xs text-gray-500">이 성취기준이 다루는 내용 요소 2~3개 (눌러서 고르기 · 회색은 다른 성취기준에서 이미 쓴 것)</p>
+                  {standardNeedsRewrite(s) && (
+                    <p className="text-xs font-semibold text-amber-700">
+                      ⚠ 내용 요소가 바뀌었어요 — 위쪽 &lsquo;바뀐 성취기준 문장 고치기&rsquo;로 AI에게 받거나 문장을 직접 고쳐 주세요.
+                    </p>
+                  )}
+                  <textarea
+                    rows={2}
+                    className={inputClass}
+                    value={s.text}
+                    placeholder="~을 이해하고, ~할 수 있다."
+                    onChange={(e) =>
+                      set((st) => {
+                        st.text = e.target.value;
+                        st.textFor = [...st.elements]; // 직접 고친 문장은 지금 내용 요소에 맞춘 것으로 봄
+                      })
+                    }
+                  />
+                  <p className="text-xs text-gray-500">
+                    이 성취기준이 다루는 내용 요소 2~3개 (눌러서 고르기 · 회색은 다른 성취기준에서 이미 쓴 것)
+                    {s.elements.length < 2 && <span className="ml-1 font-semibold text-red-600">— 2개 이상 골라 주세요 (지금 {s.elements.length}개)</span>}
+                    {s.elements.length > 3 && <span className="ml-1 font-semibold text-amber-700">— 3개까지 권장 (지금 {s.elements.length}개)</span>}
+                  </p>
                   <Chips
                     options={allElements(a)}
                     selected={s.elements}
@@ -281,7 +323,12 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
                       const other = doc.standards.find((x) => x.id !== s.id && x.elements.includes(o));
                       return other ? `${codes.get(other.id)}에서 사용 중` : false;
                     }}
-                    onToggle={(o) => set((st) => void (st.elements = toggle(st.elements, o)))}
+                    onToggle={(o) =>
+                      set((st) => {
+                        if (!st.textFor && st.text.trim()) st.textFor = [...st.elements]; // 예전 저장본: 바꾸기 전 내용 요소를 기준으로
+                        st.elements = toggle(st.elements, o);
+                      })
+                    }
                   />
                 </div>
               );

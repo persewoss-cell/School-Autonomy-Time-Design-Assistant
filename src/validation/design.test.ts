@@ -84,12 +84,19 @@ describe("성취기준", () => {
     doc.standards[1].elements.push("세계와 연결된 나의 삶");
     expect(errors(checkStandards(doc)).some((i) => i.message.includes("겹쳐 들어가"))).toBe(true);
   });
-  it("어느 성취기준에도 안 쓴 내용 요소는 경고, 내용 요소 1개나 4개 이상도 경고", () => {
+  it("어느 성취기준에도 안 쓴 내용 요소는 경고, 내용 요소 1개는 오류", () => {
     const doc = sampleSubject();
     doc.standards[0].elements = ["세계와 연결된 나의 삶"];
     const issues = checkStandards(doc);
     expect(issues.some((i) => i.message.includes("연결되지 않은 내용 요소") && i.message.includes("세계 어린이의 생활 탐구하기"))).toBe(true);
-    expect(issues.some((i) => i.message.includes("2~3개를 묶는 것을 권장"))).toBe(true);
+    expect(errors(issues).some((i) => i.message.includes("1개뿐"))).toBe(true);
+  });
+  it("문장을 쓴 뒤 내용 요소가 바뀌면 확인 필요", () => {
+    const doc = sampleSubject();
+    doc.standards[2].textFor = [...doc.standards[2].elements];
+    doc.standards[2].elements = ["세계의 다양한 문화", "다양한 문화 존중 모습 표현하기"];
+    doc.standards[3].elements = ["생활 속 문화 존중 사례 조사하기", "다양한 문화를 존중하는 태도"];
+    expect(checkStandards(doc).some((i) => i.field === "[3사지구02-01]" && i.message.includes("바뀌었습니다"))).toBe(true);
   });
   it("내용 요소가 없으면 오류", () => {
     const doc = sampleSubject();

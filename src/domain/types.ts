@@ -71,6 +71,16 @@ export interface Standard {
   text: string;
   /** 연결한 내용 요소 (내용 체계에 확정된 문구만) */
   elements: string[];
+  /** 문장을 쓸 때 연결돼 있던 내용 요소. 지금 elements와 다르면 문장을 고쳐야 함 */
+  textFor?: string[];
+}
+
+/** 문장을 쓴 뒤 내용 요소가 바뀌었는지 */
+export function standardNeedsRewrite(s: Standard): boolean {
+  if (!s.textFor || !s.text.trim()) return false;
+  const a = [...s.textFor].sort().join("\u0000");
+  const b = [...s.elements].sort().join("\u0000");
+  return a !== b;
 }
 
 /** ⑥ 필요성(활동)·성격(과목) 및 목표 */

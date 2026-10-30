@@ -7,6 +7,7 @@ import {
   coreIdeasPrompt,
   introPrompt,
   planPrompt,
+  reviseStandardsPrompt,
   standardsPrompt,
   teachingPrompt,
 } from "./steps";
@@ -213,13 +214,42 @@ describe("영역별 성취기준 수", () => {
     d.areas[0].knowledge.push("세계 공동체의 구성원");
     d.standardCounts = [3, null];
     const p = standardsPrompt.build(d);
-    expect(p).toContain("- (1) 세계시민의 이해: 3개");
-    expect(p).toContain("- (2) 문화 다양성과 존중: 2개");
+    expect(p).toContain("- (1) 세계시민의 이해: 성취기준 3개 (성취기준별 내용 요소 수: 2개, 2개, 2개)");
+    expect(p).toContain("- (2) 문화 다양성과 존중: 성취기준 2개");
     const r = standardsPrompt.parse(wrap({ standards: [{ area: 1, text: "가.", elements: ["세계와 연결된 나의 삶"] }, { area: 2, text: "나.", elements: ["세계의 다양한 문화"] }, { area: 2, text: "다.", elements: ["세계의 다양한 문화"] }] }), d);
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.notes.join()).toContain("3개로 정했는데 AI가 1개");
       expect(r.notes.join()).not.toContain("(2) 문화 다양성과 존중:");
     }
+  });
+});
+
+describe("성취기준 내용 요소 최소 2개와 문장 고치기", () => {
+  it("성취기준별 내용 요소 수를 정확히 안내 (6개·3개 → 2,2,2 / 7개·3개 → 3,2,2)", async () => {
+    const { elementSplit } = await import("@/domain/standardCounts");
+    expect(elementSplit(6, 3)).toEqual([2, 2, 2]);
+    expect(elementSplit(7, 3)).toEqual([3, 2, 2]);
+    expect(elementSplit(6, 2)).toEqual([3, 3]);
+    expect(standardsPrompt.build(sampleSubject())).toContain("성취기준 2개 (성취기준별 내용 요소 수: 3개, 2개)");
+  });
+  it("내용 요소가 2개 미만인 성취기준은 알림", () => {
+    const r = standardsPrompt.parse(wrap({ standards: [{ area: 1, text: "하나뿐인 성취기준이다.", elements: ["세계와 연결된 나의 삶"] }] }), doc);
+    expect(r.ok && r.notes.join()).toContain("2개 미만");
+  });
+  it("내용 요소를 바꾼 성취기준만 문장 고치기 프롬프트에 들어가고, 답으로 문장만 바뀐다", async () => {
+    const { standardNeedsRewrite } = await import("@/domain/types");
+    const d = sampleSubject();
+    d.standards[0].textFor = [...d.standards[0].elements];
+    d.standards[0].elements = ["세계와 연결된 나의 삶", "세계시민 규칙을 실천하려는 의지"];
+    expect(standardNeedsRewrite(d.standards[0])).toBe(true);
+    expect(standardNeedsRewrite(d.standards[1])).toBe(false);
+    const p = reviseStandardsPrompt.build(d);
+    expect(p).toContain("[3사지구01-01]");
+    expect(p).toContain("바뀐 내용 요소: 세계와 연결된 나의 삶 / 세계시민 규칙을 실천하려는 의지");
+    expect(p).not.toContain("지금 문장: 세계 문제 해결을");
+    const r = reviseStandardsPrompt.parse(wrap({ standards: [{ code: "[3사지구01-01]", text: "새 문장이다." }, { code: "[9가짜01-01]", text: "x" }] }), d);
+    expect(r.ok && r.data).toEqual([{ id: "s1", text: "새 문장이다." }]);
+    expect(r.ok && r.notes.join()).toContain("[9가짜01-01]");
   });
 });

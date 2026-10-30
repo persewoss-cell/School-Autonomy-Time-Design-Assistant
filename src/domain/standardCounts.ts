@@ -29,3 +29,11 @@ export function standardCountsFor(doc: Pick<DesignDoc, "areas" | "standardCounts
     return typeof n === "number" && n >= 1 ? clamp(n, standardCountRange(a)) : recommendedStandardCount(a);
   });
 }
+
+/** 내용 요소 n개를 성취기준 k개에 2~3개씩 겹치지 않게 나눌 때 성취기준별 내용 요소 수 (예: 7개·3개 → [3, 2, 2]) */
+export function elementSplit(n: number, k: number): number[] {
+  if (k <= 0) return [];
+  const base = Math.floor(n / k);
+  const extra = n % k;
+  return Array.from({ length: k }, (_, i) => base + (i < extra ? 1 : 0));
+}

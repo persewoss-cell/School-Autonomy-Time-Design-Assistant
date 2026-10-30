@@ -1,4 +1,4 @@
-import { CATEGORIES, DESIGN_TYPES, type Area, type DesignDoc } from "@/domain/types";
+import { CATEGORIES, DESIGN_TYPES, standardNeedsRewrite, type Area, type DesignDoc } from "@/domain/types";
 import { codeMap, standardCategories } from "@/domain/codes";
 import { checklistFor } from "@/domain/checklist";
 import { checkBasicHours, checkPlanHours } from "./hours";
@@ -188,12 +188,27 @@ export function checkStandards(doc: Pick<DesignDoc, "basic" | "abbrev" | "areas"
       });
       continue;
     }
-    if (s.elements.length === 1 || s.elements.length > 3) {
+    if (s.elements.length === 1) {
+      issues.push({
+        level: "error",
+        field: code,
+        message: "내용 요소가 1개뿐입니다. 성취기준은 내용 요소를 2개 이상 조합해야 합니다.",
+        fix: "이 영역의 내용 요소를 하나 더 고르거나, 다른 성취기준과 내용 요소를 나누어 조정해 주세요.",
+      });
+    } else if (s.elements.length > 3) {
       issues.push({
         level: "warning",
         field: code,
         message: `내용 요소가 ${s.elements.length}개 연결되어 있습니다. 성취기준 하나에 내용 요소 2~3개를 묶는 것을 권장합니다.`,
         fix: "내용 요소를 2~3개가 되도록 조정해 주세요.",
+      });
+    }
+    if (standardNeedsRewrite(s)) {
+      issues.push({
+        level: "warning",
+        field: code,
+        message: "문장을 쓴 뒤 연결된 내용 요소가 바뀌었습니다. 문장이 바뀐 내용 요소를 담고 있는지 확인해야 합니다.",
+        fix: "성취기준 화면의 '바뀐 성취기준 문장 고치기'로 AI에게 받거나, 문장을 직접 고쳐 주세요.",
       });
     }
     const cats = standardCategories(doc.areas, s);
