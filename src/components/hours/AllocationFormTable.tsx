@@ -1,40 +1,42 @@
 "use client";
 
-import { formModel, signed, vertical } from "@/domain/allocationForm";
+import { formModel, signed } from "@/domain/allocationForm";
 import { withCreativeParts, type AllocationInput, type CreativePart, type FourSemesters, type SemesterIndex } from "@/validation/allocation";
 
 /**
- * 시수 점검 편성표 — 학교 '( )학년 교육과정 편성표' 양식 모양 그대로, 편성 시수 칸에 바로 입력.
- * 글자는 한 줄로(세로 글자 칸 제외), 1주 수업시간 칸은 두지 않는다.
+ * 시수 점검 편성표 — 학교 '( )학년 교육과정 편성표' 양식과 같은 줄 구성을 보기 쉽게 정리한 화면용 표.
+ * 편성 시수 칸에 바로 입력하고, 증감은 칸 옆에 작게, 교과군 합계 옆에 이상유무를 보여 준다. (.docx는 양식 그대로)
  */
 
-const td = "border border-gray-400 px-1 py-0.5 text-center whitespace-nowrap";
-const th = `${td} bg-[#dce3ee] font-semibold`;
-const blue = "text-[#1f3fbf]";
-const red = "text-red-600";
-const course = "bg-[#fce4d6]";
+const cellBase = "border-b border-gray-100 px-2 py-1.5 text-center whitespace-nowrap";
+const th = "px-2 py-2 text-center text-xs font-semibold text-gray-600 whitespace-nowrap";
 const input =
-  "w-10 rounded-sm border border-gray-300 bg-white px-0.5 py-0.5 text-center text-xs [appearance:textfield] focus:border-brand-500 focus:outline-none [&::-webkit-inner-spin-button]:appearance-none";
+  "w-12 rounded-md border border-gray-300 bg-white px-1 py-1 text-center text-sm [appearance:textfield] focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 [&::-webkit-inner-spin-button]:appearance-none";
 const num = (v: string) => Math.max(0, Math.floor(Number(v) || 0));
 const n = (v: number) => v.toLocaleString("ko-KR");
 
-function Vertical({ text }: { text: string }) {
+/** 증감 표시: 줄면 빨강, 늘면 파랑, 0이면 숨김 */
+function Delta({ v, strong = false }: { v: number; strong?: boolean }) {
+  if (v === 0) return <span className="inline-block w-8" />;
   return (
-    <span className="inline-flex flex-col items-center leading-tight">
-      {vertical(text).map((c, i) => (
-        <span key={i}>{c}</span>
-      ))}
+    <span className={`inline-block w-8 text-left text-[11px] ${strong ? "font-bold" : ""} ${v < 0 ? "text-red-600" : "text-blue-600"}`}>
+      {signed(v)}
     </span>
   );
 }
 
-function Stack({ lines, className = "" }: { lines: string[]; className?: string }) {
+/** 교과군 합계 + 이상유무 */
+function GroupTotal({ value, ok, range }: { value: number; ok: boolean; range: string }) {
   return (
-    <span className={`inline-flex flex-col items-center leading-tight ${className}`}>
-      {lines.map((l, i) => (
-        <span key={i}>{l}</span>
-      ))}
-    </span>
+    <div className="flex flex-col items-center gap-0.5">
+      <span className={`text-sm font-bold ${ok ? "text-gray-900" : "text-red-700"}`}>{n(value)}</span>
+      <span
+        title={ok ? "이상없음" : `증감 범위 ${range} 밖`}
+        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
+      >
+        {ok ? "이상없음" : "범위 밖"}
+      </span>
+    </div>
   );
 }
 
@@ -49,7 +51,6 @@ export function AllocationFormTable({
   yearOf: (s: SemesterIndex) => number;
 }) {
   const m = formModel(a);
-  const subjectLineCount = m.groups.reduce((t, g) => t + g.lines.length, 0);
   const setSubject = (key: string, sem: number, v: number) => {
     const next = structuredClone(a);
     (next.subjectHours[key] as FourSemesters)[sem] = v;
@@ -62,212 +63,206 @@ export function AllocationFormTable({
   };
   const years = [0, 1] as const;
   const semOf = (y: number, k: 0 | 1) => (y * 2 + k) as SemesterIndex;
+  const yearBorder = "border-l border-gray-200";
 
-  /** 소계·연간 줄의 학년별 칸 */
-  const sumCells = (base: number, at: (s: SemesterIndex) => number, showDelta = true) =>
-    years.flatMap((y) => {
-      const A = at(semOf(y, 0));
-      const B = at(semOf(y, 1));
-      return [
-        <td key={`b${y}`} className={`${td} font-bold`}>{n(base / 2)}</td>,
-        <td key={`d${y}`} className={`${td} font-bold ${red}`}>{showDelta ? signed(A + B - base / 2) : ""}</td>,
-        <td key={`a${y}`} className={`${td} font-bold`}>{n(A)}</td>,
-        <td key={`e${y}`} className={td} />,
-        <td key={`c${y}`} className={`${td} font-bold`}>{n(B)}</td>,
-        <td key={`t${y}`} className={`${td} font-bold`}>{n(A + B)}</td>,
-      ];
-    });
+  /** 학년별 칸: 배당 | 1학기 | 2학기 | 계 */
+  const SumYear = ({ base, A, B, bold = true }: { base: number; A: number; B: number; bold?: boolean }) => (
+    <>
+      <td className={`${cellBase} ${yearBorder} text-gray-500`}>{n(base / 2)}</td>
+      <td className={`${cellBase} ${bold ? "font-semibold" : ""}`}>{n(A)}</td>
+      <td className={`${cellBase} ${bold ? "font-semibold" : ""}`}>{n(B)}</td>
+      <td className={`${cellBase} font-semibold`}>
+        {n(A + B)} <Delta v={A + B - base / 2} />
+      </td>
+    </>
+  );
 
-  let firstLine = true;
+  const sectionRow = (label: string) => (
+    <tr>
+      <td colSpan={12} className="bg-gray-50 px-3 py-1.5 text-left text-xs font-bold tracking-wide text-gray-500">
+        {label}
+      </td>
+    </tr>
+  );
+
   return (
-    <div className="overflow-x-auto">
-      <table className="mx-auto border-collapse text-xs">
-        <thead>
+    <div className="overflow-x-auto rounded-xl border border-gray-200">
+      <table className="w-full border-collapse text-sm">
+        <thead className="bg-brand-50">
           <tr>
-            <th rowSpan={3} colSpan={3} className={`${th} relative h-16 min-w-[120px]`}>
-              <svg className="absolute inset-0 h-full w-full" preserveAspectRatio="none" viewBox="0 0 100 100" aria-hidden>
-                <line x1="0" y1="0" x2="100" y2="100" stroke="#6b7280" strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
-              </svg>
-              <span className="absolute right-1 top-1">학년</span>
-              <span className="absolute bottom-1 left-1">구분</span>
+            <th rowSpan={2} className={`${th} text-left`}>교과(군)</th>
+            <th rowSpan={2} className={`${th} text-left`}>교과</th>
+            <th rowSpan={2} className={th}>
+              기준시수
+              <span className="block text-[10px] font-normal text-gray-400">증감 범위</span>
             </th>
-            <th rowSpan={3} className={th}><Stack lines={["기준", "시수"]} /></th>
-            <th rowSpan={3} className={th}><Stack lines={["증감", "범위"]} /></th>
             {years.map((y) => (
-              <th key={y} colSpan={6} className={`${th} ${red}`}>
-                {m.grades[y]}학년({yearOf(semOf(y, 0))}학년도)
+              <th key={y} colSpan={4} className={`${th} ${yearBorder} border-b border-brand-100 text-brand-700`}>
+                {m.grades[y]}학년 <span className="font-normal text-gray-500">· {yearOf(semOf(y, 0))}학년도</span>
               </th>
             ))}
-            <th rowSpan={3} className={th}><Stack lines={[`${m.grades[0]}~${m.grades[1]}`, "학년군", "시수", "합계"]} /></th>
+            <th rowSpan={2} className={`${th} ${yearBorder}`}>
+              {m.grades[0]}~{m.grades[1]}학년군
+              <span className="block text-[10px] font-normal text-gray-400">합계</span>
+            </th>
           </tr>
           <tr>
             {years.map((y) => [
-              <th key={`p${y}`} rowSpan={2} className={th}><Stack lines={["학년", "시수", "배당"]} /></th>,
-              <th key={`1${y}`} colSpan={2} className={th}>1학기</th>,
-              <th key={`2${y}`} colSpan={2} className={th}>2학기</th>,
-              <th key={`t${y}`} rowSpan={2} className={th}>계</th>,
+              <th key={`p${y}`} className={`${th} ${yearBorder} font-normal`}>배당</th>,
+              <th key={`1${y}`} className={th}>1학기</th>,
+              <th key={`2${y}`} className={th}>2학기</th>,
+              <th key={`t${y}`} className={th}>계</th>,
             ])}
-          </tr>
-          <tr>
-            {years.flatMap((y) =>
-              [0, 1].flatMap((k) => [
-                <th key={`d${y}${k}`} className={th}><Stack lines={["증감", "시수"]} /></th>,
-                <th key={`e${y}${k}`} className={th}><Stack lines={["편성", "시수"]} /></th>,
-              ]),
-            )}
           </tr>
         </thead>
         <tbody>
+          {sectionRow("교과")}
           {m.groups.flatMap((g) =>
             g.lines.map((ln, li) => {
-              const cells = [];
-              if (firstLine) {
-                cells.push(
-                  <td key="kyo" rowSpan={subjectLineCount + 1} className={`${td} font-bold`}>
-                    <Vertical text="교과" />
-                  </td>,
-                );
-                firstLine = false;
-              }
-              if (li === 0) {
-                cells.push(
-                  g.merged ? (
-                    <td key="g" colSpan={2} className={`${td} font-semibold`}>{vertical(g.label).join(" ")}</td>
-                  ) : (
-                    <td key="g" rowSpan={g.lines.length} className={`${td} font-semibold`}>
-                      <Vertical text={g.label} />
+              const last = li === g.lines.length - 1;
+              const rowCls = last ? "border-b border-gray-200" : "";
+              const isCourse = ln.kind === "course";
+              const tint = isCourse ? "bg-orange-50" : "";
+              return (
+                <tr key={`${g.label}-${li}`} className={`${rowCls} hover:bg-gray-50/60`}>
+                  {li === 0 &&
+                    (g.merged ? (
+                      <td colSpan={2} className={`${cellBase} text-left font-semibold`}>{g.label}</td>
+                    ) : (
+                      <td rowSpan={g.lines.length} className={`${cellBase} border-r border-gray-100 text-left font-semibold`}>
+                        {g.label}
+                      </td>
+                    ))}
+                  {!g.merged && (
+                    <td className={`${cellBase} text-left ${tint} ${ln.kind === "placeholder" ? "text-gray-300" : ""}`}>
+                      {ln.kind === "subject" ? (
+                        ln.key
+                      ) : ln.kind === "course" ? (
+                        <span className="inline-flex items-center gap-1 font-semibold text-orange-800">
+                          <span className="rounded bg-orange-200 px-1 text-[10px] text-orange-900">학자시</span>
+                          {ln.name}
+                        </span>
+                      ) : (
+                        ln.name
+                      )}
                     </td>
-                  ),
-                );
-              }
-              if (!g.merged) {
-                cells.push(
-                  <td key="s" className={`${td} ${ln.kind === "course" ? `${course} font-bold outline outline-2 -outline-offset-2 outline-red-500` : ""}`}>
-                    {ln.kind === "subject" ? ln.key : ln.name}
-                  </td>,
-                );
-              }
-              if (li === 0) {
-                cells.push(
-                  <td key="b" rowSpan={g.lines.length} className={`${td} ${blue}`}>
-                    <Stack lines={[n(g.base), `(${g.noReduction ? "+" : "±"}${g.delta})`]} />
-                  </td>,
-                  <td key="r" rowSpan={g.lines.length} className={`${td} ${blue}`}>
-                    <Stack lines={[String(g.min), "~", String(g.max)]} />
-                  </td>,
-                );
-              }
-              for (const y of years) {
-                const A = semOf(y, 0);
-                const B = semOf(y, 1);
-                if (ln.kind === "subject") {
-                  const q = ln.base / 4;
-                  cells.push(
-                    <td key={`p${y}`} className={td}>{ln.base / 2}</td>,
-                    <td key={`dA${y}`} className={`${td} ${red}`}>{signed(ln.hours[A] - q)}</td>,
-                    <td key={`hA${y}`} className={td}>
-                      <input type="number" className={input} value={ln.hours[A]} onChange={(e) => setSubject(ln.key, A, num(e.target.value))} />
-                    </td>,
-                    <td key={`dB${y}`} className={`${td} ${red}`}>{signed(ln.hours[B] - q)}</td>,
-                    <td key={`hB${y}`} className={td}>
-                      <input type="number" className={input} value={ln.hours[B]} onChange={(e) => setSubject(ln.key, B, num(e.target.value))} />
-                    </td>,
-                    <td key={`t${y}`} className={td}>{ln.hours[A] + ln.hours[B]}</td>,
-                  );
-                } else if (ln.kind === "course") {
-                  const at = (s: SemesterIndex) => (ln.semester === s ? ln.hours : 0);
-                  cells.push(
-                    <td key={`p${y}`} className={`${td} ${course}`}>-</td>,
-                    <td key={`dA${y}`} className={`${td} ${course} font-bold ${red}`}>{signed(at(A))}</td>,
-                    <td key={`hA${y}`} className={`${td} ${course}`}>{at(A) || ""}</td>,
-                    <td key={`dB${y}`} className={`${td} ${course} font-bold ${red}`}>{signed(at(B))}</td>,
-                    <td key={`hB${y}`} className={`${td} ${course}`}>{at(B) || ""}</td>,
-                    <td key={`t${y}`} className={`${td} ${course}`}>{at(A) + at(B) || ""}</td>,
-                  );
-                } else {
-                  cells.push(
-                    <td key={`p${y}`} className={td}>{y === 0 ? "-" : ""}</td>,
-                    ...[0, 1, 2, 3, 4].map((k) => <td key={`x${y}${k}`} className={td} />),
-                  );
-                }
-              }
-              if (li === 0) {
-                cells.push(
-                  <td
-                    key="sum"
-                    rowSpan={g.lines.length}
-                    title={g.ok ? "이상없음" : `증감 범위 ${g.min}~${g.max} 밖`}
-                    className={`${td} font-bold ${g.ok ? blue : "bg-red-100 text-red-700"}`}
-                  >
-                    {n(g.planned)}
-                  </td>,
-                );
-              }
-              return <tr key={`${g.label}-${li}`}>{cells}</tr>;
+                  )}
+                  {li === 0 && (
+                    <td rowSpan={g.lines.length} className={cellBase}>
+                      <span className="font-semibold">{n(g.base)}</span>
+                      <span className="block text-[11px] text-gray-400">
+                        {g.min}~{g.max}
+                      </span>
+                    </td>
+                  )}
+                  {years.map((y) => {
+                    const A = semOf(y, 0);
+                    const B = semOf(y, 1);
+                    if (ln.kind === "subject") {
+                      const q = ln.base / 4;
+                      return [
+                        <td key={`p${y}`} className={`${cellBase} ${yearBorder} text-gray-500`}>{ln.base / 2}</td>,
+                        ...[A, B].map((s) => (
+                          <td key={`h${s}`} className={cellBase}>
+                            <span className="inline-flex items-center gap-1">
+                              <input type="number" aria-label={`${ln.key} ${s}`} className={input} value={ln.hours[s]} onChange={(e) => setSubject(ln.key, s, num(e.target.value))} />
+                              <Delta v={ln.hours[s] - q} />
+                            </span>
+                          </td>
+                        )),
+                        <td key={`t${y}`} className={`${cellBase} font-semibold`}>{ln.hours[A] + ln.hours[B]}</td>,
+                      ];
+                    }
+                    if (ln.kind === "course") {
+                      const at = (s: SemesterIndex) => (ln.semester === s ? ln.hours : 0);
+                      return [
+                        <td key={`p${y}`} className={`${cellBase} ${yearBorder} ${tint} text-gray-400`}>-</td>,
+                        ...[A, B].map((s) => (
+                          <td key={`h${s}`} className={`${cellBase} ${tint}`}>
+                            {at(s) ? <span className="font-bold text-orange-700">+{at(s)}</span> : ""}
+                          </td>
+                        )),
+                        <td key={`t${y}`} className={`${cellBase} ${tint} font-semibold`}>{at(A) + at(B) || ""}</td>,
+                      ];
+                    }
+                    return [
+                      <td key={`p${y}`} className={`${cellBase} ${yearBorder} text-gray-300`}>-</td>,
+                      <td key={`a${y}`} className={cellBase} />,
+                      <td key={`b${y}`} className={cellBase} />,
+                      <td key={`t${y}`} className={cellBase} />,
+                    ];
+                  })}
+                  {li === 0 && (
+                    <td rowSpan={g.lines.length} className={`${cellBase} ${yearBorder}`}>
+                      <GroupTotal value={g.planned} ok={g.ok} range={`${g.min}~${g.max}`} />
+                    </td>
+                  )}
+                </tr>
+              );
             }),
           )}
-          <tr className="bg-gray-50">
-            <td colSpan={2} className={`${td} font-bold`}>소&nbsp;&nbsp;&nbsp;계</td>
-            <td className={`${td} font-bold ${blue}`}>{n(m.subtotal.base)}</td>
-            <td className={td} />
-            {sumCells(m.subtotal.base, (s) => m.subjectSem[s])}
-            <td className={`${td} font-bold ${m.subtotal.ok ? blue : "bg-red-100 text-red-700"}`}>{n(m.subtotal.planned)}</td>
+          <tr className="border-b-2 border-gray-200 bg-gray-50">
+            <td colSpan={2} className={`${cellBase} text-left font-bold`}>교과 소계</td>
+            <td className={`${cellBase} font-bold`}>{n(m.subtotal.base)}</td>
+            {years.map((y) => (
+              <SumYear key={y} base={m.subtotal.base} A={m.subjectSem[semOf(y, 0)]} B={m.subjectSem[semOf(y, 1)]} />
+            ))}
+            <td className={`${cellBase} ${yearBorder}`}>
+              <GroupTotal value={m.subtotal.planned} ok={m.subtotal.ok} range="" />
+            </td>
           </tr>
+          {sectionRow("창의적 체험활동")}
           {m.creative.parts.map((p, k) => (
-            <tr key={p.key}>
+            <tr key={p.key} className={k === 2 ? "border-b border-gray-200" : ""}>
+              <td colSpan={2} className={`${cellBase} text-left`}>{p.name}</td>
               {k === 0 && (
-                <td rowSpan={4} className={`${td} font-bold`}>
-                  <Vertical text="창의적체험활동" />
+                <td rowSpan={3} className={cellBase}>
+                  <span className="font-semibold">{n(m.creative.base)}</span>
+                  <span className="block text-[11px] text-gray-400">
+                    {m.creative.min}~{m.creative.max}
+                  </span>
                 </td>
               )}
-              <td colSpan={2} className={td}>{p.name}</td>
-              {k === 0 && (
-                <>
-                  <td rowSpan={3} className={`${td} ${blue}`}>
-                    <Stack lines={[n(m.creative.base), `(±${m.creative.delta})`]} />
-                  </td>
-                  <td rowSpan={3} className={`${td} ${blue}`}>
-                    <Stack lines={[String(m.creative.min), "~", String(m.creative.max)]} />
-                  </td>
-                </>
-              )}
-              {years.flatMap((y) => {
+              {years.map((y) => {
                 const A = semOf(y, 0);
                 const B = semOf(y, 1);
-                const q = m.creative.base / 4;
                 return [
-                  k === 0 && <td key={`p${y}`} rowSpan={3} className={td}>{m.creative.base / 2}</td>,
-                  k === 0 && <td key={`dA${y}`} rowSpan={3} className={`${td} ${red}`}>{signed(m.creativeSem[A] - q)}</td>,
-                  <td key={`hA${y}`} className={td}>
-                    <input type="number" className={input} value={p.hours[A]} onChange={(e) => setPart(p.key, A, num(e.target.value))} />
-                  </td>,
-                  k === 0 && <td key={`dB${y}`} rowSpan={3} className={`${td} ${red}`}>{signed(m.creativeSem[B] - q)}</td>,
-                  <td key={`hB${y}`} className={td}>
-                    <input type="number" className={input} value={p.hours[B]} onChange={(e) => setPart(p.key, B, num(e.target.value))} />
-                  </td>,
-                  k === 0 && <td key={`t${y}`} rowSpan={3} className={td}>{m.creativeSem[A] + m.creativeSem[B]}</td>,
-                ].filter(Boolean);
+                  k === 0 ? (
+                    <td key={`p${y}`} rowSpan={3} className={`${cellBase} ${yearBorder} text-gray-500`}>{m.creative.base / 2}</td>
+                  ) : null,
+                  ...[A, B].map((s) => (
+                    <td key={`h${s}`} className={cellBase}>
+                      <input type="number" aria-label={`${p.name} ${s}`} className={input} value={p.hours[s]} onChange={(e) => setPart(p.key, s, num(e.target.value))} />
+                    </td>
+                  )),
+                  k === 0 ? (
+                    <td key={`t${y}`} rowSpan={3} className={`${cellBase} font-semibold`}>
+                      {m.creativeSem[A] + m.creativeSem[B]} <Delta v={m.creativeSem[A] + m.creativeSem[B] - m.creative.base / 2} />
+                    </td>
+                  ) : null,
+                ];
               })}
               {k === 0 && (
-                <td rowSpan={3} className={`${td} font-bold ${m.creative.ok ? blue : "bg-red-100 text-red-700"}`}>
-                  {n(m.creative.planned)}
+                <td rowSpan={3} className={`${cellBase} ${yearBorder}`}>
+                  <GroupTotal value={m.creative.planned} ok={m.creative.ok} range={`${m.creative.min}~${m.creative.max}`} />
                 </td>
               )}
             </tr>
           ))}
-          <tr className="bg-gray-50">
-            <td colSpan={2} className={`${td} font-bold`}>소&nbsp;&nbsp;&nbsp;계</td>
-            <td className={`${td} font-bold ${blue}`}>{n(m.creative.base)}</td>
-            <td className={td} />
-            {sumCells(m.creative.base, (s) => m.creativeSem[s])}
-            <td className={`${td} font-bold ${m.creative.ok ? blue : "bg-red-100 text-red-700"}`}>{n(m.creative.planned)}</td>
-          </tr>
-          <tr>
-            <td colSpan={3} className={`${td} font-bold`}>연간수업시간수</td>
-            <td className={`${td} font-bold ${blue}`}>{n(m.total.base)}</td>
-            <td className={td} />
-            {sumCells(m.total.base, (s) => m.subjectSem[s] + m.creativeSem[s], false)}
-            <td className={`${td} font-bold ${m.total.ok ? blue : "bg-red-100 text-red-700"}`}>{n(m.total.planned)}</td>
+          <tr className="bg-brand-50 font-bold">
+            <td colSpan={2} className={`${cellBase} text-left font-bold`}>연간 수업 시간 수</td>
+            <td className={`${cellBase} font-bold`}>{n(m.total.base)}</td>
+            {years.map((y) => (
+              <SumYear
+                key={y}
+                base={m.total.base}
+                A={m.subjectSem[semOf(y, 0)] + m.creativeSem[semOf(y, 0)]}
+                B={m.subjectSem[semOf(y, 1)] + m.creativeSem[semOf(y, 1)]}
+              />
+            ))}
+            <td className={`${cellBase} ${yearBorder}`}>
+              <GroupTotal value={m.total.planned} ok={m.total.ok} range={String(m.total.base)} />
+            </td>
           </tr>
         </tbody>
       </table>

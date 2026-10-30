@@ -309,8 +309,9 @@ export function HoursChecker() {
       <Card className="space-y-3">
         <h2 className="font-bold">② 교과·창체 편성표</h2>
         <p className="text-sm text-gray-600">
-          학교 편성표 양식 그대로예요. 흰 칸(편성 시수)에 숫자를 넣으면 증감·계·합계가 자동 계산돼요. 학교자율시간은 ①에서 넣으면 주황 줄로 들어가요.
-          증감 범위는 지침대로 교과(군) 단위로 보고, 범위를 벗어나면 학년군 합계 칸이 빨갛게 바뀌어요.
+          학교 편성표와 같은 줄 구성이에요. 칸에 학기별 편성 시수를 넣으면 증감(빨강 −, 파랑 +)·계·합계가 자동 계산돼요.
+          학교자율시간은 ①에서 넣으면 주황 줄로 들어가요. 증감 범위는 지침대로 교과(군) 단위로 보고, 오른쪽 끝에 이상없음/범위 밖이 표시돼요.
+          내려받는 편성표(.docx)는 학교 양식 모양 그대로 나와요.
         </p>
         <AllocationFormTable a={a} setA={setA} yearOf={(s) => viewYears(grade, check.schoolYear)[s]} />
         <details className="text-sm">
