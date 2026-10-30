@@ -124,9 +124,13 @@ export function FinalStep({
   const errors = issues.filter((i) => i.level === "error");
   const checklist = checklistResults(doc);
   const [busy, setBusy] = useState(false);
+  // 체크리스트를 모두 점검·체크해야 문서를 만들 수 있다 (사용자 결정, 2026-10-31)
+  const unchecked = checklist.filter((c) => !c.ok);
+  const blocked = unchecked.length > 0;
 
   const FORM_NOTICE = "내려받는 문서는 교육청에서 제공하는 양식과 다를 수 있습니다.\n한글(HWP)에서 열어 양식을 다듬어 쓰세요.";
   const download = async () => {
+    if (blocked) return;
     if (!confirm(`${FORM_NOTICE}\n\n확인을 누르면 내려받습니다.`)) return;
     if (errors.length > 0 && !confirm(`아직 오류가 ${errors.length}개 있습니다. 그래도 문서를 내려받을까요?`)) return;
     setBusy(true);
@@ -148,6 +152,7 @@ export function FinalStep({
 
   /** 예시안 모양의 인쇄 화면을 새 창으로 열고 인쇄 창을 띄움 → 'PDF로 저장' */
   const printPdf = () => {
+    if (blocked) return;
     if (errors.length > 0 && !confirm(`아직 오류가 ${errors.length}개 있습니다. 그래도 PDF로 만들까요?`)) return;
     const w = window.open("", "_blank");
     if (!w) {
@@ -197,7 +202,7 @@ export function FinalStep({
                   onChange={() => setDoc((d) => void (d.checklist[c.id] = !d.checklist[c.id]))}
                 />
               )}
-              <span>
+              <span className={c.ok ? "" : "text-red-700"}>
                 <span className="text-gray-400">[{c.area}]</span> {c.label}
                 {c.auto && <span className="ml-1 text-xs text-gray-400">(자동)</span>}
               </span>
@@ -217,10 +222,10 @@ export function FinalStep({
           PDF로 받기: 예시안과 같은 모양의 인쇄 화면이 새 창으로 열려요. 인쇄 창의 대상(프린터)에서 &lsquo;PDF로 저장&rsquo;을 고르세요. 한글(HWP)이 깔린 컴퓨터에서 가장 예시안과 비슷하게 나와요.
         </p>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={download} disabled={busy} className="rounded-lg bg-brand-600 px-5 py-2 font-semibold text-white hover:bg-brand-700 disabled:bg-gray-300">
+          <button type="button" onClick={download} disabled={busy || blocked} className="rounded-lg bg-brand-600 px-5 py-2 font-semibold text-white hover:bg-brand-700 disabled:bg-gray-300">
             {busy ? "만드는 중…" : "📄 문서 내려받기 (.docx)"}
           </button>
-          <button type="button" onClick={printPdf} disabled={busy} className="rounded-lg bg-brand-600 px-5 py-2 font-semibold text-white hover:bg-brand-700 disabled:bg-gray-300">
+          <button type="button" onClick={printPdf} disabled={busy || blocked} className="rounded-lg bg-brand-600 px-5 py-2 font-semibold text-white hover:bg-brand-700 disabled:bg-gray-300">
             🖨 PDF로 받기
           </button>
           {onSave && (
@@ -241,6 +246,19 @@ export function FinalStep({
             </button>
           )}
         </div>
+        {blocked && (
+          <div className="space-y-1 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <p className="font-semibold">⚠ 체크리스트 내용을 모두 점검하고 체크해야 문서가 만들어집니다. (남은 항목 {unchecked.length}개)</p>
+            <ul className="list-disc pl-5">
+              {unchecked.map((c) => (
+                <li key={c.id}>
+                  [{c.area}] {c.label}
+                  <span className="text-red-500"> ({c.auto ? "자동: ① 지침 점검 결과의 오류를 고치면 ○" : "직접 확인 후 ②에서 체크"})</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </Card>
 
       <DocPreview doc={doc} />
