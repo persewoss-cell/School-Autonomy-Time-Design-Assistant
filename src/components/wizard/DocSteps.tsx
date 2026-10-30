@@ -1,5 +1,6 @@
 "use client";
 
+import { useLayoutEffect, useRef } from "react";
 import { CATEGORIES, CATEGORY_KEYS, newId, type Area, type DesignDoc, type Standard } from "@/domain/types";
 import { codeMap, defaultAbbrev, standardCategories } from "@/domain/codes";
 import { contentSystemPrompt, coreIdeasPrompt, introPrompt, standardsPrompt, teachingPrompt } from "@/prompts/steps";
@@ -40,53 +41,128 @@ export function ContentStep({ doc, setDoc, onBack, onNext, onParseFail }: StepPr
         onParseFail={(e) => onParseFail?.("content", e)}
         onApply={(areas) => setDoc((d) => void (d.areas = areas))}
       />
-      {doc.areas.map((a, i) => (
-        <Card key={i} className="space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="shrink-0 text-sm font-bold text-brand-600">({i + 1}) 영역</span>
-            <input
-              className={`${inputClass} font-semibold`}
-              value={a.name}
-              placeholder="영역 이름 (명사형, 예: 평화와 존중의 지구촌)"
-              onChange={(e) => setDoc((d) => void (d.areas[i].name = e.target.value))}
-            />
-            <button
-              type="button"
-              className="shrink-0 text-sm text-gray-400 hover:text-red-600"
-              onClick={() =>
-                confirm("이 영역을 삭제할까요? 이 영역의 성취기준도 함께 삭제됩니다.") &&
-                setDoc((d) => {
-                  d.areas.splice(i, 1);
-                  d.standards = d.standards.filter((s) => s.areaIndex !== i).map((s) => (s.areaIndex > i ? { ...s, areaIndex: s.areaIndex - 1 } : s));
-                })
-              }
-            >
-              영역 삭제
-            </button>
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            {CATEGORY_KEYS.map((c) => (
-              <div key={c} className="space-y-1">
-                <p className="text-sm font-semibold">{CATEGORIES[c]}</p>
-                <ListEditor
-                  items={a[c]}
-                  onChange={(items) => setDoc((d) => void (d.areas[i][c] = items))}
-                  placeholder={c === "process" ? "~하기" : c === "knowledge" ? "명사형" : "~태도, ~의지"}
-                />
-              </div>
-            ))}
-          </div>
-        </Card>
-      ))}
-      <button
-        type="button"
-        className="w-full rounded-xl border-2 border-dashed border-gray-300 py-3 text-sm text-gray-500 hover:border-brand-500 hover:text-brand-600"
-        onClick={() => setDoc((d) => void d.areas.push(emptyArea()))}
-      >
-        + 영역 추가
-      </button>
+      <ContentTable doc={doc} setDoc={setDoc} />
       <StepIssues issues={checkContentSystem(doc.areas.map((a) => ({ ...a, knowledge: clean(a.knowledge), process: clean(a.process), values: clean(a.values) })))} />
       <NavButtons onBack={onBack} onNext={onNext} />
+    </div>
+  );
+}
+
+/** 내용 체계표: 예시 문서처럼 영역은 오른쪽으로, 범주는 아래로 (지식·이해 → 과정·기능 → 가치·태도) */
+function ContentTable({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">) {
+  const removeArea = (i: number) =>
+    confirm("이 영역을 삭제할까요? 이 영역의 성취기준도 함께 삭제됩니다.") &&
+    setDoc((d) => {
+      d.areas.splice(i, 1);
+      d.standards = d.standards.filter((s) => s.areaIndex !== i).map((s) => (s.areaIndex > i ? { ...s, areaIndex: s.areaIndex - 1 } : s));
+    });
+  const addArea = () => setDoc((d) => void d.areas.push(emptyArea()));
+  const th = "border border-gray-300 bg-brand-50 p-2 text-sm font-semibold";
+  const placeholder = { knowledge: "명사형", process: "~하기", values: "~태도, ~의지" } as const;
+
+  return (
+    <Card className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-bold">내용 체계표</h2>
+        <button type="button" onClick={addArea} className="rounded-lg border border-brand-500 px-3 py-1 text-sm font-semibold text-brand-700 hover:bg-brand-50">
+          + 영역 추가 (오른쪽에 열 추가)
+        </button>
+      </div>
+      {doc.areas.length === 0 ? (
+        <p className="rounded-lg bg-gray-50 p-4 text-center text-sm text-gray-500">
+          위의 &lsquo;AI에게 초안 받기&rsquo;로 채우거나 &lsquo;+ 영역 추가&rsquo;를 눌러 직접 작성하세요.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse" style={{ minWidth: 120 + doc.areas.length * 240 }}>
+            <thead>
+              <tr>
+                <th rowSpan={2} className={`${th} w-24`}>범주</th>
+                <th colSpan={doc.areas.length} className={th}>내용 요소</th>
+              </tr>
+              <tr>
+                {doc.areas.map((a, i) => (
+                  <th key={i} className={`${th} align-top`}>
+                    <div className="flex items-center gap-1">
+                      <span className="shrink-0 text-brand-700">({i + 1})</span>
+                      <input
+                        className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-center font-semibold focus:border-brand-500 focus:outline-none"
+                        value={a.name}
+                        placeholder="영역 이름 (명사형)"
+                        onChange={(e) => setDoc((d) => void (d.areas[i].name = e.target.value))}
+                      />
+                      <button type="button" title="영역 삭제" onClick={() => removeArea(i)} className="shrink-0 px-1 text-xs font-normal text-gray-400 hover:text-red-600">
+                        삭제
+                      </button>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {CATEGORY_KEYS.map((c) => (
+                <tr key={c}>
+                  <th className={`${th} whitespace-nowrap`}>{CATEGORIES[c]}</th>
+                  {doc.areas.map((a, i) => (
+                    <td key={i} className="border border-gray-300 p-2 align-top">
+                      <CellList
+                        items={a[c]}
+                        placeholder={placeholder[c]}
+                        onChange={(items) => setDoc((d) => void (d.areas[i][c] = items))}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** 글 길이에 맞춰 높이가 저절로 늘어나는 입력 칸 */
+function AutoTextarea({ value, placeholder, onChange }: { value: string; placeholder: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      className="w-full resize-none overflow-hidden rounded border border-transparent px-1.5 py-1 text-sm hover:border-gray-200 focus:border-brand-500 focus:outline-none"
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+}
+
+/** 표 칸 안의 내용 요소 목록: 한 줄에 하나, 앞에 · 표시 */
+function CellList({ items, onChange, placeholder }: { items: string[]; onChange: (items: string[]) => void; placeholder: string }) {
+  return (
+    <div className="space-y-1">
+      {items.map((v, j) => (
+        <div key={j} className="flex items-start gap-1">
+          <span className="pt-1.5 text-gray-400">·</span>
+          <AutoTextarea
+            value={v}
+            placeholder={placeholder}
+            onChange={(t) => onChange(items.map((x, k) => (k === j ? t.replace(/\n/g, "") : x)))}
+          />
+          <button type="button" aria-label="삭제" className="px-1 pt-1 text-xs text-gray-300 hover:text-red-600" onClick={() => onChange(items.filter((_, k) => k !== j))}>
+            ✕
+          </button>
+        </div>
+      ))}
+      <button type="button" className="pl-3 text-xs font-semibold text-brand-600 hover:underline" onClick={() => onChange([...items, ""])}>
+        + 추가
+      </button>
     </div>
   );
 }
