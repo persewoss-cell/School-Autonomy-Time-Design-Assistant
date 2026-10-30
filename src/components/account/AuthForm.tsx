@@ -3,14 +3,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { REGION_GROUPS } from "@/domain/regions";
 import { Card, Field, inputClass } from "../ui";
 import { useMe } from "../useMe";
 
-/** 가입할 수 있는 지역 (서버 services.ts의 REGIONS와 같게) */
-const REGIONS = [
-  ["전남", "전라남도"],
-  ["광주", "광주광역시"],
-] as const;
 
 /** 계정은 학교 단위(한 학교당 1개). 가입: 지역 → 학교명 → 비밀번호·확인. 로그인: 학교명 + 비밀번호. */
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
@@ -71,15 +67,19 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           ) : (
             <>
               {mode === "signup" && (
-                <Field label="지역">
+                <Field label="지역 (시·군·구)">
                   <select required className={inputClass} value={form.region} onChange={set("region")}>
                     <option value="" disabled>
                       지역을 고르세요
                     </option>
-                    {REGIONS.map(([v, label]) => (
-                      <option key={v} value={v}>
-                        {label}
-                      </option>
+                    {REGION_GROUPS.map((g) => (
+                      <optgroup key={g.short} label={g.label}>
+                        {g.areas.map((a) => (
+                          <option key={a} value={`${g.short} ${a}`}>
+                            {g.short} {a}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </Field>

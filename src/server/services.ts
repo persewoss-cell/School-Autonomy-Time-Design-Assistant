@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { basicInfoSchema, type DesignDoc } from "@/domain/types";
+import { REGION_VALUES } from "@/domain/regions";
 import { validateDesign } from "@/validation/design";
 import type { DesignRecord, DesignSummary, Repo, User } from "./repo";
 
@@ -15,8 +16,6 @@ export class ServiceError extends Error {
   }
 }
 
-/** 가입할 수 있는 지역 (지금은 전남·광주만) */
-export const REGIONS = ["전남", "광주"] as const;
 
 /** 학교명: 띄어쓰기 없이 저장하고, 중복 확인·로그인에 쓴다 */
 export const schoolKeyOf = (name: string) => String(name ?? "").replace(/\s+/g, "");
@@ -36,7 +35,7 @@ const passwordSchema = z.string().min(8, "비밀번호는 8자 이상이어야 �
 
 export const signupSchema = z
   .object({
-    region: z.enum(REGIONS, { message: "지역을 골라 주세요." }),
+    region: z.string().refine((v) => REGION_VALUES.includes(v), "지역(시·군·구)을 골라 주세요."),
     schoolName: schoolNameSchema,
     password: passwordSchema,
     passwordConfirm: z.string(),
@@ -246,6 +245,7 @@ export async function adminStats(repo: Repo) {
       resetRequests,
       byStatus: count(users, (u) => u.status),
       byRegion: count(users, (u) => u.region || "(지역 없음)"),
+      bySido: count(users, (u) => (u.region ? u.region.split(" ")[0] : "(지역 없음)")),
     },
     designs: {
       total: designs.length,
