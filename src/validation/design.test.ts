@@ -79,6 +79,18 @@ describe("성취기준", () => {
     doc.standards[0].elements = ["세계와 연결된 나의 삶"];
     expect(checkStandards(doc).some((i) => i.message.includes("[지식·이해] 범주만"))).toBe(true);
   });
+  it("한 내용 요소를 두 성취기준에 넣으면 오류", () => {
+    const doc = sampleSubject();
+    doc.standards[1].elements.push("세계와 연결된 나의 삶");
+    expect(errors(checkStandards(doc)).some((i) => i.message.includes("겹쳐 들어가"))).toBe(true);
+  });
+  it("어느 성취기준에도 안 쓴 내용 요소는 경고, 내용 요소 1개나 4개 이상도 경고", () => {
+    const doc = sampleSubject();
+    doc.standards[0].elements = ["세계와 연결된 나의 삶"];
+    const issues = checkStandards(doc);
+    expect(issues.some((i) => i.message.includes("연결되지 않은 내용 요소") && i.message.includes("세계 어린이의 생활 탐구하기"))).toBe(true);
+    expect(issues.some((i) => i.message.includes("2~3개를 묶는 것을 권장"))).toBe(true);
+  });
   it("내용 요소가 없으면 오류", () => {
     const doc = sampleSubject();
     doc.standards[0].elements = [];

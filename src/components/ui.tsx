@@ -225,23 +225,33 @@ export function Chips({
   selected,
   onToggle,
   render = (o) => o,
+  disabled,
 }: {
   options: string[];
   selected: string[];
   onToggle: (o: string) => void;
   render?: (o: string) => React.ReactNode;
+  /** 고를 수 없는 항목이면 이유 문구, 아니면 false */
+  disabled?: (o: string) => string | false;
 }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {options.map((o) => {
         const on = selected.includes(o);
+        const why = !on && disabled ? disabled(o) : false;
         return (
           <button
             key={o}
             type="button"
+            disabled={!!why}
+            title={why || undefined}
             onClick={() => onToggle(o)}
             className={`rounded-full border px-2.5 py-1 text-xs ${
-              on ? "border-brand-500 bg-brand-50 font-semibold text-brand-700" : "border-gray-300 text-gray-500 hover:border-brand-500"
+              on
+                ? "border-brand-500 bg-brand-50 font-semibold text-brand-700"
+                : why
+                  ? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-300 line-through"
+                  : "border-gray-300 text-gray-500 hover:border-brand-500"
             }`}
           >
             {on ? "✓ " : ""}

@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { CATEGORIES, CATEGORY_KEYS, newId, type Area, type DesignDoc, type Standard } from "@/domain/types";
 import { codeMap, defaultAbbrev, standardCategories } from "@/domain/codes";
-import { elementCount, recommendedStandardCount, standardCountsFor } from "@/domain/standardCounts";
+import { elementCount, recommendedStandardCount, standardCountRange, standardCountsFor } from "@/domain/standardCounts";
 import { contentSystemPrompt, coreIdeasPrompt, introPrompt, standardsPrompt, teachingPrompt } from "@/prompts/steps";
 import { checkContentSystem, checkCoreIdeas, checkIntro, checkStandards, checkTeaching } from "@/validation/design";
 import { AiAssist } from "./AiAssist";
@@ -273,10 +273,14 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
                     </span>
                   </div>
                   <textarea rows={2} className={inputClass} value={s.text} placeholder="~을 이해하고, ~할 수 있다." onChange={(e) => set((st) => void (st.text = e.target.value))} />
-                  <p className="text-xs text-gray-500">이 성취기준이 다루는 내용 요소 (눌러서 고르기)</p>
+                  <p className="text-xs text-gray-500">이 성취기준이 다루는 내용 요소 2~3개 (눌러서 고르기 · 회색은 다른 성취기준에서 이미 쓴 것)</p>
                   <Chips
                     options={allElements(a)}
                     selected={s.elements}
+                    disabled={(o) => {
+                      const other = doc.standards.find((x) => x.id !== s.id && x.elements.includes(o));
+                      return other ? `${codes.get(other.id)}에서 사용 중` : false;
+                    }}
                     onToggle={(o) => set((st) => void (st.elements = toggle(st.elements, o)))}
                   />
                 </div>
@@ -324,11 +328,13 @@ function StandardCountPicker({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">)
         )}
       </div>
       <p className="text-sm text-gray-600">
-        성취기준 하나가 내용 요소 2~3개를 묶으므로, 내용 요소 수에 맞춰 추천했어요. 원하는 개수로 바꾸면 AI 프롬프트에 그대로 들어가요.
+        성취기준 하나는 내용 요소 2~3개를 묶고, 내용 요소 하나는 성취기준 하나에만 들어가요. 그래서 내용 요소 수에 따라 고를 수 있는 개수가 정해져요.
+        정한 개수는 AI 프롬프트에 그대로 들어가요.
       </p>
       <div className="divide-y divide-gray-100">
         {doc.areas.map((a, i) => {
           const rec = recommendedStandardCount(a);
+          const { min, max } = standardCountRange(a);
           return (
             <div key={i} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <div className="text-sm">
@@ -336,15 +342,15 @@ function StandardCountPicker({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">)
                   ({i + 1}) {a.name}
                 </b>
                 <span className="ml-2 text-gray-500">
-                  내용 요소 {elementCount(a)}개 → 추천 {rec}개
+                  내용 요소 {elementCount(a)}개 → {min === max ? `${min}개만 가능` : `${min}~${max}개 가능`} (추천 {rec}개)
                 </span>
               </div>
               <div className="flex items-center gap-1">
-                <button type="button" aria-label="줄이기" disabled={counts[i] <= 1} onClick={() => set(i, counts[i] - 1)} className="h-8 w-8 rounded-lg border border-gray-300 text-lg leading-none disabled:opacity-30">
+                <button type="button" aria-label="줄이기" disabled={counts[i] <= min} onClick={() => set(i, counts[i] - 1)} className="h-8 w-8 rounded-lg border border-gray-300 text-lg leading-none disabled:opacity-30">
                   −
                 </button>
                 <span className={`w-14 text-center font-semibold ${counts[i] === rec ? "" : "text-brand-700"}`}>{counts[i]}개</span>
-                <button type="button" aria-label="늘리기" disabled={counts[i] >= 8} onClick={() => set(i, counts[i] + 1)} className="h-8 w-8 rounded-lg border border-gray-300 text-lg leading-none disabled:opacity-30">
+                <button type="button" aria-label="늘리기" disabled={counts[i] >= max} onClick={() => set(i, counts[i] + 1)} className="h-8 w-8 rounded-lg border border-gray-300 text-lg leading-none disabled:opacity-30">
                   +
                 </button>
               </div>
@@ -352,7 +358,9 @@ function StandardCountPicker({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">)
           );
         })}
       </div>
-      {counts.some((n) => n < 2) && <p className="text-xs text-amber-700">지침은 영역별로 성취기준 2가지 이상 개발을 권장해요.</p>}
+      {counts.some((n) => n < 2) && (
+        <p className="text-xs text-amber-700">지침은 영역별로 성취기준 2가지 이상 개발을 권장해요. 내용 요소가 4개 이상이면 2개 이상 만들 수 있어요.</p>
+      )}
     </Card>
   );
 }

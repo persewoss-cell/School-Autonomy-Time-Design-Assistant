@@ -136,6 +136,32 @@ export function checkStandards(doc: Pick<DesignDoc, "basic" | "abbrev" | "areas"
       });
     }
   });
+  // 내용 요소 하나는 성취기준 하나에만, 내용 요소는 빠짐없이
+  const owner = new Map<string, string>();
+  for (const s of doc.standards) {
+    for (const e of s.elements) {
+      const prev = owner.get(e);
+      if (prev && prev !== s.id) {
+        issues.push({
+          level: "error",
+          field: `내용 요소 '${e}'`,
+          message: `${codes.get(prev)}와(과) ${codes.get(s.id)}에 겹쳐 들어가 있습니다. 내용 요소 하나는 성취기준 하나에만 넣습니다.`,
+          fix: "한쪽 성취기준에서 이 내용 요소를 빼 주세요.",
+        });
+      } else owner.set(e, s.id);
+    }
+  }
+  doc.areas.forEach((a, i) => {
+    const unused = [...a.knowledge, ...a.process, ...a.values].map((e) => e.trim()).filter((e) => e && !owner.has(e));
+    if (unused.length && doc.standards.some((s) => s.areaIndex === i)) {
+      issues.push({
+        level: "warning",
+        field: `${i + 1}영역(${a.name}) 내용 요소`,
+        message: `어느 성취기준에도 연결되지 않은 내용 요소가 있습니다: ${unused.join(", ")}`,
+        fix: "성취기준에 연결하거나, 필요 없으면 내용 체계에서 빼 주세요.",
+      });
+    }
+  });
   const seen = new Set<string>();
   for (const s of doc.standards) {
     const code = codes.get(s.id) ?? "";
@@ -161,6 +187,14 @@ export function checkStandards(doc: Pick<DesignDoc, "basic" | "abbrev" | "areas"
         fix: "이 성취기준이 다루는 내용 요소를 골라 주세요.",
       });
       continue;
+    }
+    if (s.elements.length === 1 || s.elements.length > 3) {
+      issues.push({
+        level: "warning",
+        field: code,
+        message: `내용 요소가 ${s.elements.length}개 연결되어 있습니다. 성취기준 하나에 내용 요소 2~3개를 묶는 것을 권장합니다.`,
+        fix: "내용 요소를 2~3개가 되도록 조정해 주세요.",
+      });
     }
     const cats = standardCategories(doc.areas, s);
     if (cats.length < 2) {

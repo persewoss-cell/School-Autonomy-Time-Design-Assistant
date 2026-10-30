@@ -41,6 +41,25 @@ describe("내용 체계", () => {
   });
 });
 
+describe("성취기준 — 내용 요소는 한 성취기준에만", () => {
+  it("겹친 내용 요소는 처음 것에만 남기고 알림", () => {
+    const r = standardsPrompt.parse(
+      wrap({
+        standards: [
+          { area: 1, text: "가.", elements: ["세계와 연결된 나의 삶", "세계시민 규칙 정하기"] },
+          { area: 1, text: "나.", elements: ["세계와 연결된 나의 삶", "세계 어린이의 생활 탐구하기"] },
+        ],
+      }),
+      doc,
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.data[1].elements).toEqual(["세계 어린이의 생활 탐구하기"]);
+      expect(r.notes.join()).toContain("겹쳐 들어간 내용 요소");
+    }
+  });
+});
+
 describe("성취기준 — AI가 지어낸 내용 요소 걸러 내기", () => {
   it("내용 체계에 없는 내용 요소는 빼고 알린다, 코드는 무시", () => {
     const r = standardsPrompt.parse(
@@ -168,13 +187,30 @@ describe("영역 수·영역명과 학년 수준", () => {
 });
 
 describe("영역별 성취기준 수", () => {
-  it("내용 요소 수로 추천: 5개→2, 4개→2, 9개→4, 최소 2", async () => {
+  const area = (n: number) => ({ name: "a", knowledge: Array.from({ length: n }, (_, i) => `요소${i}`), process: [], values: [] });
+  it("범위: 내용 요소를 2~3개씩 겹치지 않게 나누면 최소 ⌈n÷3⌉, 최대 ⌊n÷2⌋", async () => {
+    const { standardCountRange } = await import("@/domain/standardCounts");
+    expect([4, 5, 6, 7, 9, 10, 3].map((n) => standardCountRange(area(n)))).toEqual([
+      { min: 2, max: 2 },
+      { min: 2, max: 2 },
+      { min: 2, max: 3 },
+      { min: 3, max: 3 },
+      { min: 3, max: 4 },
+      { min: 4, max: 5 },
+      { min: 1, max: 1 },
+    ]);
+  });
+  it("추천은 범위 안: 5개→2, 9개→4, 10개→4, 3개→1", async () => {
     const { recommendedStandardCount } = await import("@/domain/standardCounts");
-    const area = (n: number) => ({ name: "a", knowledge: Array(n).fill("x"), process: [], values: [] });
-    expect([5, 4, 9, 1, 0].map((n) => recommendedStandardCount(area(n)))).toEqual([2, 2, 4, 2, 2]);
+    expect([5, 9, 10, 3].map((n) => recommendedStandardCount(area(n)))).toEqual([2, 4, 4, 1]);
+  });
+  it("범위를 벗어난 값은 범위 안으로", async () => {
+    const { standardCountsFor } = await import("@/domain/standardCounts");
+    expect(standardCountsFor({ areas: [area(5), area(9)], standardCounts: [5, 1] })).toEqual([2, 3]);
   });
   it("정한 개수가 프롬프트에 들어가고, 다르게 오면 알림", () => {
     const d = sampleSubject();
+    d.areas[0].knowledge.push("세계 공동체의 구성원");
     d.standardCounts = [3, null];
     const p = standardsPrompt.build(d);
     expect(p).toContain("- (1) 세계시민의 이해: 3개");

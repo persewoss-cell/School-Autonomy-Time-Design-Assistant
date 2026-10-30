@@ -171,7 +171,7 @@ ${standardCountsFor(doc)
 2. 지식·이해 / 과정·기능 / 가치·태도 세 범주 중 두 가지 이상을 결합해 한 문장으로 씁니다. 지식·이해 하나만으로 쓰지 않습니다.
    예: 코딩 로봇의 기본 요소와 사용법[지식·이해]을 익히고, 창의적인 작품을 만들 수 있다.[과정·기능]
 3. elements에는 그 성취기준이 다루는 내용 요소를 그 영역의 내용 체계에서 **글자 그대로 복사해서** 2~3개 넣습니다. 내용 체계에 없는 내용 요소는 넣지 않습니다.
-   한 영역의 내용 요소가 그 영역의 성취기준들에 고루 나뉘어 빠짐없이 쓰이도록 합니다.
+   **내용 요소 하나는 성취기준 하나에만** 넣습니다. 같은 내용 요소를 두 성취기준에 겹쳐 쓰지 않고, 그 영역의 내용 요소를 **빠짐없이 모두** 나누어 씁니다.
 4. area에는 영역 번호(1부터)를 씁니다.
 5. 문장은 '~한다.', '~할 수 있다.', '~갖는다.'처럼 '~다.'로 끝냅니다.
 6. 같은 도달점을 반복하지 않습니다.
@@ -199,6 +199,8 @@ ${formatBlock(`{
     if (!r.ok) return r;
     const notes: string[] = [];
     const data: Standard[] = [];
+    const usedElements = new Set<string>();
+    const repeated = new Set<string>();
     for (const s of r.data) {
       const areaIndex = s.area - 1;
       if (areaIndex < 0 || areaIndex >= doc.areas.length) {
@@ -209,10 +211,17 @@ ${formatBlock(`{
       const kept = s.elements.filter((e) => categoryOf(doc.areas, e) !== null);
       const dropped = s.elements.filter((e) => categoryOf(doc.areas, e) === null);
       if (dropped.length) notes.push(`내용 체계에 없는 내용 요소를 뺐습니다: ${dropped.join(", ")}`);
-      const normalized = kept.map((e) => findElementText(doc.areas, e) ?? e);
+      // 내용 요소 하나는 성취기준 하나에만: 앞 성취기준에서 이미 쓴 것은 뺀다
+      const normalized = [...new Set(kept.map((e) => findElementText(doc.areas, e) ?? e))].filter((e) => {
+        if (!usedElements.has(e)) return true;
+        repeated.add(e);
+        return false;
+      });
+      normalized.forEach((e) => usedElements.add(e));
       data.push({ id: newId(), areaIndex, text: s.text.replace(/^\[[^\]]+\]\s*/, ""), elements: normalized });
     }
     if (data.length === 0) return { ok: false, error: "쓸 수 있는 성취기준이 없습니다. 영역 번호(area)를 확인하세요." };
+    if (repeated.size) notes.push(`여러 성취기준에 겹쳐 들어간 내용 요소는 처음 것에만 남겼습니다: ${[...repeated].join(", ")}`);
     standardCountsFor(doc).forEach((want, i) => {
       const got = data.filter((s) => s.areaIndex === i).length;
       if (got !== want) notes.push(`(${i + 1}) ${doc.areas[i].name}: ${want}개로 정했는데 AI가 ${got}개를 주었습니다. 아래에서 추가·삭제하거나 AI에게 다시 요청하세요.`);
