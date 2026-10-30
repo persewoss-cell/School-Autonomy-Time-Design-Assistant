@@ -221,6 +221,7 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
           "성취기준: 학습을 통해 학생에게 궁극적으로 기대하는 결과 혹은 도달점",
           "영역별로 2가지 이상 개발",
           "[지식·이해], [과정·기능], [가치·태도] 중 두 가지 이상 범주를 결합하여 진술 (지식·이해만으로는 지양)",
+          "문장 끝은 '~한다.'처럼 써요. '~할 수 있다.'로 끝내지 않아요 (예: 만들 수 있다. → 만든다.)",
           doc.basic.type === "activity"
             ? "활동은 기존 교과 성취기준을 재구조화할 수 있어요 (그대로 옮겨 쓰기는 안 돼요)"
             : "과목은 새로운 성취기준을 개발해요",
@@ -303,7 +304,7 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
                     rows={2}
                     className={inputClass}
                     value={s.text}
-                    placeholder="~을 이해하고, ~할 수 있다."
+                    placeholder="~을 이해하고, ~한다."
                     onChange={(e) =>
                       set((st) => {
                         st.text = e.target.value;

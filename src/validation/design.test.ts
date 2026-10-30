@@ -98,6 +98,13 @@ describe("성취기준", () => {
     doc.standards[3].elements = ["생활 속 문화 존중 사례 조사하기", "다양한 문화를 존중하는 태도"];
     expect(checkStandards(doc).some((i) => i.field === "[3사지구02-01]" && i.message.includes("바뀌었습니다"))).toBe(true);
   });
+  it("'~할 수 있다.'로 끝나면 오류, '~한다.'는 통과", () => {
+    const doc = sampleSubject();
+    doc.standards[0].text = "세계와 연결된 나의 삶을 이해하고, 세계 어린이의 생활을 탐구할 수 있다.";
+    expect(errors(checkStandards(doc)).some((i) => i.message.includes("'~할 수 있다.'"))).toBe(true);
+    doc.standards[0].text = "세계와 연결된 나의 삶을 이해하고, 세계 어린이의 생활을 탐구한다.";
+    expect(checkStandards(doc).some((i) => i.message.includes("'~할 수 있다.'"))).toBe(false);
+  });
   it("내용 요소가 없으면 오류", () => {
     const doc = sampleSubject();
     doc.standards[0].elements = [];

@@ -11,6 +11,8 @@ import type { Issue, StepKey } from "./types";
 
 const VERB_ENDINGS = /(하기|알기|보기|찾기|만들기|쓰기|읽기|기르기|갖기|가지기|익히기|살펴보기)$/;
 const SENTENCE_END = /다\.?$/;
+/** 성취기준 문장 끝 '~할 수 있다.' ('~한다.'로 써야 함) */
+const CAN_END = /수\s*있다\.?$/;
 const VALUE_WORDS = ["태도", "흥미", "인식", "자세", "가치관", "감수성", "실천", "배려", "존중", "민감성", "내면화", "즐거움", "호기심", "관용", "효능감", "창의성", "자기존중", "어울림", "향유", "의지", "책임감", "의식", "마음"];
 
 const clean = (s: string) => s.trim().replace(/[.\s]+$/, "");
@@ -176,8 +178,15 @@ export function checkStandards(doc: Pick<DesignDoc, "basic" | "abbrev" | "areas"
       issues.push({ level: "error", field: code, message: "같은 문장의 성취기준이 이미 있습니다.", fix: "도달점이 겹치지 않게 고쳐 주세요." });
     }
     seen.add(s.text.trim());
-    if (!SENTENCE_END.test(s.text.trim())) {
-      issues.push({ level: "warning", field: code, message: "성취기준은 '~한다.', '~할 수 있다.'처럼 '~다.'로 끝맺습니다.", fix: "문장 끝을 고쳐 주세요." });
+    if (CAN_END.test(s.text.trim())) {
+      issues.push({
+        level: "error",
+        field: code,
+        message: "성취기준은 '~할 수 있다.'로 끝맺지 않고 '~한다.'처럼 씁니다.",
+        fix: "문장 끝을 바꿔 주세요. (예: '만들 수 있다.' → '만든다.', '설명할 수 있다.' → '설명한다.')",
+      });
+    } else if (!SENTENCE_END.test(s.text.trim())) {
+      issues.push({ level: "warning", field: code, message: "성취기준은 '~한다.', '~갖는다.'처럼 '~다.'로 끝맺습니다.", fix: "문장 끝을 고쳐 주세요." });
     }
     if (s.elements.length === 0) {
       issues.push({
