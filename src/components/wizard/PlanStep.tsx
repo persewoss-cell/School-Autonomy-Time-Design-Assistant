@@ -7,7 +7,7 @@ import { planPrompt } from "@/prompts/steps";
 import { makeDemoPlans } from "@/prompts/demoPlans";
 import { checkUnitPlan, planCoverage } from "@/validation/design";
 import { checkPlanHours, checkUnitHours, lessonLabels, totalLessonHours } from "@/validation/hours";
-import { MIN_UNIT_HOURS, recommendedUnitHours, unitHoursFor } from "@/domain/unitHours";
+import { recommendedUnitHours, unitHoursFor } from "@/domain/unitHours";
 import type { PlanRequest } from "@/domain/types";
 import { AiAssist } from "./AiAssist";
 import type { StepProps } from "./DocSteps";
@@ -39,7 +39,7 @@ export function PlanStep(props: StepProps) {
         <PlanRequestCard doc={doc} setDoc={setDoc} />
         {blockers.length > 0 ? (
           <Card className="space-y-2 border-2 border-red-200">
-            <p className="font-bold text-red-700">단원별 차시를 먼저 고쳐야 AI에게 물을 수 있어요.</p>
+            <p className="font-bold text-red-700">단원별 차시를 먼저 맞춰야 AI에게 물을 수 있어요.</p>
             <IssueList issues={blockers} />
           </Card>
         ) : (
@@ -102,7 +102,7 @@ function PlanRequestCard({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">) {
           )}
         </div>
         <p className="text-sm text-gray-600">
-          단원(= 내용 체계의 영역)마다 몇 차시로 할지 적어요. 빈칸은 추천대로 채워져요. 단원마다 <b>{MIN_UNIT_HOURS}차시 이상</b>, 합계는 운영 시수 {doc.basic.hours}차시와 같아야 해요.
+          단원(= 내용 체계의 영역)마다 몇 차시로 할지 적어요. 빈칸은 추천(내용 요소 수 비율)대로 채워져요. 합계는 운영 시수 {doc.basic.hours}차시와 같아야 해요.
         </p>
         <div className="divide-y divide-gray-100">
           {doc.areas.map((a, i) => {
@@ -118,7 +118,7 @@ function PlanRequestCard({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">) {
                     type="number"
                     min={1}
                     max={doc.basic.hours}
-                    className={`w-20 rounded border px-2 py-1 text-right ${hours[i] < MIN_UNIT_HOURS ? "border-red-400 bg-red-50" : "border-gray-300"}`}
+                    className={`w-20 rounded border px-2 py-1 text-right ${hours[i] < 1 ? "border-red-400 bg-red-50" : "border-gray-300"}`}
                     placeholder={String(hours[i])}
                     value={typed ? v : ""}
                     onChange={(e) =>
@@ -302,7 +302,7 @@ function EditPlan({ doc, setDoc, onBack, onNext, tips }: StepProps & { tips: str
           <div className="flex items-center gap-2">
             <span className="shrink-0 text-sm font-bold text-brand-600">{ui + 1}단원</span>
             <input className={`${inputClass} font-semibold`} value={u.unitName} onChange={(e) => mutate((p) => void (p.units[ui].unitName = e.target.value))} />
-            <span className={`shrink-0 text-sm font-semibold ${u.lessons.reduce((sum, l) => sum + l.hours, 0) < MIN_UNIT_HOURS ? "text-red-600" : "text-gray-500"}`}>
+            <span className="shrink-0 text-sm font-semibold text-gray-500">
               {u.lessons.reduce((sum, l) => sum + l.hours, 0)}차시
             </span>
             <button

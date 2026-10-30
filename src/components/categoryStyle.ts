@@ -1,29 +1,33 @@
 import type { Category } from "@/domain/types";
 
-/** 내용 체계 범주별 색 (지식·이해 빨강, 과정·기능 초록, 가치·태도 보라). 내용 체계 표와 성취기준 내용 요소 칩에서 같이 씀 */
+/**
+ * 내용 체계 범주별 색 (사용자가 고른 색: 지식·이해 #FDEADA 살구, 과정·기능 #EBF1DE 연두, 가치·태도 #DBEEF4 하늘).
+ * 범주 이름 칸은 고른 색 그대로, 내용 칸은 더 연하게, 테두리·글자는 같은 계열의 진한 색.
+ * 내용 체계 표와 성취기준 내용 요소 칩에서 같이 씀.
+ */
 export const CATEGORY_STYLE: Record<Category, { head: string; cell: string; box: string; chipOn: string; chipOff: string; badge: string }> = {
   knowledge: {
-    head: "bg-rose-100 text-rose-900",
-    cell: "bg-rose-50/70",
-    box: "border-rose-200 bg-white hover:border-rose-300",
-    chipOn: "border-rose-500 bg-rose-100 font-semibold text-rose-800",
-    chipOff: "border-rose-200 bg-rose-50 text-rose-700 hover:border-rose-400",
-    badge: "bg-rose-100 text-rose-800",
+    head: "bg-[#FDEADA] text-[#8A4A1C]",
+    cell: "bg-[#FEF6EF]",
+    box: "border-[#F3CFB1] bg-white hover:border-[#E8AE80]",
+    chipOn: "border-[#D9874A] bg-[#FBD9BD] font-semibold text-[#7A3E14]",
+    chipOff: "border-[#F3CFB1] bg-[#FDEADA] text-[#8A4A1C] hover:border-[#D9874A]",
+    badge: "bg-[#FDEADA] text-[#8A4A1C]",
   },
   process: {
-    head: "bg-emerald-100 text-emerald-900",
-    cell: "bg-emerald-50/70",
-    box: "border-emerald-200 bg-white hover:border-emerald-300",
-    chipOn: "border-emerald-500 bg-emerald-100 font-semibold text-emerald-800",
-    chipOff: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-400",
-    badge: "bg-emerald-100 text-emerald-800",
+    head: "bg-[#EBF1DE] text-[#4A5E22]",
+    cell: "bg-[#F6F9F0]",
+    box: "border-[#CFDDB0] bg-white hover:border-[#AFC684]",
+    chipOn: "border-[#8AA552] bg-[#D8E6BE] font-semibold text-[#3F521B]",
+    chipOff: "border-[#CFDDB0] bg-[#EBF1DE] text-[#4A5E22] hover:border-[#8AA552]",
+    badge: "bg-[#EBF1DE] text-[#4A5E22]",
   },
   values: {
-    head: "bg-violet-100 text-violet-900",
-    cell: "bg-violet-50/70",
-    box: "border-violet-200 bg-white hover:border-violet-300",
-    chipOn: "border-violet-500 bg-violet-100 font-semibold text-violet-800",
-    chipOff: "border-violet-200 bg-violet-50 text-violet-700 hover:border-violet-400",
-    badge: "bg-violet-100 text-violet-800",
+    head: "bg-[#DBEEF4] text-[#1F5767]",
+    cell: "bg-[#EFF8FB]",
+    box: "border-[#B3DAE6] bg-white hover:border-[#86C2D4]",
+    chipOn: "border-[#4E9DB5] bg-[#BFE2EC] font-semibold text-[#184C5A]",
+    chipOff: "border-[#B3DAE6] bg-[#DBEEF4] text-[#1F5767] hover:border-[#4E9DB5]",
+    badge: "bg-[#DBEEF4] text-[#1F5767]",
   },
 };

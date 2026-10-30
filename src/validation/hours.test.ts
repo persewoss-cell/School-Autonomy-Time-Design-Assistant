@@ -106,17 +106,13 @@ describe("checkSemesterTotal (지침 6쪽 예시)", () => {
   });
 });
 
-describe("단원별 차시 (단원마다 10차시 이상)", () => {
-  it("문제 없으면 빈 목록", () => {
-    expect(checkUnitHours(32, [{ name: "가", hours: 12 }, { name: "나", hours: 10 }, { name: "다", hours: 10 }])).toEqual([]);
+describe("단원별 차시", () => {
+  it("문제 없으면 빈 목록 (단원별 최소 차시 규칙은 없음)", () => {
+    expect(checkUnitHours(32, [{ name: "가", hours: 25 }, { name: "나", hours: 4 }, { name: "다", hours: 3 }])).toEqual([]);
   });
-  it("10차시 미만 단원과 합계 오류", () => {
-    const issues = checkUnitHours(32, [{ name: "가", hours: 9 }, { name: "나", hours: 20 }]);
-    expect(issues.some((i) => i.field === "1단원(가)" && i.message.includes("10차시 이상"))).toBe(true);
+  it("0차시 단원과 합계 오류", () => {
+    const issues = checkUnitHours(32, [{ name: "가", hours: 0 }, { name: "나", hours: 29 }]);
+    expect(issues.some((i) => i.field === "1단원(가)")).toBe(true);
     expect(issues.some((i) => i.field === "단원별 차시 합계" && i.message.includes("3차시 적습니다"))).toBe(true);
-  });
-  it("운영 시수로 만들 수 있는 단원 수를 넘으면 설명", () => {
-    const issues = checkUnitHours(29, [{ name: "가", hours: 10 }, { name: "나", hours: 10 }, { name: "다", hours: 9 }]);
-    expect(issues.find((i) => i.field === "단원 수")?.message).toContain("최대 2개");
   });
 });

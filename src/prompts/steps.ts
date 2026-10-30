@@ -3,7 +3,7 @@ import { CATEGORIES, newId, planSchema, standardNeedsRewrite, type Area, type As
 import { categoryOf, codeMap, hasSameCategory } from "@/domain/codes";
 import { categorySplit, splitProblem, standardCountsFor } from "@/domain/standardCounts";
 import { planCoverage } from "@/validation/design";
-import { MIN_UNIT_HOURS, unitHoursFor } from "@/domain/unitHours";
+import { unitHoursFor } from "@/domain/unitHours";
 import { COMMON_RULES, contextBlock, formatBlock, parseAiJson, toList, type AiParse } from "./common";
 
 const CIRCLED = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"];
@@ -395,7 +395,7 @@ ${doc.planRequest?.notes.trim() || "(없음)"}
 1. 성격이 분명히 다른 3안을 만듭니다. (예: 탐구 중심 / 체험·프로젝트 중심 / 표현·발표 중심)
 2. 한 안의 모든 차시(hours)를 더한 값은 반드시 정확히 ${doc.basic.hours}이어야 합니다. 답하기 전에 직접 더해서 확인하세요.
 3. 단원은 내용 체계의 영역 순서대로 하나씩 만듭니다. (단원 ${doc.areas.length}개) 단원명은 영역명을 그대로 쓰거나, 영역을 포함하는 의미로 재구성합니다.
-   각 단원의 차시 합계는 위 '단원별 차시'와 **정확히** 같아야 합니다. (단원마다 ${MIN_UNIT_HOURS}차시 이상)
+   각 단원의 차시 합계는 위 '단원별 차시'와 **정확히** 같아야 합니다.
 4. 각 단원의 standards에는 그 단원에서 다루는 성취기준 코드를 위 목록에서 **그대로** 넣습니다. 모든 성취기준이 어느 단원엔가 들어가야 하고, 목록에 없는 코드는 쓰지 않습니다.
 5. 학습주제(topic)는 짧은 개괄식으로 씁니다.
 6. 학습 목표(goal)는 '~해 봅시다.'로 끝나는 한 문장으로 씁니다.

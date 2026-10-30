@@ -44,7 +44,7 @@ export function ContentStep({ doc, setDoc, onBack, onNext, onParseFail }: StepPr
         onApply={(areas) => setDoc((d) => void (d.areas = areas))}
       />
       <ContentTable doc={doc} setDoc={setDoc} />
-      <StepIssues issues={checkContentSystem(doc.areas.map((a) => ({ ...a, knowledge: clean(a.knowledge), process: clean(a.process), values: clean(a.values) })), doc.basic.hours)} />
+      <StepIssues issues={checkContentSystem(doc.areas.map((a) => ({ ...a, knowledge: clean(a.knowledge), process: clean(a.process), values: clean(a.values) })))} />
       <NavButtons onBack={onBack} onNext={onNext} />
     </div>
   );
@@ -60,7 +60,7 @@ function ContentTable({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">) {
       d.standards = d.standards.filter((s) => s.areaIndex !== i).map((s) => (s.areaIndex > i ? { ...s, areaIndex: s.areaIndex - 1 } : s));
     });
   const addArea = () => setDoc((d) => void d.areas.push(emptyArea()));
-  const th = "border border-gray-300 bg-brand-50 p-2 text-sm font-semibold";
+  const th = "border border-gray-300 bg-gray-100 p-2 text-sm font-semibold";
   const placeholder = { knowledge: "명사형", process: "~하기", values: "~태도, ~의지" } as const;
 
   return (
