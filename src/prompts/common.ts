@@ -89,6 +89,19 @@ export const toList = (v: unknown): string[] => {
     .filter(Boolean);
 };
 
+/** 학년별 수준 안내 (모든 프롬프트에 넣어 학년에 맞는 내용·낱말·활동이 나오게 함) */
+export function gradeGuide(grade: number): string {
+  const byGrade: Record<number, string> = {
+    3: "3학년(3~4학년군 시작): 가정·학교·고장 등 가까운 생활 속 소재, 직접 보고 만지고 해 보는 구체적 체험·놀이 중심, 짧고 쉬운 낱말. 개념은 '알아보기·찾아보기' 수준으로 간단히.",
+    4: "4학년(3~4학년군): 고장·지역으로 범위를 넓히고, 간단한 조사·비교·분류와 쉬운 자료 정리(표·그림), 모둠 활동을 시작하는 수준. 추상적 개념은 구체적 사례로 풀어서.",
+    5: "5학년(5~6학년군 시작): 지역·국가로 범위 확장, 자료를 찾아 정리·분석하고 까닭을 설명하기, 모둠 프로젝트와 발표. 개념과 원리를 사례와 연결해 이해하는 수준.",
+    6: "6학년(5~6학년군): 국가·세계로 범위 확장, 탐구·토의·토론과 문제 해결, 디지털 도구로 결과물을 만들어 공유하기, 가치를 판단하고 실천을 다짐하는 수준.",
+  };
+  return `- ${byGrade[grade] ?? `${grade}학년 수준`}
+- 같은 학년(군) 교과 교육과정의 성취기준 수준을 넘지 않게 하고, 어려운 한자어·전문 용어는 쉬운 말로 바꿉니다.
+- 한 차시(40분)에 이 학년 학생이 해낼 수 있는 분량과 난이도로 제안합니다.`;
+}
+
 /** 모든 프롬프트 앞부분: 역할 + 기본 정보 + [전단계] 주제와 활동 내용 */
 export function contextBlock(doc: Pick<DesignDoc, "basic" | "input">): string {
   const { basic, input } = doc;
@@ -119,7 +132,10 @@ ${list(input.desiredActivities)}
 ${input.schoolContext || "(없음)"}
 
 ## 연계 가능한 자원 (마을학교, 체험처, 인적 자원 등)
-${input.resources || "(없음)"}`;
+${input.resources || "(없음)"}
+
+## 학년 수준 (꼭 고려)
+${gradeGuide(basic.grade)}`;
 }
 
 export const COMMON_RULES = `- 정치적·종교적으로 편향된 내용, 특정 상업 브랜드 홍보, 학생 개인정보는 넣지 않습니다.

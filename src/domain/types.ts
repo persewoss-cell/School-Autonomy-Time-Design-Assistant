@@ -49,6 +49,10 @@ export const topicInputSchema = z.object({
   desiredActivities: z.array(z.string().trim().min(1).max(200)).max(15),
   schoolContext: z.string().trim().max(1000),
   resources: z.string().trim().max(1000),
+  /** 내용 체계의 영역 수 (선택, 비우면 AI가 정함) */
+  areaCount: z.number().int().min(1).max(5).nullable().default(null),
+  /** 정해 둔 영역명 (선택, 비우면 AI가 정함) */
+  areaNames: z.array(z.string().trim().min(1).max(60)).max(5).default([]),
 });
 export type TopicInput = z.infer<typeof topicInputSchema>;
 
@@ -187,7 +191,7 @@ export function emptyDesign(): DesignDoc {
       openingType: "학교 특색교육형",
       operationMode: "지속형",
     },
-    input: { topic: "", requiredContents: [], desiredActivities: [], schoolContext: "", resources: "" },
+    input: { topic: "", requiredContents: [], desiredActivities: [], schoolContext: "", resources: "", areaCount: null, areaNames: [] },
     areas: [],
     coreIdeas: [],
     abbrev: "",

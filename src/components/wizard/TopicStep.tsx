@@ -24,6 +24,8 @@ export function TopicStep({
   const [desired, setDesired] = useState(value.desiredActivities.join("\n"));
   const [context, setContext] = useState(value.schoolContext);
   const [resources, setResources] = useState(value.resources);
+  const [areaCount, setAreaCount] = useState(value.areaCount ? String(value.areaCount) : "");
+  const [areaNames, setAreaNames] = useState((value.areaNames ?? []).join("\n"));
   const [error, setError] = useState("");
 
   const submit = () => {
@@ -33,8 +35,13 @@ export function TopicStep({
       desiredActivities: toLines(desired),
       schoolContext: context,
       resources,
+      areaCount: areaCount ? Number(areaCount) : null,
+      areaNames: toLines(areaNames),
     });
     if (!parsed.success) return setError(parsed.error.issues[0]?.message ?? "입력값을 확인해 주세요.");
+    if (parsed.data.areaCount && parsed.data.areaNames.length > parsed.data.areaCount) {
+      return setError(`정해 둔 영역명이 ${parsed.data.areaNames.length}개인데 영역 수는 ${parsed.data.areaCount}개입니다. 영역 수를 늘리거나 영역명을 줄여 주세요.`);
+    }
     setError("");
     onNext(parsed.data);
   };
@@ -56,6 +63,24 @@ export function TopicStep({
       <Field label="하고 싶은 활동 (한 줄에 하나씩)" hint="예: 역할극 발표 / 마을학교 체험 / UCC 제작">
         <textarea rows={4} className={inputClass} value={desired} onChange={(e) => setDesired(e.target.value)} />
       </Field>
+      <div className="space-y-3 rounded-xl border border-gray-200 p-4">
+        <p className="text-sm font-semibold">내용 체계 영역 (선택 — 비워 두면 AI가 주제와 학년에 맞게 정해요)</p>
+        <div className="grid gap-4 sm:grid-cols-[180px_1fr]">
+          <Field label="영역 수" hint="2~3개 권장">
+            <select className={inputClass} value={areaCount} onChange={(e) => setAreaCount(e.target.value)}>
+              <option value="">알아서 (2~3개)</option>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n}개
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="정해 둔 영역명 (한 줄에 하나씩, 순서대로)" hint="일부만 적어도 돼요. 나머지는 AI가 정해요. 예: 세계시민의 이해 / 문화 다양성과 존중">
+            <textarea rows={3} className={inputClass} value={areaNames} onChange={(e) => setAreaNames(e.target.value)} />
+          </Field>
+        </div>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="학교·지역 여건 (선택)" hint="학교 특색교육, 학생 특성, 교육공동체 요구 등">
           <textarea rows={3} className={inputClass} value={context} onChange={(e) => setContext(e.target.value)} />

@@ -122,3 +122,47 @@ describe("교수·학습", () => {
     expect(r.ok).toBe(true);
   });
 });
+
+describe("영역 수·영역명과 학년 수준", () => {
+  const withAreas = (count: number | null, names: string[]) => {
+    const d = sampleSubject();
+    d.input = { ...d.input, areaCount: count, areaNames: names };
+    return d;
+  };
+  it("정해 둔 영역 수와 영역명이 프롬프트에 들어간다", () => {
+    const p = contentSystemPrompt.build(withAreas(3, ["경제생활과 소득"]));
+    expect(p).toContain("영역은 정확히 3개");
+    expect(p).toContain("(1) 경제생활과 소득");
+    expect(p).toContain("나머지 2개 영역의 이름은 주제에 맞게");
+  });
+  it("비워 두면 AI가 2~3개로 정한다", () => {
+    expect(contentSystemPrompt.build(withAreas(null, []))).toContain("2~3개로 나눕니다");
+  });
+  it("영역명만 2개 적으면 2개로", () => {
+    expect(contentSystemPrompt.build(withAreas(null, ["가", "나"]))).toContain("영역은 정확히 2개");
+  });
+  it("오래된 저장본(영역 칸 없음)도 동작", () => {
+    const d = sampleSubject();
+    d.input = { ...d.input } as typeof d.input;
+    delete (d.input as Partial<typeof d.input>).areaNames;
+    delete (d.input as Partial<typeof d.input>).areaCount;
+    expect(contentSystemPrompt.build(d)).toContain("2~3개로 나눕니다");
+  });
+  it("영역 수·영역명이 다르게 오면 알려 준다", () => {
+    const r = contentSystemPrompt.parse(wrap({ areas: [{ name: "다른 이름", knowledge: ["a"], process: ["b하기"], values: ["c"] }] }), withAreas(2, ["세계시민의 이해"]));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.notes.join()).toContain("2개로 정했는데 AI가 1개");
+      expect(r.notes.join()).toContain("세계시민의 이해");
+    }
+  });
+  it("모든 단계 프롬프트에 학년 수준 안내가 들어간다", () => {
+    const d = sampleSubject();
+    for (const p of [contentSystemPrompt, coreIdeasPrompt, standardsPrompt, introPrompt, planPrompt, assessmentPrompt, teachingPrompt]) {
+      expect(p.build(d)).toContain("## 학년 수준 (꼭 고려)");
+    }
+    expect(contentSystemPrompt.build(d)).toContain("3학년(3~4학년군 시작)");
+    d.basic.grade = 6;
+    expect(planPrompt.build(d)).toContain("6학년(5~6학년군)");
+  });
+});

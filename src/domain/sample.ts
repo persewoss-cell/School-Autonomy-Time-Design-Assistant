@@ -32,6 +32,8 @@ export function sampleSubject(): DesignDoc {
       desiredActivities: ["세계시민 여권 만들기", "문화 존중 역할극", "언어 어울림(이중언어) 발표회"],
       schoolContext: "학교 특색교육: 세계시민교육, 한중일 공동교육과정",
       resources: "마을학교 코티칭, 중국어 원어민",
+      areaCount: 2,
+      areaNames: ["세계시민의 이해", "문화 다양성과 존중"],
     },
     areas: [
       {

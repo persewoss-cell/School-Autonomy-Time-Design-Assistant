@@ -45,14 +45,15 @@ export const contentSystemPrompt: StepPrompt<Area[]> = {
 내용 체계는 무엇을 가르치고 배울지를 범위와 수준으로 제시한 것입니다.
 
 ## 반드시 지킬 규칙
-1. 영역은 2~3개로 나누고, 영역 이름은 명사형으로 씁니다. (영역 = 내용과 활동을 범주화한 소주제, 단원명이 될 수 있음)
+1. ${areaRule(doc)}
+   영역 이름은 명사형으로 씁니다. (영역 = 내용과 활동을 범주화한 소주제, 단원명이 될 수 있음)
 2. 영역마다 세 범주의 내용 요소를 각각 1~3개 씁니다.
    - 지식·이해(knowledge): 이해해야 할 개념·원리. 반드시 명사형. (X) 평화의 중요성 알기 → (O) 평화의 중요성
    - 과정·기능(process): 사고 및 탐구 과정. 반드시 '~하기'로 끝냄. 예: 탐구하기, 자료수집하기, 비교·분석하기, 해결 방법 모색하기, 표현하기, 발표하기, 제작하기, 성찰하기
    - 가치·태도(values): 기를 수 있는 가치와 태도. 명사형. 주된 종결어: 태도, 흥미, 인식, 자세, 가치관, 감수성, 실천, 배려, 존중, 민감성, 내면화, 호기심, 관용, 효능감, 어울림
 3. '꼭 들어가야 할 내용'은 반드시 어느 영역의 내용 요소에 반영합니다.
 4. 학습 내용들을 포괄하도록 쓰고, 특정 브랜드나 지역명은 쓰지 않습니다.
-5. ${doc.basic.grade}학년 수준에 맞게 씁니다.
+5. 위 '학년 수준'에 맞는 낱말과 범위로 씁니다. (${doc.basic.grade}학년 학생이 이해하고 해낼 수 있는 내용)
 ${COMMON_RULES}
 
 ${formatBlock(`{
@@ -65,7 +66,7 @@ ${formatBlock(`{
     }
   ]
 }`)}`,
-  parse: (text) => {
+  parse: (text, doc) => {
     const r = parseAiJson(
       text,
       z.union([
@@ -77,11 +78,39 @@ ${formatBlock(`{
     const areaSchema = z.object({ name: z.string().trim().min(1), knowledge: list, process: list, values: list });
     const parsed = z.array(areaSchema).safeParse(r.data);
     if (!parsed.success) return { ok: false, error: "영역 이름(name) 또는 내용 요소 칸이 비었거나 형식이 맞지 않습니다." };
-    const notes = parsed.data.length > 3 ? [`AI가 영역을 ${parsed.data.length}개 주었습니다. 2~3개로 줄이는 것을 권장합니다.`] : [];
+    const notes: string[] = [];
+    const { count, names } = areaPlan(doc);
+    if (count && parsed.data.length !== count) {
+      notes.push(`전단계에서 영역을 ${count}개로 정했는데 AI가 ${parsed.data.length}개를 주었습니다. 표에서 고치거나 AI에게 다시 요청하세요.`);
+    } else if (!count && parsed.data.length > 3) {
+      notes.push(`AI가 영역을 ${parsed.data.length}개 주었습니다. 2~3개로 줄이는 것을 권장합니다.`);
+    }
+    const norm = (s: string) => s.replace(/\s+/g, "");
+    const differ = names.filter((n, i) => norm(parsed.data[i]?.name ?? "") !== norm(n));
+    if (differ.length) notes.push(`정해 둔 영역명과 다르게 온 영역이 있습니다: ${differ.join(", ")} — 표의 영역 이름 칸에서 고쳐 주세요.`);
     return { ok: true, data: parsed.data, notes };
   },
-  reminder: () => "- areas에는 2~3개의 영역이 있어야 하고, 각 영역에 name, knowledge, process, values가 있어야 합니다.",
+  reminder: (doc) => `- ${areaRule(doc)}
+- 각 영역에 name, knowledge, process, values가 있어야 합니다.`,
 };
+
+/** 전단계에서 정한 영역 수·영역명 (오래된 저장본에는 없을 수 있음) */
+function areaPlan(doc: DesignDoc): { count: number | null; names: string[] } {
+  const names = (doc.input.areaNames ?? []).map((s) => s.trim()).filter(Boolean);
+  const count = doc.input.areaCount ?? null;
+  return { count: count ? Math.max(count, names.length) : null, names };
+}
+
+/** 영역 수·영역명 규칙 문장: 정해 둔 것은 그대로, 비어 있으면 AI가 정함 */
+function areaRule(doc: DesignDoc): string {
+  const { count, names } = areaPlan(doc);
+  const total = count ?? (names.length >= 2 ? names.length : null);
+  const countText = total ? `영역은 정확히 ${total}개로 나눕니다.` : "영역은 주제와 운영 시수에 맞게 2~3개로 나눕니다.";
+  if (names.length === 0) return `${countText} 영역 이름은 주제에 맞게 정합니다.`;
+  const fixed = names.map((n, i) => `(${i + 1}) ${n}`).join(", ");
+  const rest = total && total > names.length ? ` 나머지 ${total - names.length}개 영역의 이름은 주제에 맞게 정합니다.` : !total ? " 더 필요한 영역의 이름은 주제에 맞게 정합니다." : "";
+  return `${countText} 다음 영역 이름은 순서대로 글자 그대로 씁니다: ${fixed}.${rest}`;
+}
 
 // ───────────────────────── ④ 핵심아이디어 ─────────────────────────
 export const coreIdeasPrompt: StepPrompt<string[]> = {
