@@ -1,5 +1,5 @@
 {
-  "_source": "학교자율시간 시수 편성 점검표(엑셀) — 학교자율시간점검(3~4학년), 학교자율시간점검(5~6학년) 시트. 기준시수는 학년군(2개 학년) 합계.",
+  "_source": "학교자율시간 시수 편성 점검표(엑셀) — 학교자율시간점검(3~4학년), 학교자율시간점검(5~6학년) 시트. 기준시수는 학년군(2개 학년) 합계. 증감 범위는 지침 26쪽 표대로 교과(군) 단위(group)로 본다.",
   "weeksPerYear": 34,
   "minHoursPerCourse": 10,
   "maxCoursesPerSemester": 3,
@@ -15,8 +15,8 @@
         { "key": "수학", "group": "수학", "baseHours": 272 },
         { "key": "과학", "group": "과학", "baseHours": 204 },
         { "key": "체육", "group": "체육", "baseHours": 204, "noReduction": true },
-        { "key": "음악", "group": "음악", "baseHours": 136, "noReduction": true },
-        { "key": "미술", "group": "미술", "baseHours": 136, "noReduction": true },
+        { "key": "음악", "group": "음악/미술", "baseHours": 136, "noReduction": true },
+        { "key": "미술", "group": "음악/미술", "baseHours": 136, "noReduction": true },
         { "key": "영어", "group": "영어", "baseHours": 136 }
       ],
       "creativeBaseHours": 204

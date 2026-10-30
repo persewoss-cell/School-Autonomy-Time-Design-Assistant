@@ -86,10 +86,19 @@ describe("checkAllocation", () => {
     expect(pe.ok).toBe(true);
   });
 
-  it("교과가 20%를 넘게 줄면 점검 필요", () => {
+  it("증감 범위는 교과(군) 단위 (지침 26쪽): 사회/도덕 합계로 본다", () => {
     const a = validPlan();
-    a.subjectHours["도덕"] = [10, 10, 10, 10]; // 40 < 55
-    expect(checkAllocation(a).issues.some((i) => i.field === "도덕")).toBe(true);
+    a.subjectHours["도덕"] = [10, 10, 10, 10]; // 도덕만 보면 40 < 55지만 사회/도덕 합계는 범위 안
+    a.subjectHours["사회"] = a.subjectHours["사회"].map((h) => h + 7) as typeof a.subjectHours["사회"];
+    expect(checkAllocation(a).issues.some((i) => i.field === "도덕" || i.field === "사회/도덕")).toBe(false);
+    a.subjectHours["사회"] = [30, 30, 30, 30]; // 사회/도덕 160 < 218
+    expect(checkAllocation(a).issues.some((i) => i.field === "사회/도덕" && i.message.includes("교과(군) 증감 범위"))).toBe(true);
+  });
+  it("음악·미술은 교과마다 기준시수보다 줄일 수 없음 (교과군 합계가 맞아도)", () => {
+    const a = validPlan();
+    a.subjectHours["음악"] = a.subjectHours["음악"].map((h, i) => (i === 0 ? h - 2 : h)) as typeof a.subjectHours["음악"];
+    a.subjectHours["미술"] = a.subjectHours["미술"].map((h, i) => (i === 0 ? h + 2 : h)) as typeof a.subjectHours["미술"];
+    expect(checkAllocation(a).issues.some((i) => i.field === "음악" && i.message.includes("줄일 수 없습니다"))).toBe(true);
   });
 
   it("학년별 한 학기 이상 운영해야 함", () => {

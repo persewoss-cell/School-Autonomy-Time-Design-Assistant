@@ -466,6 +466,7 @@ export interface AllocationAttachment {
   input: AllocationInput;
   years: number[];
   grade: number;
+  schoolYear: number;
 }
 
 export function buildDesignDocx(doc: DesignDoc, allocation?: AllocationAttachment): Document {
@@ -486,7 +487,7 @@ export function buildDesignDocx(doc: DesignDoc, allocation?: AllocationAttachmen
       ...curriculumDoc(doc),
       ...checklistDoc(doc),
       ...(allocation
-        ? [para(`[붙임] (${allocation.grade})학년 교육과정 편성표 (시수 점검표)`, { size: 9, line: 1, pageBreak: true, after: 2 }), ...allocationChildren(allocation.input, allocation.years)]
+        ? [para(`[붙임] (${allocation.grade})학년 교육과정 편성표 (시수 점검표)`, { size: 9, line: 1, pageBreak: true, after: 2 }), ...allocationChildren(allocation.input, { years: allocation.years, grade: allocation.grade, schoolYear: allocation.schoolYear, schoolName: schoolOf(doc), width: PAGE_WIDTH })]
         : []),
     ],
   };

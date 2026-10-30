@@ -20,8 +20,11 @@ import {
 import { useHourChecks } from "./useHourChecks";
 import {
   bandInfo,
+  CREATIVE_PARTS,
   autoReduce,
   checkAllocation,
+  creativePartsOf,
+  withCreativeParts,
   oneWeekHours,
   type AllocationInput,
   type FourSemesters,
@@ -41,7 +44,7 @@ export function HoursChecker() {
   const router = useRouter();
   const q = Number(params.get("grade"));
   const grade: ViewGrade = isViewGrade(q) ? q : 3;
-  const { checks, designs, loaded, save, loggedIn } = useHourChecks();
+  const { checks, designs, loaded, save, loggedIn, me } = useHourChecks();
   const [check, setCheck] = useState<HourCheck | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -101,6 +104,7 @@ export function HoursChecker() {
   };
   const info = bandInfo(a.band);
   const r = checkAllocation(a);
+  const parts = creativePartsOf(a);
   const mutate = (fn: (x: AllocationInput) => void) => {
     const next = structuredClone(a);
     fn(next);
@@ -330,9 +334,17 @@ export function HoursChecker() {
             <tbody className="divide-y divide-gray-100">
               {info.subjects.map((s, i) => {
                 const row = r.rows[i];
+                // 교과(군)의 첫 교과에서만 교과군 이름·범위·이상유무를 여러 줄로 묶어 보여 줌 (지침 26쪽: 범위는 교과군 단위)
+                const g = r.groups.find((x) => x.keys.includes(s.key))!;
+                const first = g.keys[0] === s.key;
+                const span = g.keys.length;
                 return (
                   <tr key={s.key}>
-                    <td className="p-2 text-gray-500">{s.group}</td>
+                    {first && (
+                      <td rowSpan={span} className="p-2 text-gray-500">
+                        {s.group}
+                      </td>
+                    )}
                     <td className="p-2 font-medium">
                       {s.key}
                       {s.noReduction && <span className="ml-1 text-xs text-blue-600">(감축 불가)</span>}
@@ -358,8 +370,17 @@ export function HoursChecker() {
                     <td className="p-2 text-center">{row.autonomy || "-"}</td>
                     <td className="p-2 text-center font-semibold">{row.planned}</td>
                     <td className="p-2 text-center">{fmt(row.oneWeek)}</td>
-                    <td className="p-2 text-center text-gray-500">{row.min}~{row.max}</td>
-                    <td className="p-2 text-center"><Status ok={row.ok} /></td>
+                    {first && (
+                      <td rowSpan={span} className="p-2 text-center text-gray-500">
+                        {g.min}~{g.max}
+                        {span > 1 && <span className="block text-xs">(교과군 {g.planned})</span>}
+                      </td>
+                    )}
+                    {first ? (
+                      <td rowSpan={span} className="p-2 text-center">
+                        <Status ok={r.rows.filter((x) => g.keys.includes(x.label)).every((x) => x.ok)} />
+                      </td>
+                    ) : null}
                   </tr>
                 );
               })}
@@ -373,32 +394,49 @@ export function HoursChecker() {
                 <td className="p-2 text-center text-gray-500">{r.subtotal.min}~{r.subtotal.max}</td>
                 <td className="p-2 text-center"><Status ok={r.subtotal.ok} /></td>
               </tr>
-              <tr>
-                <td className="p-2 font-medium" colSpan={2}>창의적 체험활동</td>
-                <td className="p-2 text-center">
-                  <input
-                    type="number"
-                    className={cell}
-                    value={a.creativeBaseHours}
-                    onChange={(e) => mutate((x) => (x.creativeBaseHours = num(e.target.value)))}
-                  />
-                </td>
-                {SEMS.map((sem) => (
-                  <td key={sem} className="p-2 text-center">
-                    <input
-                      type="number"
-                      className={cell}
-                      value={a.creativeHours[sem]}
-                      onChange={(e) => mutate((x) => (x.creativeHours[sem] = num(e.target.value)))}
-                    />
-                  </td>
-                ))}
-                <td className="p-2 text-center">-</td>
-                <td className="p-2 text-center font-semibold">{r.creative.planned}</td>
-                <td className="p-2 text-center">{fmt(r.creative.oneWeek)}</td>
-                <td className="p-2 text-center text-gray-500">{r.creative.min}~{r.creative.max}</td>
-                <td className="p-2 text-center"><Status ok={r.creative.ok} /></td>
-              </tr>
+              {CREATIVE_PARTS.map(([key, name], k) => (
+                <tr key={key}>
+                  {k === 0 && (
+                    <td rowSpan={3} className="p-2 font-medium">
+                      창의적 체험활동
+                    </td>
+                  )}
+                  <td className="p-2">{name}</td>
+                  {k === 0 && (
+                    <td rowSpan={3} className="p-2 text-center">
+                      <input
+                        type="number"
+                        className={cell}
+                        value={a.creativeBaseHours}
+                        onChange={(e) => mutate((x) => (x.creativeBaseHours = num(e.target.value)))}
+                      />
+                    </td>
+                  )}
+                  {SEMS.map((sem) => (
+                    <td key={sem} className="p-2 text-center">
+                      <input
+                        type="number"
+                        className={cell}
+                        value={parts[key][sem]}
+                        onChange={(e) => {
+                          const next = structuredClone(parts);
+                          next[key][sem] = num(e.target.value);
+                          setA(withCreativeParts(a, next));
+                        }}
+                      />
+                    </td>
+                  ))}
+                  {k === 0 && (
+                    <>
+                      <td rowSpan={3} className="p-2 text-center">-</td>
+                      <td rowSpan={3} className="p-2 text-center font-semibold">{r.creative.planned}</td>
+                      <td rowSpan={3} className="p-2 text-center">{fmt(r.creative.oneWeek)}</td>
+                      <td rowSpan={3} className="p-2 text-center text-gray-500">{r.creative.min}~{r.creative.max}</td>
+                      <td rowSpan={3} className="p-2 text-center"><Status ok={r.creative.ok} /></td>
+                    </>
+                  )}
+                </tr>
+              ))}
               <tr className="bg-brand-50 font-bold">
                 <td className="p-2" colSpan={2}>학년군 총 수업 시간 수</td>
                 <td className="p-2 text-center">{r.total.baseHours}</td>
@@ -419,7 +457,7 @@ export function HoursChecker() {
           type="button"
           className="rounded-lg border-2 border-brand-600 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50"
           onClick={async () => {
-            const url = URL.createObjectURL(await Packer.toBlob(buildAllocationDocx(a, viewYears(grade, check.schoolYear))));
+            const url = URL.createObjectURL(await Packer.toBlob(buildAllocationDocx(a, { years: viewYears(grade, check.schoolYear), grade, schoolYear: check.schoolYear, schoolName: me?.user?.schoolName })));
             const link = document.createElement("a");
             link.href = url;
             link.download = `${grade}학년_교육과정_편성표.docx`;
@@ -439,7 +477,7 @@ export function HoursChecker() {
 
 function Status({ ok }: { ok: boolean }) {
   return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+    <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-bold ${ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
       {ok ? "이상없음" : "점검필요"}
     </span>
   );

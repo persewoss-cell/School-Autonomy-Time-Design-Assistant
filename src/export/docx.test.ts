@@ -38,7 +38,7 @@ describe("docx 만들기", () => {
 });
 
 describe("편성표 docx", () => {
-  it("과목·활동과 이상유무가 들어간다", async () => {
+  it("학교 편성표 양식: 학교자율시간 줄과 증감이 들어간다", async () => {
     const { buildAllocationDocx } = await import("./allocationDocx");
     const { defaultAllocation } = await import("@/validation/allocation");
     const a = defaultAllocation("5-6");
@@ -46,9 +46,9 @@ describe("편성표 docx", () => {
     const buf = await Packer.toBuffer(buildAllocationDocx(a));
     const { default: JSZip } = await import("jszip");
     const text = (await (await JSZip.loadAsync(buf)).file("word/document.xml")!.async("string")).replace(/<[^>]+>/g, "");
-    expect(text).toContain("5~6학년 교육과정 편성표");
+    expect(text).toContain("5학년 교육과정 편성표");
     expect(text).toContain("나도 인문작가");
-    expect(text).toContain("점검필요"); // 교과를 줄이지 않아 총시수 초과
+    expect(text).toContain("+32"); // 학교자율시간 줄: 1학기 증감
   });
 });
 
@@ -56,10 +56,15 @@ describe("설계 문서에 시수 점검표 붙이기", () => {
   it("시수 점검이 있으면 문서 끝에 편성표가 들어간다", async () => {
     const { initialCheck, viewYears } = await import("@/domain/hoursView");
     const c = initialCheck(3, 2026, [{ id: "x", name: "지구마을 첫걸음", grade: 3, semester: 2, hours: 29, subjectGroup: "사회" }]);
-    const buf = await Packer.toBuffer(buildDesignDocx(sampleSubject(), { input: c.input, years: viewYears(3, 2026), grade: 3 }));
+    const buf = await Packer.toBuffer(buildDesignDocx(sampleSubject(), { input: c.input, years: viewYears(3, 2026), grade: 3, schoolYear: 2026 }));
     const { default: JSZip } = await import("jszip");
     const text = (await (await JSZip.loadAsync(buf)).file("word/document.xml")!.async("string")).replace(/<[^>]+>/g, "");
     expect(text).toContain("[붙임] (3)학년 교육과정 편성표");
-    expect(text).toContain("3학년 2학기 (2026)");
+    expect(text).toContain("3학년 교육과정 편성표");
+    expect(text).toContain("3학년(2026학년도)");
+    expect(text).toContain("4학년(2027학년도)");
+    expect(text).toContain("사회/도덕");
+    expect(text).toContain("동아리활동");
+    expect(text).toContain("연간수업시간수");
   });
 });

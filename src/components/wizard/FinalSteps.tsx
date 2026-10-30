@@ -149,7 +149,7 @@ export function FinalStep({
     setBusy(true);
     try {
       const blob = await Packer.toBlob(
-        buildDesignDocx(doc, ownView ? { input: ownView.input, years: viewYears(ownView.grade, ownView.schoolYear), grade: ownView.grade } : undefined),
+        buildDesignDocx(doc, ownView ? { input: ownView.input, years: viewYears(ownView.grade, ownView.schoolYear), grade: ownView.grade, schoolYear: ownView.schoolYear } : undefined),
       );
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -274,16 +274,8 @@ export function FinalStep({
           )}
         </div>
         {unchecked.length > 0 && (
-          <div className="space-y-1 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             <p className="font-semibold">⚠ 체크리스트 내용을 모두 점검하고 체크해야 문서가 만들어집니다. (남은 항목 {unchecked.length}개)</p>
-            <ul className="list-disc pl-5">
-              {unchecked.map((c) => (
-                <li key={c.id}>
-                  [{c.area}] {c.label}
-                  <span className="text-red-500"> ({c.auto ? "자동: ① 지침 점검 결과의 오류를 고치면 ○" : "직접 확인 후 ②에서 체크"})</span>
-                </li>
-              ))}
-            </ul>
           </div>
         )}
       </Card>

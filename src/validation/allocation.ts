@@ -9,6 +9,8 @@ import type { Issue } from "./types";
  * - 증감범위 하한 = ROUNDUP(기준시수 × 0.8)  (체육·음악·미술은 ROUNDUP(기준시수) = 감축 불가)
  * - 증감범위 상한 = ROUNDDOWN(기준시수 × 1.2)
  * - 편성시수 = 교과 편성시수 + 그 교과에 편성한 학교자율시간 시수
+ * - 증감 범위는 지침 26쪽대로 교과(군) 단위로 본다 (국어, 사회/도덕, 수학, 과학/실과, 체육, 음악/미술, 영어)
+ *   체육·음악·미술은 교과마다 기준시수보다 줄일 수 없다 (사용자 확인, 2026-10-31)
  * - 교과 소계·창체도 같은 범위로 점검, 총시수는 기준 총시수와 같아야 함
  */
 
@@ -42,8 +44,30 @@ export interface AllocationInput {
   creativeBaseHours: number;
   /** 교과별 학기 편성시수 (학교자율시간 제외) */
   subjectHours: Record<string, FourSemesters>;
+  /** 창체 학기별 합계 (= 아래 세 영역의 합) */
   creativeHours: FourSemesters;
+  /** 창체 영역별 학기 시수: 자율·자치활동 / 동아리활동 / 진로활동 (예전 저장본에는 없을 수 있음) */
+  creativeParts?: CreativeParts;
   courses: AutonomyCourse[];
+}
+
+export const CREATIVE_PARTS = [
+  ["self", "자율·자치활동"],
+  ["club", "동아리활동"],
+  ["career", "진로활동"],
+] as const;
+export type CreativePart = (typeof CREATIVE_PARTS)[number][0];
+export type CreativeParts = Record<CreativePart, FourSemesters>;
+
+/** 창체 영역별 시수 (예전 저장본은 모두 자율·자치활동으로 봄) */
+export function creativePartsOf(a: AllocationInput): CreativeParts {
+  return a.creativeParts ?? { self: [...a.creativeHours] as FourSemesters, club: [0, 0, 0, 0], career: [0, 0, 0, 0] };
+}
+
+/** 창체 영역 시수를 바꾸고 학기 합계를 다시 계산 */
+export function withCreativeParts(a: AllocationInput, parts: CreativeParts): AllocationInput {
+  const sum = [0, 1, 2, 3].map((s) => parts.self[s] + parts.club[s] + parts.career[s]) as FourSemesters;
+  return { ...a, creativeParts: parts, creativeHours: sum };
 }
 
 export interface RowResult {
@@ -57,8 +81,16 @@ export interface RowResult {
   ok: boolean;
 }
 
+/** 교과(군) 점검 결과 (증감 범위는 교과군 단위) */
+export interface GroupResult extends RowResult {
+  /** 이 교과군에 속한 교과 */
+  keys: string[];
+}
+
 export interface AllocationResult {
+  /** 교과별 (min·max는 그 교과군의 범위, ok는 교과군 범위 + 감축 불가 교과 여부) */
   rows: RowResult[];
+  groups: GroupResult[];
   subtotal: RowResult;
   creative: RowResult;
   total: { baseHours: number; planned: number; ok: boolean };
@@ -104,7 +136,7 @@ export function defaultAllocation(band: BandKey): AllocationInput {
     const r = base - q * 4;
     return [q + (r > 0 ? 1 : 0), q + (r > 2 ? 1 : 0), q + (r > 1 ? 1 : 0), q];
   };
-  return {
+  const base: AllocationInput = {
     band,
     baseHours: Object.fromEntries(b.subjects.map((s) => [s.key, s.baseHours])),
     creativeBaseHours: b.creativeBaseHours,
@@ -112,6 +144,11 @@ export function defaultAllocation(band: BandKey): AllocationInput {
     creativeHours: split(b.creativeBaseHours),
     courses: [],
   };
+  // 창체 기본값: 동아리 학기당 10시간, 진로 1학기 3·2학기 5시간, 나머지는 자율·자치 (학교에서 고쳐 씀)
+  const club: FourSemesters = [10, 10, 10, 10];
+  const career: FourSemesters = [3, 5, 3, 5];
+  const total = split(b.creativeBaseHours);
+  return withCreativeParts(base, { self: total.map((t, i) => t - club[i] - career[i]) as FourSemesters, club, career });
 }
 
 function row(label: string, base: number, planned: number, autonomy: number, noReduction = false): RowResult {
@@ -133,40 +170,75 @@ export function checkAllocation(input: AllocationInput): AllocationResult {
   const b = data.bands[input.band];
   const issues: Issue[] = [];
 
-  const rows = b.subjects.map((s) => {
+  const subjectRows = b.subjects.map((s) => {
     const base = input.baseHours[s.key] ?? s.baseHours;
     const own = sum4(input.subjectHours[s.key] ?? [0, 0, 0, 0]);
     const autonomy = input.courses.filter((c) => c.subjectKey === s.key).reduce((t, c) => t + c.hours, 0);
     return row(s.key, base, own + autonomy, autonomy, s.noReduction);
   });
 
-  const subtotalBase = rows.reduce((t, r) => t + r.baseHours, 0);
-  const subtotal = row("교과 소계", subtotalBase, rows.reduce((t, r) => t + r.planned, 0), rows.reduce((t, r) => t + r.autonomy, 0));
+  // 교과(군)별 증감 범위 (지침 26쪽)
+  const groupNames = [...new Set(b.subjects.map((s) => s.group))];
+  const groups: GroupResult[] = groupNames.map((g) => {
+    const keys = b.subjects.filter((s) => s.group === g).map((s) => s.key);
+    const mine = subjectRows.filter((r) => keys.includes(r.label));
+    const noReduction = b.subjects.some((s) => s.group === g && s.noReduction);
+    const gr = row(
+      g,
+      mine.reduce((t, r) => t + r.baseHours, 0),
+      mine.reduce((t, r) => t + r.planned, 0),
+      mine.reduce((t, r) => t + r.autonomy, 0),
+      noReduction,
+    );
+    return { ...gr, keys };
+  });
+  const rows = subjectRows.map((r) => {
+    const g = groups.find((x) => x.keys.includes(r.label))!;
+    const rule = b.subjects.find((s) => s.key === r.label);
+    const ownOk = !rule?.noReduction || r.planned >= r.baseHours;
+    return { ...r, min: g.min, max: g.max, ok: g.ok && ownOk };
+  });
+
+  const subtotalBase = subjectRows.reduce((t, r) => t + r.baseHours, 0);
+  const subtotal = row("교과 소계", subtotalBase, subjectRows.reduce((t, r) => t + r.planned, 0), subjectRows.reduce((t, r) => t + r.autonomy, 0));
   const creative = row("창의적 체험활동", input.creativeBaseHours, sum4(input.creativeHours), 0);
   const totalBase = subtotalBase + input.creativeBaseHours;
   const totalPlanned = subtotal.planned + creative.planned;
   const total = { baseHours: totalBase, planned: totalPlanned, ok: totalBase === totalPlanned };
 
-  for (const r of [...rows, subtotal, creative]) {
+  for (const r of [...groups, subtotal, creative]) {
     if (r.ok) continue;
-    const rule = b.subjects.find((s) => s.key === r.label);
+    const noReduction = "keys" in r && b.subjects.some((s) => s.group === r.label && s.noReduction);
     if (r.planned < r.min) {
       issues.push({
         level: "error",
         field: r.label,
-        message: rule?.noReduction
+        message: noReduction
           ? `${r.label}은(는) 기준시수(${r.baseHours}시간)보다 줄일 수 없습니다. 현재 편성시수는 ${r.planned}시간입니다. (학교자율시간 포함)`
-          : `${r.label} 편성시수 ${r.planned}시간이 증감 범위(${r.min}~${r.max}시간)보다 ${r.min - r.planned}시간 적습니다.`,
-        fix: rule?.noReduction
-          ? `${r.label} 시수를 ${r.min - r.planned}시간 늘리거나, 학교자율시간을 ${r.label} 교과에 편성해 채워 주세요.`
+          : `${r.label} 편성시수 ${r.planned}시간이 교과(군) 증감 범위(${r.min}~${r.max}시간)보다 ${r.min - r.planned}시간 적습니다.`,
+        fix: noReduction
+          ? `${r.label} 시수를 ${r.min - r.planned}시간 늘리거나, 학교자율시간을 이 교과에 편성해 채워 주세요.`
           : `${r.label} 시수를 ${r.min - r.planned}시간 이상 늘려 주세요.`,
       });
     } else {
       issues.push({
         level: "error",
         field: r.label,
-        message: `${r.label} 편성시수 ${r.planned}시간이 증감 범위(${r.min}~${r.max}시간)를 ${r.planned - r.max}시간 넘습니다.`,
+        message: `${r.label} 편성시수 ${r.planned}시간이 ${"keys" in r ? "교과(군) " : ""}증감 범위(${r.min}~${r.max}시간)를 ${r.planned - r.max}시간 넘습니다.`,
         fix: `${r.label} 시수를 ${r.planned - r.max}시간 이상 줄이거나, 학교자율시간을 다른 교과에 편성해 주세요.`,
+      });
+    }
+  }
+  // 체육·음악·미술: 교과마다 기준시수보다 줄일 수 없음 (교과군 합계가 맞아도)
+  for (const r of subjectRows) {
+    const rule = b.subjects.find((s) => s.key === r.label);
+    const g = groups.find((x) => x.keys.includes(r.label))!;
+    if (rule?.noReduction && r.planned < r.baseHours && g.keys.length > 1) {
+      issues.push({
+        level: "error",
+        field: r.label,
+        message: `${r.label}은(는) 기준시수(${r.baseHours}시간)보다 줄일 수 없습니다. 현재 편성시수는 ${r.planned}시간입니다. (학교자율시간 포함)`,
+        fix: `${r.label} 시수를 ${r.baseHours - r.planned}시간 늘려 주세요.`,
       });
     }
   }
@@ -237,13 +309,20 @@ export function checkAllocation(input: AllocationInput): AllocationResult {
     }
   });
 
-  return { rows, subtotal, creative, total, autonomyBySemester: bySem, semesterTarget: target, issues };
+  return { rows, groups, subtotal, creative, total, autonomyBySemester: bySem, semesterTarget: target, issues };
 }
 
 /** 학교자율시간을 운영하는 학기에서 교과·창체를 '1주 수업시간'만큼 줄여 주는 도움 기능 */
 export function autoReduce(a: AllocationInput): AllocationInput {
   const base = defaultAllocation(a.band);
-  const next: AllocationInput = { ...a, subjectHours: base.subjectHours, creativeHours: base.creativeHours };
+  let next: AllocationInput = { ...a, subjectHours: base.subjectHours, creativeHours: base.creativeHours };
+  // 창체 동아리·진로는 학교가 정한 값을 두고, 자율·자치에서 줄인다
+  const kept = creativePartsOf(a);
+  const parts: CreativeParts = {
+    club: [...kept.club] as FourSemesters,
+    career: [...kept.career] as FourSemesters,
+    self: base.creativeHours.map((t, i) => t - kept.club[i] - kept.career[i]) as FourSemesters,
+  };
   const subjects = bandInfo(a.band).subjects;
   for (const s of [0, 1, 2, 3] as SemesterIndex[]) {
     const need = a.courses.filter((c) => c.semester === s).reduce((t, c) => t + c.hours, 0);
@@ -256,7 +335,7 @@ export function autoReduce(a: AllocationInput): AllocationInput {
       cut += w;
     }
     const cw = Math.floor(oneWeekHours(a.creativeBaseHours));
-    next.creativeHours[s] -= cw;
+    parts.self[s] -= cw;
     cut += cw;
     // 모자라는 시수는 국어 → 수학 순서로 추가 감축 (넘치면 되돌림)
     const order = ["국어", "수학", "영어", "사회"];
@@ -268,5 +347,6 @@ export function autoReduce(a: AllocationInput): AllocationInput {
       k++;
     }
   }
+  next = withCreativeParts(next, parts);
   return next;
 }
