@@ -2,11 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { isViewGrade, type DesignBrief, type HourCheck, type ViewGrade } from "@/domain/hoursView";
+import { checkKey, isViewGrade, type Checks, type DesignBrief, type HourCheck } from "@/domain/hoursView";
 import { useMe } from "../useMe";
 
-const LOCAL_KEY = "sat-hours-v2";
-type Checks = Partial<Record<ViewGrade, HourCheck>>;
+const LOCAL_KEY = "sat-hours-v3";
 
 function readLocal(): Checks {
   try {
@@ -40,7 +39,7 @@ export function useHourChecks() {
     ])
       .then(([h, d]) => {
         const map: Checks = {};
-        for (const c of h.checks) if (isViewGrade(c.grade)) map[c.grade] = c.data;
+        for (const c of h.checks) if (isViewGrade(c.grade) && c.data?.schoolYear) map[checkKey(c.data.schoolYear, c.grade)] = c.data;
         setChecks(map);
         setDesigns(d.designs);
       })
@@ -53,7 +52,7 @@ export function useHourChecks() {
     async (check: HourCheck, opts: { keepalive?: boolean } = {}) => {
       const stamped = { ...check, updatedAt: new Date().toISOString() };
       setChecks((c) => {
-        const next = { ...c, [check.grade]: stamped };
+        const next = { ...c, [checkKey(check.schoolYear, check.grade)]: stamped };
         if (!loggedIn) {
           try {
             localStorage.setItem(LOCAL_KEY, JSON.stringify(next));

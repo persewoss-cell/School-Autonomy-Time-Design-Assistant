@@ -171,10 +171,11 @@ describe("시수 점검 저장", () => {
     const repo = memoryRepo();
     const t = await repo.users.create({ region: "광양시", schoolName: "가초등학교", schoolKey: "가초등학교", passwordHash: "x", role: "teacher", status: "active", mustChangePassword: false, resetRequest: null, createdAt: new Date(), lastLoginAt: null });
     await saveHourCheck(repo, t, 3, initialCheck(3, 2026, []));
+    await saveHourCheck(repo, t, 3, { ...initialCheck(3, 2026, []), input: { ...initialCheck(3, 2026, []).input, creativeBaseHours: 200 } });
     await saveHourCheck(repo, t, 3, initialCheck(3, 2027, []));
     const list = await listHourChecks(repo, t);
-    expect(list).toHaveLength(1);
-    expect((list[0].data as { schoolYear: number }).schoolYear).toBe(2027);
+    expect(list).toHaveLength(2); // 학년도마다 따로
+    expect(list.map((c) => (c.data as { schoolYear: number }).schoolYear).sort()).toEqual([2026, 2027]);
     await expect(saveHourCheck(repo, t, 4, initialCheck(3, 2026, []))).rejects.toThrow("형식");
   });
 });

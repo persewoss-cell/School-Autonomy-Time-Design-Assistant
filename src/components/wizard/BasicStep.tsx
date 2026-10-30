@@ -49,12 +49,13 @@ export function BasicStep({
   designId?: string;
   schoolYear: string;
   onBack: () => void;
-  onNext: (b: BasicInfo) => void;
+  onNext: (b: BasicInfo, schoolYear: string) => void;
 }) {
   const [b, setB] = useState<BasicInfo>(value);
+  const [year, setYear] = useState(schoolYear || "2027");
   const saved = useSavedDesigns();
   const others = saved
-    .filter((d) => d.id !== designId && d.grade === b.grade && d.semester === b.semester && (d.schoolYear || "2027") === (schoolYear || "2027"))
+    .filter((d) => d.id !== designId && d.grade === b.grade && d.semester === b.semester && (d.schoolYear || "2027") === year)
     .map((d) => ({ name: `${d.name} (${d.type === "subject" ? "과목" : "활동"})`, hours: d.hours ?? 0 }));
   const [errors, setErrors] = useState<string[]>([]);
   const kind = DESIGN_TYPES[b.type];
@@ -65,9 +66,10 @@ export function BasicStep({
   const submit = () => {
     const r = basicInfoSchema.safeParse(b);
     if (!r.success) return setErrors(r.error.issues.map((i) => i.message));
+    if (!/^\d{4}$/.test(year)) return setErrors(["운영 학년도를 2027처럼 네 자리 숫자로 적어 주세요."]);
     if (issues.some((i) => i.level === "error")) return setErrors(["시수 점검의 오류를 먼저 고쳐 주세요."]);
     setErrors([]);
-    onNext(r.data);
+    onNext(r.data, year);
   };
 
   return (
@@ -85,7 +87,10 @@ export function BasicStep({
         <input className={inputClass} value={b.name} onChange={(e) => set("name", e.target.value)} placeholder="예: 지구마을 첫걸음" />
       </Field>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Field label="운영 학년도" hint="다음 해에는 설계 현황에서 복제해 고쳐 써요">
+          <input className={inputClass} inputMode="numeric" maxLength={4} value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, ""))} />
+        </Field>
         <Field label="학년">
           <select
             className={inputClass}
@@ -159,7 +164,7 @@ export function BasicStep({
         <p className="mb-2 text-sm font-semibold">시수 점검</p>
         {others.length > 0 && (
           <p className="mb-2 rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
-            우리 학교 {schoolYear || "2027"}학년도 {b.grade}학년 {b.semester}학기에 이미 만든 설계: {others.map((o) => `${o.name} ${o.hours}차시`).join(", ")} → 합계{" "}
+            우리 학교 {year}학년도 {b.grade}학년 {b.semester}학기에 이미 만든 설계: {others.map((o) => `${o.name} ${o.hours}차시`).join(", ")} → 합계{" "}
             {others.reduce((s, o) => s + o.hours, 0)}차시 / {semesterHours(b.grade)}차시
           </p>
         )}

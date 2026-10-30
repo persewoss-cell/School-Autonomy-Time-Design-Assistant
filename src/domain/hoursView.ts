@@ -3,6 +3,8 @@ import {
   bandOfGrade,
   checkAllocation,
   defaultAllocation,
+  creativePartsOf,
+  withCreativeParts,
   type AllocationInput,
   type AutonomyCourse,
   type BandKey,
@@ -37,7 +39,13 @@ export interface DesignBrief {
   semester: number;
   hours?: number;
   subjectGroup?: string;
+  /** 운영 학년도 (설계 기본 정보) */
+  schoolYear?: string | number;
 }
+
+/** 학년도별 저장본: 키는 '2027-3' (학년도-학년 화면) */
+export type Checks = Record<string, HourCheck>;
+export const checkKey = (schoolYear: number, grade: number) => `${schoolYear}-${grade}`;
 
 /** 학년도는 3월에 시작한다 (1~2월은 앞 학년도) */
 export function schoolYearOf(date: Date): number {
@@ -45,12 +53,23 @@ export function schoolYearOf(date: Date): number {
 }
 
 export const isViewGrade = (g: number): g is ViewGrade => (VIEW_GRADES as readonly number[]).includes(g);
+const yearOfDesign = (d: DesignBrief) => Number(d.schoolYear) || 0;
 
 /** 화면의 4개 학기가 각각 몇 학년도인지 */
 export function viewYears(grade: ViewGrade, schoolYear: number): [number, number, number, number] {
   const first = grade % 2 === 1; // 3·5학년 화면: 학년군 첫 학년이 올해
   const y0 = first ? schoolYear : schoolYear - 1;
   return [y0, y0, y0 + 1, y0 + 1];
+}
+
+/** 화면의 두 절반: 0 = 첫 학년(1·2학기), 1 = 둘째 학년 */
+export function viewHalves(grade: ViewGrade, schoolYear: number): { grade: number; year: number }[] {
+  const g = bandInfo(bandOfGrade(grade)).grades;
+  const y = viewYears(grade, schoolYear);
+  return [
+    { grade: g[0], year: y[0] },
+    { grade: g[1], year: y[2] },
+  ];
 }
 
 export function semesterLabelWithYear(grade: ViewGrade, schoolYear: number, s: SemesterIndex): string {
@@ -67,7 +86,13 @@ function subjectFor(band: BandKey, group?: string): string {
   return group && keys.includes(group) ? group : keys[0];
 }
 
-/** 설계 현황 → 그 학년군의 학교자율시간 목록 */
+/** 이 화면(학년도·학년)에 들어가는 설계: 각 절반의 학년·학년도가 맞는 것만 */
+export function designsForView(grade: ViewGrade, schoolYear: number, designs: DesignBrief[]): DesignBrief[] {
+  const halves = viewHalves(grade, schoolYear);
+  return designs.filter((d) => halves.some((h) => h.grade === d.grade && h.year === yearOfDesign(d)));
+}
+
+/** 설계 → 그 학년군의 학교자율시간 목록 (학년으로 학기 위치를 정함) */
 export function coursesFromDesigns(band: BandKey, designs: DesignBrief[]): AutonomyCourse[] {
   const grades = bandInfo(band).grades as readonly number[];
   return designs
@@ -81,16 +106,135 @@ export function coursesFromDesigns(band: BandKey, designs: DesignBrief[]): Auton
     }));
 }
 
-/** 처음 여는 화면: 엑셀 기본값 + 설계 현황의 학교자율시간 */
-export function initialCheck(grade: ViewGrade, schoolYear: number, designs: DesignBrief[]): HourCheck {
+// ───── 절반(한 학년 1·2학기) 단위로 다른 화면과 주고받기 ─────
+interface HalfData {
+  subjects: Record<string, [number, number]>;
+  creative: Record<string, [number, number]>;
+  courses: { name: string; subjectKey: string; second: boolean; hours: number }[];
+}
+
+/** 키 순서와 상관없이 비교되도록 정렬해서 두 학기 값만 */
+const pick = (o: Record<string, number[]>, s0: number, s1: number): Record<string, [number, number]> =>
+  Object.fromEntries(
+    Object.keys(o)
+      .sort()
+      .map((k) => [k, [o[k][s0], o[k][s1]]]),
+  );
+
+function halfData(check: HourCheck, half: 0 | 1): HalfData {
+  const a = check.input;
+  const [s0, s1] = [half * 2, half * 2 + 1];
+  const parts = creativePartsOf(a);
+  return {
+    subjects: pick(a.subjectHours, s0, s1),
+    creative: pick(parts, s0, s1),
+    courses: a.courses
+      .filter((c) => c.semester === s0 || c.semester === s1)
+      .map((c) => ({ name: c.name.trim(), subjectKey: c.subjectKey, second: c.semester === s1, hours: c.hours }))
+      .sort((x, y) => (x.name + x.second).localeCompare(y.name + y.second)),
+  };
+}
+
+const sameHalf = (x: HalfData, y: HalfData) => JSON.stringify(x) === JSON.stringify(y);
+
+/** 이 화면의 절반과 같은 학년·학년도를 담은 다른 저장본 (가장 최근 것) */
+function halfSource(check: HourCheck, half: 0 | 1, checks: Checks): { check: HourCheck; half: 0 | 1 } | null {
+  const target = viewHalves(check.grade, check.schoolYear)[half];
+  const found = Object.values(checks)
+    .filter((c) => !(c.grade === check.grade && c.schoolYear === check.schoolYear))
+    .flatMap((c) =>
+      viewHalves(c.grade, c.schoolYear)
+        .map((h, i) => ({ check: c, half: i as 0 | 1, h }))
+        .filter((x) => x.h.grade === target.grade && x.h.year === target.year),
+    )
+    .sort((a, b) => (b.check.updatedAt ?? "").localeCompare(a.check.updatedAt ?? ""));
+  return found[0] ? { check: found[0].check, half: found[0].half } : null;
+}
+
+/** 다른 저장본의 절반을 이 화면의 절반으로 가져오기 */
+function applyHalf(check: HourCheck, half: 0 | 1, src: HourCheck, srcHalf: 0 | 1): HourCheck {
+  const a = structuredClone(check.input);
+  const b = src.input;
+  const [d0, d1] = [half * 2, half * 2 + 1];
+  const [s0, s1] = [srcHalf * 2, srcHalf * 2 + 1];
+  for (const k of Object.keys(a.subjectHours)) {
+    if (!b.subjectHours[k]) continue;
+    a.subjectHours[k][d0] = b.subjectHours[k][s0];
+    a.subjectHours[k][d1] = b.subjectHours[k][s1];
+  }
+  const pa = creativePartsOf(a);
+  const pb = creativePartsOf(b);
+  for (const k of Object.keys(pa) as (keyof typeof pa)[]) {
+    pa[k][d0] = pb[k][s0];
+    pa[k][d1] = pb[k][s1];
+  }
+  a.courses = [
+    ...a.courses.filter((c) => c.semester !== d0 && c.semester !== d1),
+    ...b.courses
+      .filter((c) => c.semester === s0 || c.semester === s1)
+      .map((c) => ({ ...c, semester: (c.semester === s0 ? d0 : d1) as SemesterIndex })),
+  ];
+  return { ...check, input: withCreativeParts(a, pa) };
+}
+
+/**
+ * 처음 여는 화면: 엑셀 기본값 + 그 학년도 설계.
+ * 같은 학년·학년도를 이미 점검한 다른 화면이 있으면 그 시수를 그대로 이어받는다.
+ * (예: 2027학년도 3학년 점검 → 2028학년도 4학년 화면의 3학년(2027) 부분)
+ */
+export function initialCheck(grade: ViewGrade, schoolYear: number, designs: DesignBrief[], checks: Checks = {}): HourCheck {
   const band = bandOfGrade(grade);
-  return { grade, schoolYear, input: { ...defaultAllocation(band), courses: coursesFromDesigns(band, designs) } };
+  let c: HourCheck = { grade, schoolYear, input: { ...defaultAllocation(band), courses: coursesFromDesigns(band, designsForView(grade, schoolYear, designs)) } };
+  for (const half of [0, 1] as const) {
+    const src = halfSource(c, half, checks);
+    if (src) c = applyHalf(c, half, src.check, src.half);
+  }
+  return c;
+}
+
+/** 이전에 점검한 시수와 달라진 절반 (경고만, 막지는 않음) */
+export function carryWarnings(check: HourCheck, checks: Checks): { half: 0 | 1; message: string; source: HourCheck; sourceHalf: 0 | 1 }[] {
+  return ([0, 1] as const).flatMap((half) => {
+    const src = halfSource(check, half, checks);
+    if (!src || sameHalf(halfData(check, half), halfData(src.check, src.half))) return [];
+    const h = viewHalves(check.grade, check.schoolYear)[half];
+    return [
+      {
+        half,
+        source: src.check,
+        sourceHalf: src.half,
+        message: `${h.grade}학년(${h.year}학년도) 시수가 이전에 점검한 ${src.check.schoolYear}학년도 ${src.check.grade}학년 화면과 달라요.`,
+      },
+    ];
+  });
+}
+
+/** 이전 점검 시수로 되돌리기 */
+export function restoreHalf(check: HourCheck, half: 0 | 1, source: HourCheck, sourceHalf: 0 | 1): HourCheck {
+  return applyHalf(check, half, source, sourceHalf);
+}
+
+/** 그 학년도 설계가 없는 절반과, 가져올 수 있는 가장 최근 학년도 설계 */
+export function missingHalves(check: HourCheck, designs: DesignBrief[]): { half: 0 | 1; grade: number; year: number; fromYear: number | null }[] {
+  return viewHalves(check.grade, check.schoolYear).flatMap((h, i) => {
+    if (designs.some((d) => d.grade === h.grade && yearOfDesign(d) === h.year)) return [];
+    const years = designs.filter((d) => d.grade === h.grade).map(yearOfDesign).filter((y) => y > 0);
+    return [{ half: i as 0 | 1, grade: h.grade, year: h.year, fromYear: years.length ? Math.max(...years) : null }];
+  });
+}
+
+/** 다른 학년도 설계를 가져와 직접 입력한 줄로 넣기 (그 학년도 설계가 생기면 바꿔 넣으면 됨) */
+export function importDesigns(check: HourCheck, half: 0 | 1, fromYear: number, designs: DesignBrief[]): HourCheck {
+  const h = viewHalves(check.grade, check.schoolYear)[half];
+  const picked = designs.filter((d) => d.grade === h.grade && yearOfDesign(d) === fromYear);
+  const added = coursesFromDesigns(check.input.band, picked).map(({ designId: _d, ...c }) => ({ ...c, name: `${c.name} (${fromYear} 설계)` }));
+  return { ...check, input: { ...check.input, courses: [...check.input.courses, ...added] } };
 }
 
 /** 저장된 점검에 반영되지 않은 설계 변경 (새 설계, 차시·학기·교과가 바뀐 설계, 지워진 설계) */
 export function designDiff(check: HourCheck, designs: DesignBrief[]): string[] {
   const band = check.input.band;
-  const want = coursesFromDesigns(band, designs);
+  const want = coursesFromDesigns(band, designsForView(check.grade, check.schoolYear, designs));
   const have = check.input.courses.filter((c) => c.designId);
   const out: string[] = [];
   for (const w of want) {
@@ -99,17 +243,18 @@ export function designDiff(check: HourCheck, designs: DesignBrief[]): string[] {
     else if (h.hours !== w.hours || h.semester !== w.semester || h.subjectKey !== w.subjectKey || h.name !== w.name)
       out.push(`「${w.name}」의 차시·학기·교과가 설계와 달라요.`);
   }
-  for (const h of have) if (!want.some((w) => w.designId === h.designId)) out.push(`「${h.name}」은(는) 설계 현황에서 지워졌어요.`);
+  for (const h of have) if (!want.some((w) => w.designId === h.designId)) out.push(`「${h.name}」은(는) 설계 현황에서 지워졌거나 다른 학년도예요.`);
   return out;
 }
 
 /** 설계 현황 반영: 설계에서 온 것은 지금 설계로 바꾸고, 직접 추가한 것은 그대로 둔다 */
 export function syncWithDesigns(check: HourCheck, designs: DesignBrief[]): HourCheck {
   const manual = check.input.courses.filter((c) => !c.designId);
-  return { ...check, input: { ...check.input, courses: [...coursesFromDesigns(check.input.band, designs), ...manual] } };
+  const fromDesigns = coursesFromDesigns(check.input.band, designsForView(check.grade, check.schoolYear, designs));
+  return { ...check, input: { ...check.input, courses: [...fromDesigns, ...manual] } };
 }
 
-/** 한 화면이 '이상없음'인지: 계산 오류가 없고 설계 현황과 어긋나지 않음 */
+/** 한 화면이 '이상없음'인지: 계산 오류가 없고 그 학년도 설계와 어긋나지 않음 */
 export function checkOk(check: HourCheck | undefined, designs: DesignBrief[]): boolean {
   if (!check) return false;
   return checkAllocation(check.input).issues.every((i) => i.level !== "error") && designDiff(check, designs).length === 0;
@@ -117,25 +262,28 @@ export function checkOk(check: HourCheck | undefined, designs: DesignBrief[]): b
 
 export interface BandStatus {
   band: BandKey;
+  schoolYear: number;
   complete: boolean;
   /** 화면별 상태 */
   views: { grade: ViewGrade; saved: boolean; ok: boolean }[];
-  /** 설계가 하나도 없는 학년 (시수 점검에서 직접 입력해야 함) */
+  /** 그 학년도 설계가 하나도 없는 학년 (시수 점검에서 직접 입력하거나 가져와야 함) */
   gradesWithoutDesign: number[];
 }
 
-/** 학년군 시수 점검 완료 여부: 두 학년 화면 모두 저장되고 이상없음이어야 완료 */
-export function bandStatus(grade: number, checks: Partial<Record<ViewGrade, HourCheck>>, designs: DesignBrief[]): BandStatus {
+/** 학년도의 학년군 시수 점검 완료 여부: 그 학년도 두 학년 화면이 모두 저장되고 이상없음 */
+export function bandStatus(grade: number, schoolYear: number, checks: Checks, designs: DesignBrief[]): BandStatus {
   const band = bandOfGrade(grade);
   const grades = bandInfo(band).grades as readonly number[];
   const views = grades.map((g) => {
     const vg = g as ViewGrade;
-    return { grade: vg, saved: !!checks[vg], ok: checkOk(checks[vg], designs) };
+    const c = checks[checkKey(schoolYear, vg)];
+    return { grade: vg, saved: !!c, ok: checkOk(c, designs) };
   });
   return {
     band,
+    schoolYear,
     complete: views.every((v) => v.ok),
     views,
-    gradesWithoutDesign: grades.filter((g) => !designs.some((d) => d.grade === g)),
+    gradesWithoutDesign: grades.filter((g) => !designs.some((d) => d.grade === g && yearOfDesign(d) === schoolYear)),
   };
 }

@@ -36,7 +36,9 @@ function ensureIndexes(db: Db) {
     db.collection("designs").createIndex({ type: 1, schoolName: 1, schoolYear: 1, name: 1 }),
     db.collection("designVersions").createIndex({ designId: 1, savedAt: -1 }),
     db.collection("activityLogs").createIndex({ createdAt: -1 }),
-    db.collection("hourChecks").createIndex({ ownerId: 1, grade: 1 }, { unique: true }),
+    // 학년도별로 저장하므로 예전 (ownerId, grade) 고유 인덱스는 지운다
+    db.collection("hourChecks").dropIndex("ownerId_1_grade_1").catch(() => {}),
+    db.collection("hourChecks").createIndex({ ownerId: 1, schoolYear: 1, grade: 1 }),
   ]).catch((e) => {
     indexesReady = null;
     throw e;
@@ -108,7 +110,7 @@ export function mongoRepo(db: Db): Repo {
       listByOwner: async (ownerId) =>
         (await hourChecks.find({ ownerId }).toArray()).map(({ _id: _omit, ...rest }) => rest as HourCheckRecord),
       upsert: async (r) => {
-        await hourChecks.updateOne({ ownerId: r.ownerId, grade: r.grade }, { $set: r }, { upsert: true });
+        await hourChecks.updateOne({ ownerId: r.ownerId, grade: r.grade, schoolYear: r.schoolYear }, { $set: r }, { upsert: true });
       },
     },
     logs: {

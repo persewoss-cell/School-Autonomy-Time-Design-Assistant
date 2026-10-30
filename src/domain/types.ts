@@ -209,6 +209,11 @@ export interface DesignDoc {
   progress?: { stepKey: string; maxIndex: number };
 }
 
+/** 새 설계의 기본 운영 학년도: 다음 학년도 (학년도는 3월에 시작) */
+function nextSchoolYear(now = new Date()): number {
+  return (now.getMonth() >= 2 ? now.getFullYear() : now.getFullYear() - 1) + 1;
+}
+
 export function emptyDesign(): DesignDoc {
   return {
     version: 1,
@@ -237,7 +242,7 @@ export function emptyDesign(): DesignDoc {
       englishName: "",
       textbookType: "",
       textbookName: "",
-      startYear: "2027",
+      startYear: String(nextSchoolYear()),
       teacherPlans: [TEACHER_PLANS[0]],
       etc: "",
       necessity: "",

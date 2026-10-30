@@ -242,7 +242,7 @@ const hourCheckSchema = z
 export async function saveHourCheck(repo: Repo, user: User, grade: number, raw: unknown): Promise<void> {
   const r = hourCheckSchema.safeParse(raw);
   if (!r.success || r.data.grade !== grade) throw new ServiceError(400, "시수 점검 내용 형식이 올바르지 않습니다.");
-  await repo.hourChecks.upsert({ ownerId: user.id, grade, data: r.data, updatedAt: new Date() });
+  await repo.hourChecks.upsert({ ownerId: user.id, grade, schoolYear: r.data.schoolYear, data: r.data, updatedAt: new Date() });
 }
 
 /** 설계 열기: 본인 것 또는 관리자 */

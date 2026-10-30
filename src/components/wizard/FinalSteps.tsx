@@ -6,7 +6,7 @@ import { TEACHER_PLANS, TEXTBOOK_TYPES, type DesignDoc } from "@/domain/types";
 import { applicationTexts } from "@/domain/summary";
 import { codeMap } from "@/domain/codes";
 import { buildDesignDocx, docxFileName } from "@/export/docx";
-import { bandStatus, isViewGrade, viewYears, type DesignBrief } from "@/domain/hoursView";
+import { bandStatus, checkKey, isViewGrade, viewYears, type DesignBrief } from "@/domain/hoursView";
 import { useHourChecks } from "../hours/useHourChecks";
 import { checkApplication, checklistResults, validateDesign } from "@/validation/design";
 import type { Issue, StepKey } from "@/validation/types";
@@ -43,7 +43,7 @@ export function ApplicationStep({ doc, setDoc, onBack, onNext }: StepProps) {
             </Field>
           ) : (
             <Field label="적용 시작 학년도">
-              <input className={inputClass} value={a.startYear} onChange={(e) => set("startYear", e.target.value)} />
+              <p className="rounded-lg bg-gray-50 px-3 py-2 text-gray-700">{a.startYear}학년도 <span className="text-sm text-gray-500">(기본 정보에서 바꿀 수 있어요)</span></p>
             </Field>
           )}
         </div>
@@ -53,7 +53,7 @@ export function ApplicationStep({ doc, setDoc, onBack, onNext }: StepProps) {
               <input className={inputClass} value={a.englishName} onChange={(e) => set("englishName", e.target.value)} />
             </Field>
             <Field label="적용 시작 학년도">
-              <input className={inputClass} value={a.startYear} onChange={(e) => set("startYear", e.target.value)} />
+              <p className="rounded-lg bg-gray-50 px-3 py-2 text-gray-700">{a.startYear}학년도 <span className="text-sm text-gray-500">(기본 정보에서 바꿀 수 있어요)</span></p>
             </Field>
           </div>
         )}
@@ -131,14 +131,15 @@ export function FinalStep({
   const unchecked = checklist.filter((c) => !c.ok);
   // 시수 점검: 이 설계 학년이 속한 학년군의 두 학년 화면이 모두 이상없음이어야 문서를 만든다 (사용자 결정, 2026-10-31)
   const hc = useHourChecks();
-  const current: DesignBrief = { id: designId ?? "current", name: doc.basic.name, grade: doc.basic.grade, semester: doc.basic.semester, hours: doc.basic.hours, subjectGroup: doc.basic.subjectGroup };
+  const current: DesignBrief = { id: designId ?? "current", name: doc.basic.name, grade: doc.basic.grade, semester: doc.basic.semester, hours: doc.basic.hours, subjectGroup: doc.basic.subjectGroup, schoolYear: doc.application.startYear };
+  const year = Number(doc.application.startYear) || 2027;
   const briefs = [...hc.designs.filter((d) => d.id !== current.id), current];
-  const hours = bandStatus(doc.basic.grade, hc.checks, briefs);
-  const ownView = isViewGrade(doc.basic.grade) ? hc.checks[doc.basic.grade] : undefined;
+  const hours = bandStatus(doc.basic.grade, year, hc.checks, briefs);
+  const ownView = isViewGrade(doc.basic.grade) ? hc.checks[checkKey(year, doc.basic.grade)] : undefined;
   const blocked = unchecked.length > 0 || !hours.complete;
   const goHours = async (grade: number) => {
     if (onSave) await onSave().catch(() => {});
-    window.location.href = `/hours?grade=${grade}`;
+    window.location.href = `/hours?grade=${grade}&year=${year}`;
   };
 
   const FORM_NOTICE = "내려받는 문서는 교육청에서 제공하는 양식과 다를 수 있습니다.\n한글(HWP)에서 열어 양식을 다듬어 쓰세요.";

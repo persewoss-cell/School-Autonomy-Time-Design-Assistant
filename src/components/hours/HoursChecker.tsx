@@ -5,15 +5,21 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   VIEW_GRADES,
   bandStatus,
+  carryWarnings,
+  checkKey,
   checkOk,
   designDiff,
+  importDesigns,
   initialCheck,
   isViewGrade,
+  missingHalves,
   pairGrade,
+  restoreHalf,
   schoolYearOf,
   semesterLabelWithYear,
   syncWithDesigns,
   viewYears,
+  type Checks,
   type HourCheck,
   type ViewGrade,
 } from "@/domain/hoursView";
@@ -40,21 +46,30 @@ export function HoursChecker() {
   const q = Number(params.get("grade"));
   const grade: ViewGrade = isViewGrade(q) ? q : 3;
   const { checks, designs, loaded, save, loggedIn, me } = useHourChecks();
+  // 학년도: 주소에 있으면 그것, 없으면 가장 최근 설계 학년도(없으면 올해)
+  const designYears = designs.map((d) => Number(d.schoolYear)).filter((y) => y > 2000);
+  const thisYear = schoolYearOf(new Date());
+  const qy = Number(params.get("year"));
+  const year = qy > 2000 ? qy : designYears.length ? Math.max(...designYears) : thisYear;
+  const yearOptions = Array.from(new Set([...designYears, thisYear, thisYear + 1, year])).sort();
+  const yearChoices = Array.from({ length: Math.max(...yearOptions) + 2 - (Math.min(...yearOptions) - 1) }, (_, i) => Math.min(...yearOptions) - 1 + i);
+  const key = checkKey(year, grade);
   const [check, setCheck] = useState<HourCheck | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [skipped, setSkipped] = useState<string[]>([]);
 
-  // 학년 화면을 열 때: 저장본이 있으면 그것, 없으면 설계 현황을 넣은 기본값
+  // 화면을 열 때: 저장본이 있으면 그것, 없으면 그 학년도 설계 + 이전에 점검한 같은 학년·학년도 시수
   useEffect(() => {
     if (!loaded) return;
-    setCheck(checks[grade] ?? initialCheck(grade, schoolYearOf(new Date()), designs));
+    setCheck(checks[key] ?? initialCheck(grade, year, designs, checks));
     setDirty(false);
-    setSaveState(checks[grade] ? "saved" : "idle");
-    // checks는 저장할 때마다 바뀌므로 학년을 바꿀 때만 다시 불러온다
+    setSaveState(checks[key] ? "saved" : "idle");
+    // checks는 저장할 때마다 바뀌므로 학년·학년도를 바꿀 때만 다시 불러온다
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grade, loaded, designs]);
+  }, [key, loaded, designs]);
 
-  // 아직 저장 안 된 고침: 학년을 바꾸거나 페이지를 떠날 때 바로 저장한다
+  // 아직 저장 안 된 고침: 화면을 바꾸거나 페이지를 떠날 때 바로 저장한다
   const pending = useRef<HourCheck | null>(null);
   pending.current = dirty ? check : null;
   useEffect(() => {
@@ -67,13 +82,21 @@ export function HoursChecker() {
       onHide(); // 다른 화면으로 이동할 때
     };
   }, [save]);
-  const switchGrade = async (g: ViewGrade) => {
-    if (pending.current) {
-      setSaveState("saving");
-      await save(pending.current).catch(() => setSaveState("error"));
-      pending.current = null;
+  const saveNow = async () => {
+    if (!check) return;
+    setSaveState("saving");
+    try {
+      await save(check);
+      setDirty(false);
+      setSaveState("saved");
+    } catch {
+      setSaveState("error");
     }
-    router.replace(`/hours?grade=${g}`);
+  };
+  const go = async (g: ViewGrade, y: number) => {
+    if (pending.current) await saveNow();
+    pending.current = null;
+    router.replace(`/hours?grade=${g}&year=${y}`);
   };
 
   // 고친 내용은 잠시 뒤 자동 저장
@@ -97,6 +120,10 @@ export function HoursChecker() {
     setCheck({ ...check, input: next });
     setDirty(true);
   };
+  const replaceCheck = (next: HourCheck) => {
+    setCheck(next);
+    setDirty(true);
+  };
   const info = bandInfo(a.band);
   const r = checkAllocation(a);
   const mutate = (fn: (x: AllocationInput) => void) => {
@@ -104,99 +131,143 @@ export function HoursChecker() {
     fn(next);
     setA(next);
   };
-  const label = (s: SemesterIndex) => semesterLabelWithYear(grade, check.schoolYear, s);
+  const label = (s: SemesterIndex) => semesterLabelWithYear(grade, year, s);
   const errorCount = r.issues.length;
   const diff = designDiff(check, designs);
-  const all = { ...checks, [grade]: check };
-  const status = bandStatus(grade, all, designs);
-  const thisOk = checkOk(check, designs);
+  const all: Checks = { ...checks, [key]: check };
+  const status = bandStatus(grade, year, all, designs);
   const pair = pairGrade(grade);
+  const pairCheck = all[checkKey(year, pair)];
+  const warnings = carryWarnings(check, checks);
+  const missing = missingHalves(check, designs).filter((m) => !skipped.includes(`${key}-${m.half}`));
 
   return (
     <div className="space-y-5">
-      <Card className="space-y-3">
+      {/* 상단 고정: 제목 · 학년도 설정 · 저장 */}
+      <div className="sticky top-[53px] z-20 -mx-4 border-b border-gray-200 bg-[#f7f8f6]/95 px-4 py-2 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h1 className="text-xl font-bold">학교자율시간 시수 편성 점검</h1>
-          <label className="flex items-center gap-2 text-sm text-gray-600">
-            올해 학년도
-            <input
-              type="number"
-              className="w-24 rounded border border-gray-300 px-2 py-1"
-              value={check.schoolYear}
-              onChange={(e) => {
-                setCheck({ ...check, schoolYear: Number(e.target.value) || check.schoolYear });
-                setDirty(true);
-              }}
-            />
-          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-lg font-bold">학교자율시간 시수 편성 점검</h1>
+            <label className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-900">
+              학년도 설정
+              <select className="rounded border border-amber-300 bg-white px-2 py-0.5" value={year} onChange={(e) => void go(grade, Number(e.target.value))}>
+                {yearChoices.map((y) => (
+                  <option key={y} value={y}>
+                    {y}학년도
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="flex items-center gap-3 text-sm">
+            <span className="text-xs text-gray-500">
+              {!loggedIn ? "로그인하지 않아 이 브라우저에만 저장 · " : ""}
+              {saveState === "saving" ? "저장 중…" : saveState === "saved" ? "✓ 저장됨" : saveState === "error" ? "⚠ 저장 실패" : "아직 저장 안 됨"}
+            </span>
+            <button
+              type="button"
+              onClick={() => void saveNow()}
+              className="rounded-lg border-2 border-brand-600 bg-white px-4 py-1.5 font-semibold text-brand-700 hover:bg-brand-50"
+            >
+              💾 저장
+            </button>
+          </div>
         </div>
+      </div>
+
+      <Card className="space-y-2">
         <ol className="list-decimal space-y-0.5 pl-5 text-sm text-gray-600">
-          <li>아래에서 학년을 고릅니다. 예: &lsquo;3학년&rsquo; = 지금 3학년 학생들의 3학년(올해)·4학년(내년) 시수</li>
-          <li>설계 현황의 학교자율시간이 자동으로 들어가요. 바꿀 계획이 있으면 추가·삭제·수정하세요.</li>
-          <li>교과별 &lsquo;1주 수업시간&rsquo;을 참고하여 교과·창체 시수를 편성합니다. (기준시수도 학교 상황에 맞게 고칠 수 있어요)</li>
-          <li>&lsquo;이상유무&rsquo;가 모두 &lsquo;이상없음&rsquo;인지 확인합니다. 학년군의 두 학년이 모두 이상없음이면 시수 점검 완료!</li>
+          <li>학년도와 학년을 고릅니다. 예: 2027학년도 &lsquo;3학년&rsquo; = 3학년(2027)·4학년(2028), &lsquo;4학년&rsquo; = 3학년(2026)·4학년(2027)</li>
+          <li>그 학년도 설계가 자동으로 들어가요. 같은 학년·학년도를 앞서 점검했다면 그 시수를 그대로 이어받아요.</li>
+          <li>바꿀 계획이 있으면 추가·삭제·수정하세요. 교과별 편성 시수는 아래 편성표 칸에 넣습니다.</li>
+          <li>학년군의 두 학년이 모두 이상없음이면 그 학년도 시수 점검 완료!</li>
         </ol>
-        <p className="text-xs text-gray-400">
-          기준: 학교자율시간 시수 편성 점검표(엑셀) 계산식 · {loggedIn ? "학교 계정에 자동 저장" : "로그인하지 않아 이 브라우저에만 저장"}
-          {saveState === "saving" ? " · 저장 중…" : saveState === "saved" ? " · ✓ 저장됨" : saveState === "error" ? " · ⚠ 저장 실패" : " · 아직 저장 안 됨"}
-        </p>
+        <p className="text-xs text-gray-400">기준: 학교자율시간 시수 편성 점검표(엑셀) 계산식 · 증감 범위는 지침대로 교과(군) 단위</p>
       </Card>
 
       {/* 학년 버튼: 좌우로 꽉 차는 네모 버튼 4개 */}
       <div className="grid grid-cols-4 gap-2">
         {VIEW_GRADES.map((g) => {
-          const ok = checkOk(all[g], designs);
+          const c = all[checkKey(year, g)];
+          const ok = checkOk(c, designs);
           const on = g === grade;
           return (
             <button
               key={g}
               type="button"
-              onClick={() => void switchGrade(g)}
+              onClick={() => void go(g, year)}
               className={`rounded-lg border-2 py-3 text-center font-bold transition ${
                 on ? "border-brand-600 bg-brand-600 text-white" : "border-gray-200 bg-white text-gray-700 hover:border-brand-500"
               }`}
             >
               {g}학년
-              <span className={`block text-xs font-semibold ${on ? "text-white/90" : ok ? "text-green-700" : all[g] ? "text-red-600" : "text-gray-400"}`}>
-                {ok ? "✓ 이상없음" : all[g] ? "점검 필요" : "아직 안 함"}
+              <span className={`block text-xs font-semibold ${on ? "text-white/90" : ok ? "text-green-700" : c ? "text-red-600" : "text-gray-400"}`}>
+                {ok ? "✓ 이상없음" : c ? "점검 필요" : "아직 안 함"}
               </span>
             </button>
           );
         })}
       </div>
 
-      <div
-        className={`rounded-xl p-4 text-sm ${status.complete ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-900"}`}
-      >
+      <div className={`rounded-xl p-4 text-sm ${status.complete ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-900"}`}>
         <p className="font-semibold">
           {status.complete
-            ? `✓ ${info.label} 시수 점검 완료 — 설계 현황에 '시수점검 완료'로 표시돼요.`
-            : `${info.label} 시수 점검: ${grade}학년 화면 ${thisOk ? "이상없음" : "점검 필요"} · ${pair}학년 화면 ${checkOk(all[pair], designs) ? "이상없음" : all[pair] ? "점검 필요" : "아직 안 함"}`}
+            ? `✓ ${year}학년도 ${info.label} 시수 점검 완료 — 설계 현황에 '시수점검 완료'로 표시돼요.`
+            : `${year}학년도 ${info.label}: ${grade}학년 화면 ${checkOk(check, designs) ? "이상없음" : "점검 필요"} · ${pair}학년 화면 ${checkOk(pairCheck, designs) ? "이상없음" : pairCheck ? "점검 필요" : "아직 안 함"}`}
         </p>
-        {!status.complete && <p className="mt-1">학년군의 두 학년 화면({info.grades.join("·")}학년)이 모두 이상없음이어야 시수 점검 완료예요.</p>}
-        {status.gradesWithoutDesign.length > 0 && (
-          <p className="mt-1">
-            {status.gradesWithoutDesign.join("·")}학년은 설계 현황에 설계가 없어 자동으로 들어가지 않아요. 아래 &lsquo;+ 과목·활동 추가&rsquo;로 직접 입력해 주세요.
-          </p>
-        )}
+        {!status.complete && <p className="mt-1">그 학년도의 두 학년 화면({info.grades.join("·")}학년)이 모두 이상없음이어야 시수 점검 완료예요.</p>}
       </div>
+
+      {missing.map((m) => (
+        <div key={m.half} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          <p>
+            <b>
+              {m.year}학년도 {m.grade}학년 설계가 없어요.
+            </b>{" "}
+            {m.fromYear ? `${m.fromYear}학년도 ${m.grade}학년 설계를 가져올까요? (가져온 뒤 고칠 수 있어요)` : "아래 ①에서 직접 입력해 주세요."}
+          </p>
+          <div className="flex gap-2">
+            {m.fromYear && (
+              <button
+                type="button"
+                className="rounded-lg bg-blue-600 px-3 py-1.5 font-semibold text-white hover:bg-blue-700"
+                onClick={() => {
+                  replaceCheck(importDesigns(check, m.half, m.fromYear!, designs));
+                  setSkipped((x) => [...x, `${key}-${m.half}`]);
+                }}
+              >
+                {m.fromYear}학년도 설계 가져오기
+              </button>
+            )}
+            <button type="button" className="rounded-lg border border-blue-300 bg-white px-3 py-1.5 font-semibold text-blue-700" onClick={() => setSkipped((x) => [...x, `${key}-${m.half}`])}>
+              직접 입력할게요
+            </button>
+          </div>
+        </div>
+      ))}
+
+      {warnings.map((w) => (
+        <div key={w.half} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <p>⚠ {w.message} 바꾼 것이 맞다면 그대로 두셔도 돼요.</p>
+          <button
+            type="button"
+            className="rounded-lg border border-amber-400 bg-white px-3 py-1.5 font-semibold text-amber-800 hover:bg-amber-100"
+            onClick={() => replaceCheck(restoreHalf(check, w.half, w.source, w.sourceHalf))}
+          >
+            이전 점검 시수로 되돌리기
+          </button>
+        </div>
+      ))}
 
       {diff.length > 0 && (
         <div className="space-y-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          <p className="font-semibold">설계 현황과 다른 점이 있어요. 반영해야 이상없음이 돼요.</p>
+          <p className="font-semibold">{year}학년도 설계와 다른 점이 있어요. 반영해야 이상없음이 돼요.</p>
           <ul className="list-disc pl-5">
             {diff.map((d) => (
               <li key={d}>{d}</li>
             ))}
           </ul>
-          <button
-            type="button"
-            className="rounded-lg bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-700"
-            onClick={() => {
-              setCheck(syncWithDesigns(check, designs));
-              setDirty(true);
-            }}
-          >
+          <button type="button" className="rounded-lg bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-700" onClick={() => replaceCheck(syncWithDesigns(check, designs))}>
             설계 현황 반영하기 (직접 추가한 것은 그대로)
           </button>
         </div>
@@ -313,7 +384,7 @@ export function HoursChecker() {
           학교자율시간은 ①에서 넣으면 주황 줄로 들어가요. 증감 범위는 지침대로 교과(군) 단위로 보고, 오른쪽 끝에 이상없음/범위 밖이 표시돼요.
           내려받는 편성표(.docx)는 학교 양식 모양 그대로 나와요.
         </p>
-        <AllocationFormTable a={a} setA={setA} yearOf={(s) => viewYears(grade, check.schoolYear)[s]} />
+        <AllocationFormTable a={a} setA={setA} yearOf={(s) => viewYears(grade, year)[s]} />
         <details className="text-sm">
           <summary className="cursor-pointer text-gray-600">기준시수 고치기 (학교 상황에 맞게)</summary>
           <div className="mt-2 flex flex-wrap gap-3">
@@ -338,7 +409,7 @@ export function HoursChecker() {
           type="button"
           className="rounded-lg border-2 border-brand-600 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50"
           onClick={async () => {
-            const url = URL.createObjectURL(await Packer.toBlob(buildAllocationDocx(a, { years: viewYears(grade, check.schoolYear), grade, schoolYear: check.schoolYear, schoolName: me?.user?.schoolName })));
+            const url = URL.createObjectURL(await Packer.toBlob(buildAllocationDocx(a, { years: viewYears(grade, year), grade, schoolYear: year, schoolName: me?.user?.schoolName })));
             const link = document.createElement("a");
             link.href = url;
             link.download = `${grade}학년_교육과정_편성표.docx`;

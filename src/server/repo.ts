@@ -67,10 +67,12 @@ export interface LogEntry {
 
 export type DesignSummary = Omit<DesignRecord, "doc">;
 
-/** 학교(계정)별 시수 점검 화면 저장본. 학년 화면(3~6)마다 하나 */
+/** 학교(계정)별 시수 점검 화면 저장본. 학년도 × 학년 화면(3~6)마다 하나 */
 export interface HourCheckRecord {
   ownerId: string;
   grade: number;
+  /** 점검 학년도 (예전 저장본에는 없을 수 있어 data.schoolYear로 대신함) */
+  schoolYear?: number;
   /** 화면 내용 (src/domain/hoursView.ts HourCheck) */
   data: unknown;
   updatedAt: Date;
@@ -162,7 +164,7 @@ export function memoryRepo(): Repo {
     hourChecks: {
       listByOwner: async (ownerId) => structuredClone(hourChecks.filter((h) => h.ownerId === ownerId)),
       upsert: async (r) => {
-        const i = hourChecks.findIndex((h) => h.ownerId === r.ownerId && h.grade === r.grade);
+        const i = hourChecks.findIndex((h) => h.ownerId === r.ownerId && h.grade === r.grade && h.schoolYear === r.schoolYear);
         if (i >= 0) hourChecks[i] = structuredClone(r);
         else hourChecks.push(structuredClone(r));
       },

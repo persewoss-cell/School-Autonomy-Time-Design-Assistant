@@ -249,25 +249,26 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-gray-500">
-            {doc.basic.name ? <b className="text-gray-800">{doc.basic.name}</b> : "새 설계"} · {doc.basic.type === "subject" ? "과목" : "활동"} · {doc.basic.grade}학년 {doc.basic.semester}학기
-          </p>
-          <div className="flex items-center gap-3 text-sm">
-            <span className={`text-xs ${saved.state === "error" ? "text-red-600" : "text-gray-400"}`}>{savedLabel}</span>
-            {save && (
-              <button type="button" onClick={save} className="rounded-lg border border-brand-500 px-3 py-1 font-semibold text-brand-700 hover:bg-brand-50">
-                💾 저장
-              </button>
-            )}
-            {isNew && !designId && (
-              <button type="button" onClick={reset} className="text-gray-400 hover:text-red-600">
-                처음부터 다시
-              </button>
-            )}
-          </div>
+      {/* 스크롤해도 설계 이름·저장 줄은 위에 고정 */}
+      <div className="sticky top-[53px] z-20 -mx-4 flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-[#f7f8f6]/95 px-4 py-2 backdrop-blur">
+        <p className="text-sm text-gray-500">
+          {doc.basic.name ? <b className="text-gray-800">{doc.basic.name}</b> : "새 설계"} · {doc.basic.type === "subject" ? "과목" : "활동"} · {doc.basic.grade}학년 {doc.basic.semester}학기
+        </p>
+        <div className="flex items-center gap-3 text-sm">
+          <span className={`text-xs ${saved.state === "error" ? "text-red-600" : "text-gray-400"}`}>{savedLabel}</span>
+          {save && (
+            <button type="button" onClick={save} className="rounded-lg border border-brand-500 px-3 py-1 font-semibold text-brand-700 hover:bg-brand-50">
+              💾 저장
+            </button>
+          )}
+          {isNew && !designId && (
+            <button type="button" onClick={reset} className="text-gray-400 hover:text-red-600">
+              처음부터 다시
+            </button>
+          )}
         </div>
+      </div>
+      <div className="-mt-4 space-y-2">
         <ol
           className="grid grid-cols-4 gap-1 sm:grid-cols-6 md:[grid-template-columns:repeat(var(--steps),minmax(0,1fr))]"
           style={{ "--steps": steps.length } as React.CSSProperties}
@@ -328,8 +329,11 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
           designId={designId}
           schoolYear={doc.application.startYear}
           onBack={props.onBack}
-          onNext={(basic) => {
-            setDoc((d) => void (d.basic = basic));
+          onNext={(basic, schoolYear) => {
+            setDoc((d) => {
+              d.basic = basic;
+              d.application.startYear = schoolYear;
+            });
             goIndex(index + 1);
           }}
         />

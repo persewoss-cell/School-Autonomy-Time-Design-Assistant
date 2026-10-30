@@ -7,7 +7,7 @@ import type { DesignDoc } from "@/domain/types";
 import { api } from "@/lib/api";
 import { stepsFor } from "../wizard/Wizard";
 import { semesterHours } from "@/validation/hours";
-import { bandStatus, isViewGrade, type HourCheck, type ViewGrade } from "@/domain/hoursView";
+import { bandStatus, checkKey, isViewGrade, schoolYearOf, type Checks, type HourCheck } from "@/domain/hoursView";
 import type { Grade } from "@/domain/types";
 import { Card } from "../ui";
 import { useMe } from "../useMe";
@@ -25,6 +25,7 @@ export interface DesignRow {
   errorCount: number;
   warningCount: number;
   progress?: { stepKey: string; maxIndex: number } | null;
+  createdAt?: string;
   updatedAt: string;
   owner?: string;
 }
@@ -55,25 +56,41 @@ export function MyDesigns() {
   const me = useMe();
   const router = useRouter();
   const [rows, setRows] = useState<DesignRow[] | null>(null);
-  const [checks, setChecks] = useState<Partial<Record<ViewGrade, HourCheck>>>({});
+  const [checks, setChecks] = useState<Checks>({});
   const [error, setError] = useState("");
+  const [gradeFilter, setGradeFilter] = useState<number | null>(null);
+  const [yearFilter, setYearFilter] = useState("");
   const load = useCallback(() => {
     api<{ designs: DesignRow[] }>("/api/designs")
       .then((r) => setRows(r.designs))
       .catch((e) => setError(e.message));
     api<{ checks: { grade: number; data: HourCheck }[] }>("/api/hours")
-      .then((r) => setChecks(Object.fromEntries(r.checks.filter((c) => isViewGrade(c.grade)).map((c) => [c.grade, c.data]))))
+      .then((r) => {
+        const map: Checks = {};
+        for (const c of r.checks) if (isViewGrade(c.grade) && c.data?.schoolYear) map[checkKey(c.data.schoolYear, c.grade)] = c.data;
+        setChecks(map);
+      })
       .catch(() => {});
   }, []);
   useEffect(() => {
     if (me?.user) load();
   }, [me, load]);
 
-  const duplicate = async (id: string) => {
-    const { design } = await api<{ design: { doc: DesignDoc } }>(`/api/designs/${id}`);
+  const duplicate = async (row: DesignRow) => {
+    const from = Number(row.schoolYear) || schoolYearOf(new Date());
+    const answer = prompt(`「${row.name}」을(를) 몇 학년도 설계로 복제할까요?\n(복제한 뒤 내용을 고쳐 쓰면 돼요)`, String(from + 1));
+    if (answer === null) return;
+    const year = Number(answer.trim());
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+      alert("학년도는 2028처럼 네 자리 숫자로 적어 주세요.");
+      return;
+    }
+    const { design } = await api<{ design: { doc: DesignDoc } }>(`/api/designs/${row.id}`);
     const doc = structuredClone(design.doc);
-    doc.basic.name = `${doc.basic.name} (복사본)`.slice(0, 40);
-    await api("/api/designs", { method: "POST", body: { doc } });
+    doc.application.startYear = String(year);
+    if (year === from) doc.basic.name = `${doc.basic.name} (복사본)`.slice(0, 40);
+    await api("/api/designs", { method: "POST", body: { doc } }).catch((e) => alert(e.message));
+    setYearFilter("");
     load();
   };
   const remove = async (row: DesignRow) => {
@@ -91,6 +108,10 @@ export function MyDesigns() {
       </Card>
     );
   }
+  const years = [...new Set((rows ?? []).map(yearOf))].sort((a, b) => b.localeCompare(a));
+  const shown = (rows ?? [])
+    .filter((r) => (gradeFilter === null || r.grade === gradeFilter) && (!yearFilter || yearOf(r) === yearFilter))
+    .sort((a, b) => (b.createdAt ?? b.updatedAt).localeCompare(a.createdAt ?? a.updatedAt));
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -103,12 +124,43 @@ export function MyDesigns() {
       ) : rows.length === 0 ? (
         <Card><p className="text-gray-600">아직 저장한 설계가 없어요. 새 설계를 시작해 보세요.</p></Card>
       ) : (
-        <div className="space-y-6">
-          {groupBySemester(rows).map((g) => (
-            <section key={g.key} className="space-y-3">
-              <SemesterHeader group={g} />
-              <div className="grid gap-3 sm:grid-cols-2">
-              {g.rows.map((r) => (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white p-3 shadow-sm">
+            {[null, 3, 4, 5, 6].map((g) => (
+              <button
+                key={g ?? "all"}
+                type="button"
+                onClick={() => setGradeFilter(g)}
+                className={`rounded-lg px-4 py-2 font-semibold transition ${gradeFilter === g ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              >
+                {g === null ? "전체" : `${g}학년`}
+              </button>
+            ))}
+            <label className="ml-auto flex items-center gap-2 text-sm font-semibold text-gray-700">
+              학년도
+              <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-base">
+                <option value="">전체</option>
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    {y}학년도
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {shown.length > 0 && (
+            <div className="space-y-1.5 rounded-2xl bg-white p-4 shadow-sm">
+              <p className="text-sm font-semibold text-gray-500">학기별 편성 차시</p>
+              {groupBySemester(shown).map((g) => (
+                <SemesterHeader key={g.key} group={g} />
+              ))}
+            </div>
+          )}
+          {shown.length === 0 ? (
+            <Card><p className="text-gray-600">조건에 맞는 설계가 없어요.</p></Card>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {shown.map((r) => (
                 <div
                   key={r.id}
                   role="link"
@@ -117,29 +169,28 @@ export function MyDesigns() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") router.push(`/designs/${r.id}`);
                   }}
-                  className="cursor-pointer space-y-3 rounded-2xl border-2 border-transparent bg-white p-6 shadow-sm transition hover:border-brand-500 hover:shadow-md focus:border-brand-500 focus:outline-none"
+                  className="flex cursor-pointer flex-col gap-3 rounded-2xl border-2 border-transparent bg-white p-4 shadow-sm transition hover:border-brand-500 hover:shadow-md focus:border-brand-500 focus:outline-none"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm text-gray-500">
-                        {r.type === "subject" ? "과목" : "활동"} · {r.grade}학년 {r.semester}학기{typeof r.hours === "number" ? ` · ${r.hours}차시` : ""}
-                      </p>
-                      <p className="text-xl font-bold">{r.name || "(이름 없음)"}</p>
-                    </div>
+                  <div className="space-y-1">
                     <StatusBadge errors={r.errorCount} warnings={r.warningCount} type={r.type} progress={r.progress} />
+                    <p className="text-sm text-gray-500">
+                      <b className="text-gray-700">{yearOf(r)}학년도</b> · {r.type === "subject" ? "과목" : "활동"} · {r.grade}학년 {r.semester}학기
+                      {typeof r.hours === "number" ? ` · ${r.hours}차시` : ""}
+                    </p>
+                    <p className="text-lg font-bold leading-snug">{r.name || "(이름 없음)"}</p>
                   </div>
-                  <p className="text-sm text-gray-400">마지막 저장 {fmtDate(r.updatedAt)}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {bandStatus(r.grade, checks, rows).complete ? (
-                      <span className="rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-sm font-semibold text-green-700">✓ 시수점검 완료</span>
+                  <p className="mt-auto text-xs text-gray-400">마지막 저장 {fmtDate(r.updatedAt)}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {bandStatus(r.grade, Number(yearOf(r)), checks, rows).complete ? (
+                      <span className="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1.5 text-sm font-semibold text-green-700">✓ 시수점검 완료</span>
                     ) : (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          router.push(`/hours?grade=${r.grade}`);
+                          router.push(`/hours?grade=${r.grade}&year=${yearOf(r)}`);
                         }}
-                        className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-100"
+                        className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-100"
                       >
                         ⚠ 시수점검
                       </button>
@@ -148,9 +199,9 @@ export function MyDesigns() {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        void duplicate(r.id);
+                        void duplicate(r);
                       }}
-                      className="rounded-lg border border-brand-100 bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-100"
+                      className="rounded-lg border border-brand-100 bg-brand-50 px-2.5 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-100"
                     >
                       복제
                     </button>
@@ -160,21 +211,22 @@ export function MyDesigns() {
                         e.stopPropagation();
                         void remove(r);
                       }}
-                      className="rounded-lg border border-red-100 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-100"
+                      className="rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-100"
                     >
                       삭제
                     </button>
                   </div>
                 </div>
               ))}
-              </div>
-            </section>
-          ))}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
+
+const yearOf = (r: DesignRow) => r.schoolYear || "2027";
 
 interface SemesterGroup {
   key: string;
@@ -188,7 +240,7 @@ interface SemesterGroup {
 function groupBySemester(rows: DesignRow[]): SemesterGroup[] {
   const map = new Map<string, SemesterGroup>();
   for (const r of rows) {
-    const schoolYear = r.schoolYear || "2027";
+    const schoolYear = yearOf(r);
     const key = `${schoolYear}-${r.grade}-${r.semester}`;
     if (!map.has(key)) map.set(key, { key, schoolYear, grade: r.grade, semester: r.semester, rows: [] });
     map.get(key)!.rows.push(r);
@@ -210,8 +262,8 @@ function SemesterHeader({ group }: { group: SemesterGroup }) {
           ? { cls: "bg-red-100 text-red-700", text: `${left}차시 남는데 10차시 미만이라 더 만들 수 없어요 — 기존 설계의 차시를 조정해 주세요` }
           : { cls: "bg-blue-100 text-blue-800", text: `${left}차시 남았어요 (10차시 이상이면 하나 더 만들 수 있어요)` };
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 pb-2">
-      <h2 className="text-lg font-bold">
+    <div className="flex flex-wrap items-center gap-2">
+      <h2 className="font-bold">
         {group.schoolYear}학년도 {group.grade}학년 {group.semester}학기
       </h2>
       <span className="text-sm text-gray-600">
