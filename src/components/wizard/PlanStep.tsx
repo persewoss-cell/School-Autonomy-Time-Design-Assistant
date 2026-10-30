@@ -1,14 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import type { Lesson, Plan } from "@/domain/types";
 import { codeMap } from "@/domain/codes";
 import { planPrompt } from "@/prompts/steps";
 import { makeDemoPlans } from "@/prompts/demoPlans";
 import { checkUnitPlan, planCoverage } from "@/validation/design";
-import { checkPlanHours, lessonLabels, totalLessonHours } from "@/validation/hours";
+import { checkPlanHours, checkUnitHours, lessonLabels, totalLessonHours } from "@/validation/hours";
+import { MIN_UNIT_HOURS, recommendedUnitHours, unitHoursFor } from "@/domain/unitHours";
+import type { PlanRequest } from "@/domain/types";
 import { AiAssist } from "./AiAssist";
 import type { StepProps } from "./DocSteps";
-import { Card, Chips, NavButtons, StepHeader, StepIssues, inputClass, toggle } from "../ui";
+import { Card, Chips, Field, IssueList, NavButtons, StepHeader, StepIssues, inputClass, toggle } from "../ui";
 
 const emptyLesson = (): Lesson => ({ hours: 1, topic: "", goal: "", activities: [""], assessment: "", assessFor: "", inputActivities: [], note: "" });
 
@@ -24,25 +27,38 @@ export function PlanStep(props: StepProps) {
     "과정중심평가는 성취기준마다 1개씩, 그 성취기준의 내용을 배우는 차시에 둬요 (성취기준 2개면 2개, 3개면 3개)",
   ];
 
+  const blockers = checkUnitHours(
+    doc.basic.hours,
+    unitHoursFor(doc).map((h, i) => ({ name: doc.areas[i].name, hours: h })),
+  );
+
   if (!doc.plan.selected) {
     return (
       <div className="space-y-4">
         <StepHeader title="단원 지도계획 — 3안 받기" tips={tips} />
-        <AiAssist
-          doc={doc}
-          step={planPrompt}
-          hasContent={false}
-          title="AI에게 단원 지도계획 3안 받기"
-          defaultOpen
-          onParseFail={(e) => onParseFail?.("plan", e)}
-          onApply={(plans, notes) =>
-            setDoc((d) => {
-              d.plan = { candidates: plans, demo: false, notes, selected: null };
-            })
-          }
-        />
+        <PlanRequestCard doc={doc} setDoc={setDoc} />
+        {blockers.length > 0 ? (
+          <Card className="space-y-2 border-2 border-red-200">
+            <p className="font-bold text-red-700">단원별 차시를 먼저 고쳐야 AI에게 물을 수 있어요.</p>
+            <IssueList issues={blockers} />
+          </Card>
+        ) : (
+          <AiAssist
+            doc={doc}
+            step={planPrompt}
+            hasContent={false}
+            title="AI에게 단원 지도계획 3안 받기"
+            defaultOpen
+            onParseFail={(e) => onParseFail?.("plan", e)}
+            onApply={(plans, notes) =>
+              setDoc((d) => {
+                d.plan = { candidates: plans, demo: false, notes, selected: null };
+              })
+            }
+          />
+        )}
         {doc.plan.candidates.length > 0 && <Candidates {...props} />}
-        <p className="text-center text-sm text-gray-500">
+        {blockers.length === 0 && <p className="text-center text-sm text-gray-500">
           AI 없이 화면 흐름만 먼저 보고 싶다면{" "}
           <button
             type="button"
@@ -51,12 +67,97 @@ export function PlanStep(props: StepProps) {
           >
             예시 3안으로 체험하기
           </button>
-        </p>
+        </p>}
         <NavButtons onBack={onBack} />
       </div>
     );
   }
   return <EditPlan {...props} tips={tips} />;
+}
+
+const emptyRequest = (): PlanRequest => ({ unitHours: [], mustInclude: [], notes: "" });
+
+/** AI에게 묻기 전에: 단원별 차시, 꼭 넣을 내용, 기타 참고사항 (모두 프롬프트에 들어감) */
+function PlanRequestCard({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">) {
+  const req = doc.planRequest ?? emptyRequest();
+  const rec = recommendedUnitHours(doc);
+  const hours = unitHoursFor(doc);
+  const sum = hours.reduce((a, b) => a + b, 0);
+  const update = (fn: (r: PlanRequest) => void) =>
+    setDoc((d) => {
+      d.planRequest = d.planRequest ?? emptyRequest();
+      fn(d.planRequest);
+    });
+  // 줄바꿈을 그대로 두려고 입력 중인 글은 따로 들고 있다
+  const [must, setMust] = useState(req.mustInclude.join("\n"));
+  return (
+    <Card className="space-y-4">
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-bold">단원별 차시 정하기</h2>
+          {req.unitHours.some((v) => typeof v === "number") && (
+            <button type="button" className="text-sm text-gray-500 underline" onClick={() => update((r) => void (r.unitHours = []))}>
+              모두 추천대로
+            </button>
+          )}
+        </div>
+        <p className="text-sm text-gray-600">
+          단원(= 내용 체계의 영역)마다 몇 차시로 할지 적어요. 빈칸은 추천대로 채워져요. 단원마다 <b>{MIN_UNIT_HOURS}차시 이상</b>, 합계는 운영 시수 {doc.basic.hours}차시와 같아야 해요.
+        </p>
+        <div className="divide-y divide-gray-100">
+          {doc.areas.map((a, i) => {
+            const v = req.unitHours[i];
+            const typed = typeof v === "number";
+            return (
+              <div key={i} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <span className="text-sm">
+                  <b>{i + 1}단원</b> ({a.name}) <span className="text-gray-500">추천 {rec[i]}차시</span>
+                </span>
+                <label className="flex items-center gap-1 text-sm">
+                  <input
+                    type="number"
+                    min={1}
+                    max={doc.basic.hours}
+                    className={`w-20 rounded border px-2 py-1 text-right ${hours[i] < MIN_UNIT_HOURS ? "border-red-400 bg-red-50" : "border-gray-300"}`}
+                    placeholder={String(hours[i])}
+                    value={typed ? v : ""}
+                    onChange={(e) =>
+                      update((r) => {
+                        const n = parseInt(e.target.value, 10);
+                        const list = doc.areas.map((_, k) => r.unitHours[k] ?? null);
+                        list[i] = Number.isFinite(n) && n > 0 ? n : null;
+                        r.unitHours = list;
+                      })
+                    }
+                  />
+                  차시{!typed && <span className="text-xs text-gray-400">(추천 적용: {hours[i]})</span>}
+                </label>
+              </div>
+            );
+          })}
+        </div>
+        <p className={`text-sm font-semibold ${sum === doc.basic.hours ? "text-green-700" : "text-red-600"}`}>
+          합계 {sum} / {doc.basic.hours}차시 {sum === doc.basic.hours ? "✓" : ""}
+        </p>
+      </div>
+      <Field label="단원 지도계획에 반드시 넣을 내용 (선택, 한 줄에 하나씩)" hint="전단계에서 적지 않았지만 꼭 들어가야 할 수업 내용이나 행사. 예: 학교 축제 연계 발표 / 현장체험학습(○○ 박물관) 2차시">
+        <textarea
+          rows={3}
+          className={inputClass}
+          value={must}
+          onChange={(e) => {
+            setMust(e.target.value);
+            const lines = e.target.value.split("\n").map((t) => t.trim()).filter(Boolean);
+            update((r) => void (r.mustInclude = lines));
+          }}
+        />
+      </Field>
+      <Field label="기타 참고사항 (선택)" hint="예: 10월 둘째 주는 행사로 수업이 어려움 / 모둠 활동 위주로 / 원어민 강사는 2단원에만 참여">
+        <textarea rows={3} className={inputClass} value={req.notes} onChange={(e) => update((r) => void (r.notes = e.target.value))} />
+      </Field>
+      <p className="text-xs text-gray-500">여기 적은 내용은 아래 AI 프롬프트에 그대로 들어가요. 학생 이름 등 개인정보는 적지 마세요.</p>
+    </Card>
+  );
 }
 
 function Candidates({ doc, setDoc }: StepProps) {
@@ -201,6 +302,9 @@ function EditPlan({ doc, setDoc, onBack, onNext, tips }: StepProps & { tips: str
           <div className="flex items-center gap-2">
             <span className="shrink-0 text-sm font-bold text-brand-600">{ui + 1}단원</span>
             <input className={`${inputClass} font-semibold`} value={u.unitName} onChange={(e) => mutate((p) => void (p.units[ui].unitName = e.target.value))} />
+            <span className={`shrink-0 text-sm font-semibold ${u.lessons.reduce((sum, l) => sum + l.hours, 0) < MIN_UNIT_HOURS ? "text-red-600" : "text-gray-500"}`}>
+              {u.lessons.reduce((sum, l) => sum + l.hours, 0)}차시
+            </span>
             <button
               type="button"
               className="shrink-0 text-sm text-gray-400 hover:text-red-600"

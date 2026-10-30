@@ -1,10 +1,11 @@
 import type { DesignDoc, Lesson, Plan } from "@/domain/types";
+import { unitHoursFor } from "@/domain/unitHours";
 
 /**
  * "예시 3안으로 체험하기"용 예시. 입력한 영역·성취기준·필수 내용·원하는 활동을 끼워 넣어
  * AI 없이 화면 흐름을 확인할 수 있게 한다. 차시 합계는 항상 운영 시수와 같다.
  */
-export function makeDemoPlans(doc: Pick<DesignDoc, "basic" | "input" | "areas" | "standards">): Plan[] {
+export function makeDemoPlans(doc: Pick<DesignDoc, "basic" | "input" | "areas" | "standards" | "planRequest">): Plan[] {
   const { basic, input } = doc;
   const topic = input.topic || basic.name;
   const must = input.requiredContents.length ? input.requiredContents : [`${topic}의 의미`];
@@ -20,7 +21,7 @@ export function makeDemoPlans(doc: Pick<DesignDoc, "basic" | "input" | "areas" |
   return styles.map((s, si) => {
     // 운영 시수를 단원 수만큼 나누고, 각 단원을 1~3차시짜리 학습주제로 쪼갠다.
     const n = unitNames.length;
-    const unitHours = unitNames.map((_, i) => Math.floor(basic.hours / n) + (i < basic.hours % n ? 1 : 0));
+    const unitHours = doc.areas.length ? unitHoursFor(doc) : unitNames.map((_, i) => Math.floor(basic.hours / n) + (i < basic.hours % n ? 1 : 0));
     return {
       title: s.title,
       concept: s.concept,

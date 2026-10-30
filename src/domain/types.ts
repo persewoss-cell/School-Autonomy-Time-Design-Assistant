@@ -169,6 +169,16 @@ export interface Application {
   contentSummary: string;
 }
 
+/** 단원 지도계획 요청 사항 (AI 프롬프트에 그대로 들어감) */
+export interface PlanRequest {
+  /** 단원(=영역)별 차시. null이면 추천대로 */
+  unitHours: (number | null)[];
+  /** 전단계에 적지 않았지만 단원 지도계획에 꼭 넣을 내용 (한 줄에 하나) */
+  mustInclude: string[];
+  /** 기타 참고사항 */
+  notes: string;
+}
+
 /** 설계 문서 전체 */
 export interface DesignDoc {
   version: 1;
@@ -193,6 +203,8 @@ export interface DesignDoc {
   checklist: Record<string, boolean>;
   /** 영역별 성취기준 수 (비어 있으면 내용 요소 수로 추천) */
   standardCounts?: (number | null)[];
+  /** 단원 지도계획을 AI에게 묻기 전에 교사가 정하는 것 */
+  planRequest?: PlanRequest;
   /** 어디까지 작성했는지 (다시 열면 이 단계부터) */
   progress?: { stepKey: string; maxIndex: number };
 }

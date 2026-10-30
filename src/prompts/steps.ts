@@ -3,6 +3,7 @@ import { CATEGORIES, newId, planSchema, standardNeedsRewrite, type Area, type As
 import { categoryOf, codeMap, hasSameCategory } from "@/domain/codes";
 import { categorySplit, splitProblem, standardCountsFor } from "@/domain/standardCounts";
 import { planCoverage } from "@/validation/design";
+import { MIN_UNIT_HOURS, unitHoursFor } from "@/domain/unitHours";
 import { COMMON_RULES, contextBlock, formatBlock, parseAiJson, toList, type AiParse } from "./common";
 
 const CIRCLED = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"];
@@ -376,18 +377,30 @@ ${standardsBlock(doc)}
 ## 전단계에서 교사가 적은 활동 (번호) — 모두 꼭 넣기
 ${doc.input.desiredActivities.length ? doc.input.desiredActivities.map((a, i) => `${i + 1}. ${a}`).join("\n") : "(없음)"}
 
+## 단원별 차시 (교사가 정함 — 정확히 지키기)
+${unitHoursFor(doc)
+  .map((h, i) => `- ${i + 1}단원 (${doc.areas[i].name} 영역): ${h}차시`)
+  .join("\n")}
+
+## 단원 지도계획에 반드시 넣을 내용 (교사 추가)
+${doc.planRequest?.mustInclude.length ? doc.planRequest.mustInclude.map((m) => `- ${m}`).join("\n") : "(없음)"}
+
+## 기타 참고사항 (교사)
+${doc.planRequest?.notes.trim() || "(없음)"}
+
 ## 할 일
 위 정보로 학교자율시간 ${kindOf(doc)}의 '단원 지도계획' 초안을 서로 다른 3가지 안으로 만들어 주세요.
 
 ## 반드시 지킬 규칙
 1. 성격이 분명히 다른 3안을 만듭니다. (예: 탐구 중심 / 체험·프로젝트 중심 / 표현·발표 중심)
 2. 한 안의 모든 차시(hours)를 더한 값은 반드시 정확히 ${doc.basic.hours}이어야 합니다. 답하기 전에 직접 더해서 확인하세요.
-3. 단원은 내용 체계의 영역에 맞춰 나눕니다. 단원명은 영역명을 그대로 쓰거나, 영역을 포함하는 의미로 재구성합니다.
+3. 단원은 내용 체계의 영역 순서대로 하나씩 만듭니다. (단원 ${doc.areas.length}개) 단원명은 영역명을 그대로 쓰거나, 영역을 포함하는 의미로 재구성합니다.
+   각 단원의 차시 합계는 위 '단원별 차시'와 **정확히** 같아야 합니다. (단원마다 ${MIN_UNIT_HOURS}차시 이상)
 4. 각 단원의 standards에는 그 단원에서 다루는 성취기준 코드를 위 목록에서 **그대로** 넣습니다. 모든 성취기준이 어느 단원엔가 들어가야 하고, 목록에 없는 코드는 쓰지 않습니다.
 5. 학습주제(topic)는 짧은 개괄식으로 씁니다.
 6. 학습 목표(goal)는 '~해 봅시다.'로 끝나는 한 문장으로 씁니다.
 7. 세부 활동(activities)은 2~4개, 학습 순서대로, 각각 '~하기'로 끝나는 구절로 씁니다.
-8. 단원 지도계획은 실제로 학생을 가르치는 계획입니다. '꼭 들어가야 할 내용'과 위의 **'전단계에서 교사가 적은 활동'은 모든 안에 빠짐없이** 넣습니다.
+8. 단원 지도계획은 실제로 학생을 가르치는 계획입니다. '꼭 들어가야 할 내용', 위의 **'전단계에서 교사가 적은 활동'**, **'단원 지도계획에 반드시 넣을 내용'**은 모든 안에 빠짐없이 넣습니다. '기타 참고사항'도 반영합니다.
    그 활동을 하는 차시의 fromActivities에 활동 번호를 넣습니다. (예: [2]) 활동이 여러 차시에 걸치면 그 차시마다 넣고, 관계없는 차시는 [].
 9. 과정중심평가는 **성취기준 하나에 정확히 1개**입니다. 성취기준이 ${doc.standards.length}개이므로 한 안에 과정중심평가 차시가 정확히 ${doc.standards.length}개입니다.
    - 평가하는 차시의 assessStandard에 그 성취기준 코드 1개를, assessment에 평가 내용을 씁니다.
@@ -497,10 +510,16 @@ ${formatBlock(`{
       if (missing.length) notes.push(`${i + 1}안: 전단계 활동이 빠졌습니다 — ${missing.join(", ")}`);
       const wrong = doc.standards.filter((s) => (c.assessed.get(s.id) ?? 0) !== 1).map((s) => codes.get(s.id));
       if (wrong.length) notes.push(`${i + 1}안: 과정중심평가가 1개가 아닌 성취기준이 있습니다 — ${wrong.join(", ")}`);
+      const want = unitHoursFor(doc);
+      const got = p.units.map((u) => u.lessons.reduce((sum, l) => sum + l.hours, 0));
+      if (got.length !== want.length || got.some((h, k) => h !== want[k])) {
+        notes.push(`${i + 1}안: 단원별 차시가 정한 것(${want.join("·")})과 다릅니다 — AI 답: ${got.join("·")}`);
+      }
     });
     return { ok: true, data, notes };
   },
   reminder: (doc) => `- plans에는 3개의 안이 있어야 하고, 각 안의 hours 합계는 정확히 ${doc.basic.hours}이어야 합니다.
+- 단원별 차시 합계: ${unitHoursFor(doc).map((h, i) => `${i + 1}단원 ${h}차시`).join(", ")}
 - 각 단원의 standards에는 성취기준 코드를 목록에서 그대로 넣습니다.
 - 각 차시에 fromActivities(전단계 활동 번호 목록), assessStandard(평가하는 성취기준 코드 또는 ""), assessment가 있어야 합니다.
 - 전단계 활동은 모두 들어가야 하고, 과정중심평가는 성취기준마다 정확히 1개입니다.`,

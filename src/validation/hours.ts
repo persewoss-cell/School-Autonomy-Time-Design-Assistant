@@ -1,6 +1,7 @@
 import hours from "@data/rules/curriculum-hours.json";
 import type { BasicInfo, Grade, Plan, Unit } from "@/domain/types";
 import type { Issue } from "./types";
+import { MIN_UNIT_HOURS } from "@/domain/unitHours";
 import { bandOfGrade, semesterAutonomyHours } from "./allocation";
 
 /** 학년별 한 학기 학교자율시간 운영 시수 (3·4학년 29, 5·6학년 32) — 시수 점검 엑셀 계산식 기준 */
@@ -79,6 +80,42 @@ export function checkPlanHours(plan: Plan, basic: Pick<BasicInfo, "hours">): Iss
       });
     }
   });
+  return issues;
+}
+
+/** 단원별 차시: 단원마다 10차시 이상, 합계 = 운영 시수 (사용자 결정, 2026-10-30) */
+export function checkUnitHours(total: number, units: { name: string; hours: number }[]): Issue[] {
+  const issues: Issue[] = [];
+  if (units.length === 0) return issues;
+  const maxUnits = Math.floor(total / MIN_UNIT_HOURS);
+  if (units.length > maxUnits) {
+    issues.push({
+      level: "error",
+      field: "단원 수",
+      message: `단원이 ${units.length}개입니다. 단원마다 ${MIN_UNIT_HOURS}차시 이상이어야 하므로 운영 시수 ${total}차시로는 단원을 최대 ${maxUnits}개까지 만들 수 있습니다. (${units.length}개면 최소 ${units.length * MIN_UNIT_HOURS}차시 필요)`,
+      fix: `내용 체계의 영역을 ${maxUnits}개 이하로 줄여 주세요. (영역 = 단원)`,
+    });
+  }
+  units.forEach((u, i) => {
+    if (u.hours < MIN_UNIT_HOURS) {
+      issues.push({
+        level: "error",
+        field: `${i + 1}단원(${u.name})`,
+        message: `${u.hours}차시입니다. 단원마다 ${MIN_UNIT_HOURS}차시 이상으로 구성해야 합니다.`,
+        fix: `이 단원을 ${MIN_UNIT_HOURS - u.hours}차시 이상 늘리고, 그만큼 다른 단원을 줄여 주세요.`,
+      });
+    }
+  });
+  const sum = units.reduce((s, u) => s + u.hours, 0);
+  if (sum !== total) {
+    const diff = sum - total;
+    issues.push({
+      level: "error",
+      field: "단원별 차시 합계",
+      message: `단원별 차시 합계가 ${sum}차시로, 운영 시수 ${total}차시보다 ${Math.abs(diff)}차시 ${diff > 0 ? "많습니다" : "적습니다"}.`,
+      fix: diff > 0 ? `단원 차시를 모두 합쳐 ${diff}차시 줄여 주세요.` : `단원 차시를 모두 합쳐 ${-diff}차시 늘려 주세요.`,
+    });
+  }
   return issues;
 }
 

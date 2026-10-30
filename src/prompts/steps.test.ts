@@ -311,3 +311,15 @@ describe("성취기준 내용 요소 최소 2개와 문장 고치기", () => {
     expect(r.ok && r.notes.join()).toContain("[9가짜01-01]");
   });
 });
+
+describe("단원 지도계획 요청 사항", () => {
+  it("단원별 차시, 꼭 넣을 내용, 기타 참고사항이 프롬프트에 들어간다", () => {
+    const d = sampleSubject();
+    d.planRequest = { unitHours: [17, null], mustInclude: ["학교 축제 연계 발표"], notes: "모둠 활동 위주로" };
+    const p = planPrompt.build(d);
+    expect(p).toContain("- 1단원 (세계시민의 이해 영역): 17차시");
+    expect(p).toContain("- 2단원 (문화 다양성과 존중 영역): 12차시");
+    expect(p).toContain("- 학교 축제 연계 발표");
+    expect(p).toContain("모둠 활동 위주로");
+  });
+});

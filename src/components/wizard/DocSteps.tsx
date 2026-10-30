@@ -44,7 +44,7 @@ export function ContentStep({ doc, setDoc, onBack, onNext, onParseFail }: StepPr
         onApply={(areas) => setDoc((d) => void (d.areas = areas))}
       />
       <ContentTable doc={doc} setDoc={setDoc} />
-      <StepIssues issues={checkContentSystem(doc.areas.map((a) => ({ ...a, knowledge: clean(a.knowledge), process: clean(a.process), values: clean(a.values) })))} />
+      <StepIssues issues={checkContentSystem(doc.areas.map((a) => ({ ...a, knowledge: clean(a.knowledge), process: clean(a.process), values: clean(a.values) })), doc.basic.hours)} />
       <NavButtons onBack={onBack} onNext={onNext} />
     </div>
   );

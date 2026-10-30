@@ -2,7 +2,8 @@ import { CATEGORIES, CATEGORY_KEYS, DESIGN_TYPES, standardNeedsRewrite, type Are
 import { categoryOf, codeMap } from "@/domain/codes";
 import { splitProblem } from "@/domain/standardCounts";
 import { checklistFor } from "@/domain/checklist";
-import { checkBasicHours, checkPlanHours, lessonLabels } from "./hours";
+import { checkBasicHours, checkPlanHours, checkUnitHours, lessonLabels } from "./hours";
+import { MIN_UNIT_HOURS } from "@/domain/unitHours";
 import type { Issue, StepKey } from "./types";
 
 /**
@@ -20,7 +21,7 @@ const clean = (s: string) => s.trim().replace(/[.\s]+$/, "");
 const tag = (step: StepKey, issues: Issue[]) => issues.map((i) => ({ ...i, step }));
 
 /** ③ 내용 체계: 영역 2~3개, 범주별 서술어미 (PPT 44~46쪽) */
-export function checkContentSystem(areas: Area[]): Issue[] {
+export function checkContentSystem(areas: Area[], hours?: number): Issue[] {
   const issues: Issue[] = [];
   if (areas.length === 0) {
     issues.push({ level: "error", field: "내용 체계", message: "영역이 하나도 없습니다.", fix: "영역을 2~3개 만들어 주세요." });
@@ -32,6 +33,14 @@ export function checkContentSystem(areas: Area[]): Issue[] {
       field: "영역 수",
       message: `영역이 ${areas.length}개입니다. 영역은 2~3개를 권장합니다.`,
       fix: "영역을 2~3개로 조정해 보세요.",
+    });
+  }
+  if (hours && areas.length * MIN_UNIT_HOURS > hours) {
+    issues.push({
+      level: "error",
+      field: "영역 수",
+      message: `영역(=단원)이 ${areas.length}개입니다. 단원마다 ${MIN_UNIT_HOURS}차시 이상이어야 하므로 운영 시수 ${hours}차시로는 최대 ${Math.floor(hours / MIN_UNIT_HOURS)}개까지 만들 수 있습니다.`,
+      fix: `영역을 ${Math.floor(hours / MIN_UNIT_HOURS)}개 이하로 줄여 주세요.`,
     });
   }
   areas.forEach((a, i) => {
@@ -294,7 +303,14 @@ export function checkUnitPlan(doc: Pick<DesignDoc, "basic" | "abbrev" | "standar
   if (!plan) {
     return tag("plan", [{ level: "error", field: "단원 지도계획", message: "단원 지도계획을 아직 정하지 않았습니다.", fix: "3안 중 하나를 골라 주세요." }]);
   }
-  const issues: Issue[] = [...checkBasicHours(doc.basic), ...checkPlanHours(plan, doc.basic)];
+  const issues: Issue[] = [
+    ...checkBasicHours(doc.basic),
+    ...checkPlanHours(plan, doc.basic),
+    // 합계는 checkPlanHours가 이미 봄
+    ...checkUnitHours(doc.basic.hours, plan.units.map((u) => ({ name: u.unitName, hours: u.lessons.reduce((s, l) => s + l.hours, 0) }))).filter(
+      (i) => i.field !== "단원별 차시 합계",
+    ),
+  ];
   const codes = codeMap(doc);
   const used = new Set(plan.units.flatMap((u) => u.standardIds));
   plan.units.forEach((u, i) => {
@@ -469,7 +485,7 @@ export function validateDesign(doc: DesignDoc): Issue[] {
   return [
     ...tag("basic", checkBasicHours(doc.basic)),
     ...(doc.basic.name.trim() ? [] : tag("basic", [{ level: "error" as const, field: `${DESIGN_TYPES[doc.basic.type]}명`, message: "이름이 비어 있습니다.", fix: "이름을 적어 주세요." }])),
-    ...checkContentSystem(doc.areas),
+    ...checkContentSystem(doc.areas, doc.basic.hours),
     ...checkCoreIdeas(doc.coreIdeas, doc.areas.length),
     ...checkStandards(doc),
     ...checkIntro(doc),
