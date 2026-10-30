@@ -150,6 +150,7 @@ function recordFields(doc: DesignDoc, fallbackSchool: string) {
     grade: doc.basic.grade,
     semester: doc.basic.semester,
     hours: doc.basic.hours,
+    subjectGroup: doc.basic.subjectGroup,
     schoolName: doc.application.schoolName.trim() || fallbackSchool,
     schoolYear: doc.application.startYear.trim() || "2027",
     errorCount: issues.filter((i) => i.level === "error").length,
@@ -198,11 +199,50 @@ export async function listMyDesigns(repo: Repo, user: User): Promise<DesignSumma
   const list = await repo.designs.listByOwner(user.id);
   return Promise.all(
     list.map(async (d) => {
-      if (typeof d.hours === "number") return d;
+      if (typeof d.hours === "number" && d.subjectGroup) return d;
       const full = await repo.designs.get(d.id);
-      return { ...d, hours: full?.doc.basic.hours ?? 0 };
+      return { ...d, hours: full?.doc.basic.hours ?? 0, subjectGroup: full?.doc.basic.subjectGroup };
     }),
   );
+}
+
+/** 학교의 시수 점검 화면 저장본 (학년 화면별) */
+export async function listHourChecks(repo: Repo, user: User): Promise<{ grade: number; data: unknown; updatedAt: Date }[]> {
+  return (await repo.hourChecks.listByOwner(user.id)).map(({ grade, data, updatedAt }) => ({ grade, data, updatedAt }));
+}
+
+const hourCheckSchema = z
+  .object({
+    grade: z.number().int().min(3).max(6),
+    schoolYear: z.number().int().min(2000).max(2100),
+    input: z
+      .object({
+        band: z.enum(["3-4", "5-6"]),
+        baseHours: z.record(z.string(), z.number()),
+        creativeBaseHours: z.number(),
+        subjectHours: z.record(z.string(), z.array(z.number()).length(4)),
+        creativeHours: z.array(z.number()).length(4),
+        courses: z
+          .array(
+            z.object({
+              name: z.string().max(60),
+              subjectKey: z.string().max(10),
+              semester: z.number().int().min(0).max(3),
+              hours: z.number().int().min(0).max(200),
+              designId: z.string().max(40).optional(),
+            }),
+          )
+          .max(20),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+
+/** 시수 점검 화면 저장 (학년 화면 하나) */
+export async function saveHourCheck(repo: Repo, user: User, grade: number, raw: unknown): Promise<void> {
+  const r = hourCheckSchema.safeParse(raw);
+  if (!r.success || r.data.grade !== grade) throw new ServiceError(400, "시수 점검 내용 형식이 올바르지 않습니다.");
+  await repo.hourChecks.upsert({ ownerId: user.id, grade, data: r.data, updatedAt: new Date() });
 }
 
 /** 설계 열기: 본인 것 또는 관리자 */

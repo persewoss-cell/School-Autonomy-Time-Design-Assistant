@@ -355,6 +355,7 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
       {stepKey === "final" && (
         <FinalStep
           {...props}
+          designId={designId}
           goTo={goTo}
           stepLabel={(k) => steps.find((s) => s.key === k)?.label ?? ""}
           onSave={save ? async () => save() : undefined}

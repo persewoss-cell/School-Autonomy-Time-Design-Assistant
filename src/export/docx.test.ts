@@ -51,3 +51,15 @@ describe("편성표 docx", () => {
     expect(text).toContain("점검필요"); // 교과를 줄이지 않아 총시수 초과
   });
 });
+
+describe("설계 문서에 시수 점검표 붙이기", () => {
+  it("시수 점검이 있으면 문서 끝에 편성표가 들어간다", async () => {
+    const { initialCheck, viewYears } = await import("@/domain/hoursView");
+    const c = initialCheck(3, 2026, [{ id: "x", name: "지구마을 첫걸음", grade: 3, semester: 2, hours: 29, subjectGroup: "사회" }]);
+    const buf = await Packer.toBuffer(buildDesignDocx(sampleSubject(), { input: c.input, years: viewYears(3, 2026), grade: 3 }));
+    const { default: JSZip } = await import("jszip");
+    const text = (await (await JSZip.loadAsync(buf)).file("word/document.xml")!.async("string")).replace(/<[^>]+>/g, "");
+    expect(text).toContain("[붙임] (3)학년 교육과정 편성표");
+    expect(text).toContain("3학년 2학기 (2026)");
+  });
+});

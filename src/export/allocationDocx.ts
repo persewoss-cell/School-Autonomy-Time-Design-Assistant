@@ -19,7 +19,13 @@ const cell = (text: string | number, o: { head?: boolean; span?: number } = {}) 
       .map((t) => new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: t, bold: o.head, size: 18, font: FONT })] })),
   });
 
-export function buildAllocationDocx(a: AllocationInput): Document {
+/** 학기 머리글: '3학년 1학기' (+ 학년도) */
+function semLabel(a: AllocationInput, s: SemesterIndex, years?: number[]) {
+  return `${semesterLabel(a.band, s)}${years ? ` (${years[s]})` : ""}`;
+}
+
+/** 편성표 본문 (설계 문서 .docx의 붙임으로도 쓰임). years: 학기별 학년도 */
+export function allocationChildren(a: AllocationInput, years?: number[]): (Paragraph | Table)[] {
   const info = bandInfo(a.band);
   const r = checkAllocation(a);
   const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
@@ -27,7 +33,7 @@ export function buildAllocationDocx(a: AllocationInput): Document {
     cell("교과(군)", { head: true }),
     cell("교과", { head: true }),
     cell("기준\n시수", { head: true }),
-    ...SEMS.map((s) => cell(semesterLabel(a.band, s).replace(" ", "\n"), { head: true })),
+    ...SEMS.map((s) => cell(semLabel(a, s, years).replace(" ", "\n"), { head: true })),
     cell("학교자율\n시간", { head: true }),
     cell("편성\n시수", { head: true }),
     cell("증감\n범위", { head: true }),
@@ -53,7 +59,7 @@ export function buildAllocationDocx(a: AllocationInput): Document {
 
   const courseRows: TableCell[][] = [
     [cell("과목·활동명", { head: true }), cell("편성 교과", { head: true }), cell("학년·학기", { head: true }), cell("시수", { head: true })],
-    ...a.courses.map((c) => [cell(c.name), cell(c.subjectKey), cell(semesterLabel(a.band, c.semester)), cell(c.hours)]),
+    ...a.courses.map((c) => [cell(c.name), cell(c.subjectKey), cell(semLabel(a, c.semester, years)), cell(c.hours)]),
   ];
   const tbl = (rs: TableCell[][]) =>
     new Table({
@@ -63,22 +69,26 @@ export function buildAllocationDocx(a: AllocationInput): Document {
     });
   const p = (text: string, bold = false, size = 20) => new Paragraph({ spacing: { before: 160, after: 80 }, children: [new TextRun({ text, bold, size, font: FONT })] });
 
+  return [
+    new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 200 }, children: [new TextRun({ text: `${info.label} 교육과정 편성표 (학교자율시간 시수 편성 점검)`, bold: true, size: 30, font: FONT })] }),
+    p("1. 학교자율시간 과목·활동", true),
+    tbl(courseRows),
+    p(`※ 운영 학기의 학교자율시간 합계: ${r.semesterTarget}시간(1주 분량) · 1주 수업시간 = 기준시수 ÷ 34 ÷ 2`, false, 18),
+    p("2. 교과·창의적 체험활동 편성", true),
+    tbl(rows),
+    p(`점검 결과: ${r.issues.length === 0 ? "이상 없음" : `점검 필요 ${r.issues.length}건 — ${r.issues.map((i) => i.field).join(", ")}`}`, false, 18),
+    p(`1주 수업시간: ${info.subjects.map((s, i) => `${s.key} ${fmt(r.rows[i].oneWeek)}`).join(", ")}, 창체 ${fmt(r.creative.oneWeek)}`, false, 16),
+  ];
+}
+
+export function buildAllocationDocx(a: AllocationInput, years?: number[]): Document {
   return new Document({
     creator: "학교자율시간 설계 도우미 앱",
     styles: { default: { document: { run: { font: FONT, size: 20 } } } },
     sections: [
       {
         properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1000, bottom: 1000, left: 800, right: 800 } } },
-        children: [
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 200 }, children: [new TextRun({ text: `${info.label} 교육과정 편성표 (학교자율시간 시수 편성 점검)`, bold: true, size: 30, font: FONT })] }),
-          p("1. 학교자율시간 과목·활동", true),
-          tbl(courseRows),
-          p(`※ 운영 학기의 학교자율시간 합계: ${r.semesterTarget}시간(1주 분량) · 1주 수업시간 = 기준시수 ÷ 34 ÷ 2`, false, 18),
-          p("2. 교과·창의적 체험활동 편성", true),
-          tbl(rows),
-          p(`점검 결과: ${r.issues.length === 0 ? "이상 없음" : `점검 필요 ${r.issues.length}건 — ${r.issues.map((i) => i.field).join(", ")}`}`, false, 18),
-          p(`1주 수업시간: ${info.subjects.map((s, i) => `${s.key} ${fmt(r.rows[i].oneWeek)}`).join(", ")}, 창체 ${fmt(r.creative.oneWeek)}`, false, 16),
-        ],
+        children: allocationChildren(a, years),
       },
     ],
   });

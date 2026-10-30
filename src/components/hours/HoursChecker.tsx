@@ -1,14 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  VIEW_GRADES,
+  bandStatus,
+  checkOk,
+  designDiff,
+  initialCheck,
+  isViewGrade,
+  pairGrade,
+  schoolYearOf,
+  semesterLabelWithYear,
+  syncWithDesigns,
+  viewYears,
+  type HourCheck,
+  type ViewGrade,
+} from "@/domain/hoursView";
+import { useHourChecks } from "./useHourChecks";
 import {
   bandInfo,
+  autoReduce,
   checkAllocation,
-  defaultAllocation,
   oneWeekHours,
-  semesterLabel,
   type AllocationInput,
-  type BandKey,
   type FourSemesters,
   type SemesterIndex,
 } from "@/validation/allocation";
@@ -16,65 +31,74 @@ import { Packer } from "docx";
 import { buildAllocationDocx } from "@/export/allocationDocx";
 import { Card, IssueList } from "../ui";
 
-const STORE_KEY = "sat-hours-v1";
 const SEMS: SemesterIndex[] = [0, 1, 2, 3];
 const num = (v: string) => Math.max(0, Math.floor(Number(v) || 0));
 const cell = "w-16 rounded border border-gray-300 px-1 py-1 text-right text-sm focus:border-brand-500 focus:outline-none";
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
-/** 학교자율시간을 운영하는 학기에서 교과·창체를 '1주 수업시간'만큼 줄여 주는 도움 기능 */
-function autoReduce(a: AllocationInput): AllocationInput {
-  const base = defaultAllocation(a.band);
-  const next: AllocationInput = { ...a, subjectHours: base.subjectHours, creativeHours: base.creativeHours };
-  const subjects = bandInfo(a.band).subjects;
-  for (const s of SEMS) {
-    const need = a.courses.filter((c) => c.semester === s).reduce((t, c) => t + c.hours, 0);
-    if (need === 0) continue;
-    let cut = 0;
-    for (const sub of subjects) {
-      if (sub.noReduction) continue; // 체육·음악·미술은 감축 불가
-      const w = Math.floor(oneWeekHours(a.baseHours[sub.key] ?? sub.baseHours));
-      next.subjectHours[sub.key][s] -= w;
-      cut += w;
-    }
-    const cw = Math.floor(oneWeekHours(a.creativeBaseHours));
-    next.creativeHours[s] -= cw;
-    cut += cw;
-    // 모자라는 시수는 국어 → 수학 순서로 추가 감축 (넘치면 되돌림)
-    const order = ["국어", "수학", "영어", "사회"];
-    let k = 0;
-    while (cut !== need && k < 500) {
-      const key = order[k % order.length];
-      if (next.subjectHours[key]) next.subjectHours[key][s] += cut > need ? 1 : -1;
-      cut += cut > need ? -1 : 1;
-      k++;
-    }
-  }
-  return next;
-}
-
 export function HoursChecker() {
-  const [a, setA] = useState<AllocationInput>(() => defaultAllocation("3-4"));
-  const [loaded, setLoaded] = useState(false);
+  const params = useSearchParams();
+  const router = useRouter();
+  const q = Number(params.get("grade"));
+  const grade: ViewGrade = isViewGrade(q) ? q : 3;
+  const { checks, designs, loaded, save, loggedIn } = useHourChecks();
+  const [check, setCheck] = useState<HourCheck | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORE_KEY);
-      if (raw) setA(JSON.parse(raw));
-    } catch {
-      /* 무시하고 기본값 사용 */
-    }
-    setLoaded(true);
-  }, []);
+  // 학년 화면을 열 때: 저장본이 있으면 그것, 없으면 설계 현황을 넣은 기본값
   useEffect(() => {
     if (!loaded) return;
-    try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(a));
-    } catch {
-      /* 저장 못 해도 동작에는 지장 없음 */
-    }
-  }, [a, loaded]);
+    setCheck(checks[grade] ?? initialCheck(grade, schoolYearOf(new Date()), designs));
+    setDirty(false);
+    setSaveState(checks[grade] ? "saved" : "idle");
+    // checks는 저장할 때마다 바뀌므로 학년을 바꿀 때만 다시 불러온다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grade, loaded, designs]);
 
+  // 아직 저장 안 된 고침: 학년을 바꾸거나 페이지를 떠날 때 바로 저장한다
+  const pending = useRef<HourCheck | null>(null);
+  pending.current = dirty ? check : null;
+  useEffect(() => {
+    const onHide = () => {
+      if (pending.current) void save(pending.current, { keepalive: true });
+    };
+    window.addEventListener("pagehide", onHide);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      onHide(); // 다른 화면으로 이동할 때
+    };
+  }, [save]);
+  const switchGrade = async (g: ViewGrade) => {
+    if (pending.current) {
+      setSaveState("saving");
+      await save(pending.current).catch(() => setSaveState("error"));
+      pending.current = null;
+    }
+    router.replace(`/hours?grade=${g}`);
+  };
+
+  // 고친 내용은 잠시 뒤 자동 저장
+  useEffect(() => {
+    if (!check || !dirty) return;
+    const t = setTimeout(() => {
+      setSaveState("saving");
+      save(check)
+        .then(() => {
+          setSaveState("saved");
+          setDirty(false);
+        })
+        .catch(() => setSaveState("error"));
+    }, 500);
+    return () => clearTimeout(t);
+  }, [check, dirty, save]);
+
+  if (!check) return <p className="text-gray-500">불러오는 중…</p>;
+  const a = check.input;
+  const setA = (next: AllocationInput) => {
+    setCheck({ ...check, input: next });
+    setDirty(true);
+  };
   const info = bandInfo(a.band);
   const r = checkAllocation(a);
   const mutate = (fn: (x: AllocationInput) => void) => {
@@ -82,39 +106,103 @@ export function HoursChecker() {
     fn(next);
     setA(next);
   };
-  const switchBand = (band: BandKey) => {
-    if (band === a.band) return;
-    if (a.courses.length && !confirm("학년군을 바꾸면 입력한 내용이 초기화됩니다. 바꿀까요?")) return;
-    setA(defaultAllocation(band));
-  };
+  const label = (s: SemesterIndex) => semesterLabelWithYear(grade, check.schoolYear, s);
   const errorCount = r.issues.length;
+  const diff = designDiff(check, designs);
+  const all = { ...checks, [grade]: check };
+  const status = bandStatus(grade, all, designs);
+  const thisOk = checkOk(check, designs);
+  const pair = pairGrade(grade);
 
   return (
     <div className="space-y-5">
       <Card className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h1 className="text-xl font-bold">학교자율시간 시수 편성 점검</h1>
-          <div className="flex gap-1 rounded-lg bg-gray-100 p-1 text-sm">
-            {(["3-4", "5-6"] as BandKey[]).map((b) => (
-              <button
-                key={b}
-                type="button"
-                onClick={() => switchBand(b)}
-                className={`rounded-md px-3 py-1 ${a.band === b ? "bg-white font-semibold text-brand-700 shadow-sm" : "text-gray-500"}`}
-              >
-                {bandInfo(b).label}
-              </button>
-            ))}
-          </div>
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            올해 학년도
+            <input
+              type="number"
+              className="w-24 rounded border border-gray-300 px-2 py-1"
+              value={check.schoolYear}
+              onChange={(e) => {
+                setCheck({ ...check, schoolYear: Number(e.target.value) || check.schoolYear });
+                setDirty(true);
+              }}
+            />
+          </label>
         </div>
         <ol className="list-decimal space-y-0.5 pl-5 text-sm text-gray-600">
-          <li>해당 학년군의 기준시수를 확인합니다. (학교 상황에 맞게 고칠 수 있어요)</li>
-          <li>학교자율시간 과목(활동)을 관련 교과에 기록하고 운영 시수를 입력합니다.</li>
-          <li>교과별 &lsquo;1주 수업시간&rsquo;을 참고하여 교과·창체 시수를 편성합니다.</li>
-          <li>&lsquo;이상유무&rsquo;가 모두 &lsquo;이상없음&rsquo;인지 확인합니다.</li>
+          <li>아래에서 학년을 고릅니다. 예: &lsquo;3학년&rsquo; = 지금 3학년 학생들의 3학년(올해)·4학년(내년) 시수</li>
+          <li>설계 현황의 학교자율시간이 자동으로 들어가요. 바꿀 계획이 있으면 추가·삭제·수정하세요.</li>
+          <li>교과별 &lsquo;1주 수업시간&rsquo;을 참고하여 교과·창체 시수를 편성합니다. (기준시수도 학교 상황에 맞게 고칠 수 있어요)</li>
+          <li>&lsquo;이상유무&rsquo;가 모두 &lsquo;이상없음&rsquo;인지 확인합니다. 학년군의 두 학년이 모두 이상없음이면 시수 점검 완료!</li>
         </ol>
-        <p className="text-xs text-gray-400">기준: 학교자율시간 시수 편성 점검표(엑셀) 계산식</p>
+        <p className="text-xs text-gray-400">
+          기준: 학교자율시간 시수 편성 점검표(엑셀) 계산식 · {loggedIn ? "학교 계정에 자동 저장" : "로그인하지 않아 이 브라우저에만 저장"}
+          {saveState === "saving" ? " · 저장 중…" : saveState === "saved" ? " · ✓ 저장됨" : saveState === "error" ? " · ⚠ 저장 실패" : " · 아직 저장 안 됨"}
+        </p>
       </Card>
+
+      {/* 학년 버튼: 좌우로 꽉 차는 네모 버튼 4개 */}
+      <div className="grid grid-cols-4 gap-2">
+        {VIEW_GRADES.map((g) => {
+          const ok = checkOk(all[g], designs);
+          const on = g === grade;
+          return (
+            <button
+              key={g}
+              type="button"
+              onClick={() => void switchGrade(g)}
+              className={`rounded-lg border-2 py-3 text-center font-bold transition ${
+                on ? "border-brand-600 bg-brand-600 text-white" : "border-gray-200 bg-white text-gray-700 hover:border-brand-500"
+              }`}
+            >
+              {g}학년
+              <span className={`block text-xs font-semibold ${on ? "text-white/90" : ok ? "text-green-700" : all[g] ? "text-red-600" : "text-gray-400"}`}>
+                {ok ? "✓ 이상없음" : all[g] ? "점검 필요" : "아직 안 함"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        className={`rounded-xl p-4 text-sm ${status.complete ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-900"}`}
+      >
+        <p className="font-semibold">
+          {status.complete
+            ? `✓ ${info.label} 시수 점검 완료 — 설계 현황에 '시수점검 완료'로 표시돼요.`
+            : `${info.label} 시수 점검: ${grade}학년 화면 ${thisOk ? "이상없음" : "점검 필요"} · ${pair}학년 화면 ${checkOk(all[pair], designs) ? "이상없음" : all[pair] ? "점검 필요" : "아직 안 함"}`}
+        </p>
+        {!status.complete && <p className="mt-1">학년군의 두 학년 화면({info.grades.join("·")}학년)이 모두 이상없음이어야 시수 점검 완료예요.</p>}
+        {status.gradesWithoutDesign.length > 0 && (
+          <p className="mt-1">
+            {status.gradesWithoutDesign.join("·")}학년은 설계 현황에 설계가 없어 자동으로 들어가지 않아요. 아래 &lsquo;+ 과목·활동 추가&rsquo;로 직접 입력해 주세요.
+          </p>
+        )}
+      </div>
+
+      {diff.length > 0 && (
+        <div className="space-y-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <p className="font-semibold">설계 현황과 다른 점이 있어요. 반영해야 이상없음이 돼요.</p>
+          <ul className="list-disc pl-5">
+            {diff.map((d) => (
+              <li key={d}>{d}</li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            className="rounded-lg bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-700"
+            onClick={() => {
+              setCheck(syncWithDesigns(check, designs));
+              setDirty(true);
+            }}
+          >
+            설계 현황 반영하기 (직접 추가한 것은 그대로)
+          </button>
+        </div>
+      )}
 
       <Card className="space-y-3">
         <h2 className="font-bold">① 학교자율시간 과목·활동</h2>
@@ -137,8 +225,9 @@ export function HoursChecker() {
               {a.courses.map((c, i) => (
                 <tr key={i}>
                   <td className="p-1">
+                    {c.designId && <span className="mr-1 rounded bg-brand-50 px-1.5 py-0.5 text-xs text-brand-700">설계</span>}
                     <input
-                      className="w-full rounded border border-gray-300 px-2 py-1"
+                      className="w-[85%] rounded border border-gray-300 px-2 py-1"
                       value={c.name}
                       placeholder="예: 지구마을 첫걸음"
                       onChange={(e) => mutate((x) => (x.courses[i].name = e.target.value))}
@@ -162,7 +251,7 @@ export function HoursChecker() {
                       onChange={(e) => mutate((x) => (x.courses[i].semester = Number(e.target.value) as SemesterIndex))}
                     >
                       {SEMS.map((s) => (
-                        <option key={s} value={s}>{semesterLabel(a.band, s)}</option>
+                        <option key={s} value={s}>{label(s)}</option>
                       ))}
                     </select>
                   </td>
@@ -212,7 +301,7 @@ export function HoursChecker() {
             const ok = h === 0 || h === r.semesterTarget;
             return (
               <span key={s} className={`rounded-full px-3 py-1 ${ok ? "bg-gray-100 text-gray-600" : "bg-red-100 text-red-700"}`}>
-                {semesterLabel(a.band, s)}: {h}시간
+                {label(s)}: {h}시간
               </span>
             );
           })}
@@ -229,7 +318,7 @@ export function HoursChecker() {
                 <th className="p-2 text-left">교과</th>
                 <th className="p-2">기준시수</th>
                 {SEMS.map((s) => (
-                  <th key={s} className="p-2">{semesterLabel(a.band, s)}</th>
+                  <th key={s} className="p-2">{label(s)}</th>
                 ))}
                 <th className="p-2">학교자율시간</th>
                 <th className="p-2">편성시수</th>
@@ -330,10 +419,10 @@ export function HoursChecker() {
           type="button"
           className="rounded-lg border-2 border-brand-600 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50"
           onClick={async () => {
-            const url = URL.createObjectURL(await Packer.toBlob(buildAllocationDocx(a)));
+            const url = URL.createObjectURL(await Packer.toBlob(buildAllocationDocx(a, viewYears(grade, check.schoolYear))));
             const link = document.createElement("a");
             link.href = url;
-            link.download = `${info.label}_교육과정_편성표.docx`;
+            link.download = `${grade}학년_교육과정_편성표.docx`;
             document.body.appendChild(link);
             link.click();
             link.remove();

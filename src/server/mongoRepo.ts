@@ -1,9 +1,9 @@
 import "server-only";
 import { ObjectId, type Db, type WithId, type Document } from "mongodb";
-import type { DesignRecord, DesignSummary, LogEntry, Repo, User } from "./repo";
+import type { DesignRecord, DesignSummary, HourCheckRecord, LogEntry, Repo, User } from "./repo";
 
 /**
- * MongoDB 저장소. 컬렉션: users, designs, designVersions, activityLogs
+ * MongoDB 저장소. 컬렉션: users, designs, designVersions, hourChecks, activityLogs
  * (설계 제안서 docs/PLAN.md의 데이터 구조)
  */
 
@@ -36,6 +36,7 @@ function ensureIndexes(db: Db) {
     db.collection("designs").createIndex({ type: 1, schoolName: 1, schoolYear: 1, name: 1 }),
     db.collection("designVersions").createIndex({ designId: 1, savedAt: -1 }),
     db.collection("activityLogs").createIndex({ createdAt: -1 }),
+    db.collection("hourChecks").createIndex({ ownerId: 1, grade: 1 }, { unique: true }),
   ]).catch((e) => {
     indexesReady = null;
     throw e;
@@ -49,6 +50,7 @@ export function mongoRepo(db: Db): Repo {
   const designs = db.collection("designs");
   const versions = db.collection("designVersions");
   const logs = db.collection("activityLogs");
+  const hourChecks = db.collection("hourChecks");
 
   return {
     users: {
@@ -100,6 +102,13 @@ export function mongoRepo(db: Db): Repo {
         await versions.insertOne({ designId, doc, savedAt: new Date() });
         const old = await versions.find({ designId }).sort({ savedAt: -1 }).skip(MAX_VERSIONS).project({ _id: 1 }).toArray();
         if (old.length) await versions.deleteMany({ _id: { $in: old.map((o) => o._id) } });
+      },
+    },
+    hourChecks: {
+      listByOwner: async (ownerId) =>
+        (await hourChecks.find({ ownerId }).toArray()).map(({ _id: _omit, ...rest }) => rest as HourCheckRecord),
+      upsert: async (r) => {
+        await hourChecks.updateOne({ ownerId: r.ownerId, grade: r.grade }, { $set: r }, { upsert: true });
       },
     },
     logs: {

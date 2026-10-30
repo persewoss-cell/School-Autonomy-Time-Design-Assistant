@@ -56,7 +56,7 @@ export function ChangePassword({ first }: { first: boolean }) {
         </Field>
         {msg && <p className={`rounded-lg p-3 text-sm ${msg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{msg.text}</p>}
         {msg?.ok ? (
-          <Link href="/designs" className="block rounded-lg bg-brand-600 py-2.5 text-center font-semibold text-white">내 설계로 가기</Link>
+          <Link href="/designs" className="block rounded-lg bg-brand-600 py-2.5 text-center font-semibold text-white">설계 현황으로 가기</Link>
         ) : (
           <button type="submit" disabled={busy} className="w-full rounded-lg bg-brand-600 py-2.5 font-semibold text-white hover:bg-brand-700 disabled:bg-gray-300">
             {busy ? "바꾸는 중…" : "비밀번호 바꾸기"}

@@ -21,6 +21,8 @@ import { codeMap } from "@/domain/codes";
 import { applicationTexts } from "@/domain/summary";
 import { lessonLabels } from "@/validation/hours";
 import { checklistResults } from "@/validation/design";
+import type { AllocationInput } from "@/validation/allocation";
+import { allocationChildren } from "./allocationDocx";
 
 /**
  * 설계 문서 → .docx (한글에서 열림)
@@ -459,7 +461,14 @@ function checklistDoc(doc: DesignDoc): (Paragraph | Table)[] {
   ];
 }
 
-export function buildDesignDocx(doc: DesignDoc): Document {
+/** 붙임으로 넣을 시수 점검표 (그 학년 화면) */
+export interface AllocationAttachment {
+  input: AllocationInput;
+  years: number[];
+  grade: number;
+}
+
+export function buildDesignDocx(doc: DesignDoc, allocation?: AllocationAttachment): Document {
   const footer = new Footer({
     children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ children: ["- ", PageNumber.CURRENT, " -"], font: DOTUM, size: 20 })] })],
   });
@@ -472,7 +481,14 @@ export function buildDesignDocx(doc: DesignDoc): Document {
       },
     },
     footers: { default: footer },
-    children: [...applicationForm(doc), ...curriculumDoc(doc), ...checklistDoc(doc)],
+    children: [
+      ...applicationForm(doc),
+      ...curriculumDoc(doc),
+      ...checklistDoc(doc),
+      ...(allocation
+        ? [para(`[붙임] (${allocation.grade})학년 교육과정 편성표 (시수 점검표)`, { size: 9, line: 1, pageBreak: true, after: 2 }), ...allocationChildren(allocation.input, allocation.years)]
+        : []),
+    ],
   };
   return new Document({
     creator: "학교자율시간 설계 도우미 앱",

@@ -7,6 +7,7 @@ import type { DesignDoc } from "@/domain/types";
 import { api } from "@/lib/api";
 import { stepsFor } from "../wizard/Wizard";
 import { semesterHours } from "@/validation/hours";
+import { bandStatus, isViewGrade, type HourCheck, type ViewGrade } from "@/domain/hoursView";
 import type { Grade } from "@/domain/types";
 import { Card } from "../ui";
 import { useMe } from "../useMe";
@@ -19,6 +20,7 @@ export interface DesignRow {
   semester: number;
   hours?: number;
   schoolYear?: string;
+  subjectGroup?: string;
   schoolName: string;
   errorCount: number;
   warningCount: number;
@@ -53,11 +55,15 @@ export function MyDesigns() {
   const me = useMe();
   const router = useRouter();
   const [rows, setRows] = useState<DesignRow[] | null>(null);
+  const [checks, setChecks] = useState<Partial<Record<ViewGrade, HourCheck>>>({});
   const [error, setError] = useState("");
   const load = useCallback(() => {
     api<{ designs: DesignRow[] }>("/api/designs")
       .then((r) => setRows(r.designs))
       .catch((e) => setError(e.message));
+    api<{ checks: { grade: number; data: HourCheck }[] }>("/api/hours")
+      .then((r) => setChecks(Object.fromEntries(r.checks.filter((c) => isViewGrade(c.grade)).map((c) => [c.grade, c.data]))))
+      .catch(() => {});
   }, []);
   useEffect(() => {
     if (me?.user) load();
@@ -79,7 +85,7 @@ export function MyDesigns() {
   if (me && !me.user) {
     return (
       <Card className="space-y-2">
-        <h1 className="text-xl font-bold">내 설계</h1>
+        <h1 className="text-xl font-bold">설계 현황</h1>
         <p className="text-gray-600">{me.enabled ? "로그인하면 저장한 설계를 볼 수 있어요." : "저장 기능이 아직 설정되지 않았습니다."}</p>
         {me.enabled && <Link href="/login" className="font-semibold text-brand-600 underline">로그인</Link>}
       </Card>
@@ -88,7 +94,7 @@ export function MyDesigns() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">내 설계</h1>
+        <h1 className="text-2xl font-bold">설계 현황</h1>
         <Link href="/designs/new" className="rounded-lg bg-brand-600 px-4 py-2 font-semibold text-white hover:bg-brand-700">+ 새 설계</Link>
       </div>
       {error && <p className="text-red-700">{error}</p>}
@@ -123,7 +129,21 @@ export function MyDesigns() {
                     <StatusBadge errors={r.errorCount} warnings={r.warningCount} type={r.type} progress={r.progress} />
                   </div>
                   <p className="text-sm text-gray-400">마지막 저장 {fmtDate(r.updatedAt)}</p>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {bandStatus(r.grade, checks, rows).complete ? (
+                      <span className="rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-sm font-semibold text-green-700">✓ 시수점검 완료</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/hours?grade=${r.grade}`);
+                        }}
+                        className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-100"
+                      >
+                        ⚠ 시수점검
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={(e) => {

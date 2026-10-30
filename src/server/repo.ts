@@ -39,6 +39,8 @@ export interface DesignRecord {
   semester: number;
   /** 운영 시수 (학년·학기별 합계 계산용. 예전 저장본에는 없을 수 있음) */
   hours?: number;
+  /** 편성 교과 (시수 점검에 쓰임. 예전 저장본에는 없을 수 있음) */
+  subjectGroup?: string;
   schoolName: string;
   schoolYear: string;
   errorCount: number;
@@ -65,6 +67,15 @@ export interface LogEntry {
 
 export type DesignSummary = Omit<DesignRecord, "doc">;
 
+/** 학교(계정)별 시수 점검 화면 저장본. 학년 화면(3~6)마다 하나 */
+export interface HourCheckRecord {
+  ownerId: string;
+  grade: number;
+  /** 화면 내용 (src/domain/hoursView.ts HourCheck) */
+  data: unknown;
+  updatedAt: Date;
+}
+
 export interface Repo {
   users: {
     findBySchoolKey(schoolKey: string): Promise<User | null>;
@@ -84,6 +95,10 @@ export interface Repo {
     findSameActivity(schoolName: string, schoolYear: string, name: string, excludeId?: string): Promise<DesignSummary | null>;
     saveVersion(designId: string, doc: DesignDoc): Promise<void>;
   };
+  hourChecks: {
+    listByOwner(ownerId: string): Promise<HourCheckRecord[]>;
+    upsert(r: HourCheckRecord): Promise<void>;
+  };
   logs: {
     add(l: Omit<LogEntry, "id" | "createdAt">): Promise<void>;
     list(limit: number): Promise<LogEntry[]>;
@@ -96,6 +111,7 @@ export function memoryRepo(): Repo {
   const designs: DesignRecord[] = [];
   const versions: { designId: string; doc: DesignDoc; savedAt: Date }[] = [];
   const logs: LogEntry[] = [];
+  const hourChecks: HourCheckRecord[] = [];
   let seq = 0;
   const id = () => `m${++seq}`;
   const summary = ({ doc: _doc, ...rest }: DesignRecord): DesignSummary => rest;
@@ -141,6 +157,14 @@ export function memoryRepo(): Repo {
       },
       saveVersion: async (designId, doc) => {
         versions.push({ designId, doc: structuredClone(doc), savedAt: new Date() });
+      },
+    },
+    hourChecks: {
+      listByOwner: async (ownerId) => structuredClone(hourChecks.filter((h) => h.ownerId === ownerId)),
+      upsert: async (r) => {
+        const i = hourChecks.findIndex((h) => h.ownerId === r.ownerId && h.grade === r.grade);
+        if (i >= 0) hourChecks[i] = structuredClone(r);
+        else hourChecks.push(structuredClone(r));
       },
     },
     logs: {

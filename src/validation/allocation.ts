@@ -31,6 +31,8 @@ export interface AutonomyCourse {
   subjectKey: string;
   semester: SemesterIndex;
   hours: number;
+  /** 설계 현황에서 가져온 것이면 그 설계 id (직접 추가한 것은 없음) */
+  designId?: string;
 }
 
 export interface AllocationInput {
@@ -236,4 +238,35 @@ export function checkAllocation(input: AllocationInput): AllocationResult {
   });
 
   return { rows, subtotal, creative, total, autonomyBySemester: bySem, semesterTarget: target, issues };
+}
+
+/** 학교자율시간을 운영하는 학기에서 교과·창체를 '1주 수업시간'만큼 줄여 주는 도움 기능 */
+export function autoReduce(a: AllocationInput): AllocationInput {
+  const base = defaultAllocation(a.band);
+  const next: AllocationInput = { ...a, subjectHours: base.subjectHours, creativeHours: base.creativeHours };
+  const subjects = bandInfo(a.band).subjects;
+  for (const s of [0, 1, 2, 3] as SemesterIndex[]) {
+    const need = a.courses.filter((c) => c.semester === s).reduce((t, c) => t + c.hours, 0);
+    if (need === 0) continue;
+    let cut = 0;
+    for (const sub of subjects) {
+      if (sub.noReduction) continue; // 체육·음악·미술은 감축 불가
+      const w = Math.floor(oneWeekHours(a.baseHours[sub.key] ?? sub.baseHours));
+      next.subjectHours[sub.key][s] -= w;
+      cut += w;
+    }
+    const cw = Math.floor(oneWeekHours(a.creativeBaseHours));
+    next.creativeHours[s] -= cw;
+    cut += cw;
+    // 모자라는 시수는 국어 → 수학 순서로 추가 감축 (넘치면 되돌림)
+    const order = ["국어", "수학", "영어", "사회"];
+    let k = 0;
+    while (cut !== need && k < 500) {
+      const key = order[k % order.length];
+      if (next.subjectHours[key]) next.subjectHours[key][s] += cut > need ? 1 : -1;
+      cut += cut > need ? -1 : 1;
+      k++;
+    }
+  }
+  return next;
 }

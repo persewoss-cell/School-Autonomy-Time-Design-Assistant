@@ -6,6 +6,8 @@ import { TEACHER_PLANS, TEXTBOOK_TYPES, type DesignDoc } from "@/domain/types";
 import { applicationTexts } from "@/domain/summary";
 import { codeMap } from "@/domain/codes";
 import { buildDesignDocx, docxFileName } from "@/export/docx";
+import { bandStatus, isViewGrade, viewYears, type DesignBrief } from "@/domain/hoursView";
+import { useHourChecks } from "../hours/useHourChecks";
 import { checkApplication, checklistResults, validateDesign } from "@/validation/design";
 import type { Issue, StepKey } from "@/validation/types";
 import type { StepProps } from "./DocSteps";
@@ -113,7 +115,9 @@ export function FinalStep({
   stepLabel,
   onSave,
   onDownloaded,
+  designId,
 }: StepProps & {
+  designId?: string;
   goTo: (step: StepKey) => void;
   stepLabel: (step?: StepKey) => string;
   onSave?: () => Promise<void>;
@@ -125,7 +129,17 @@ export function FinalStep({
   const [busy, setBusy] = useState(false);
   // 체크리스트를 모두 점검·체크해야 문서를 만들 수 있다 (사용자 결정, 2026-10-31)
   const unchecked = checklist.filter((c) => !c.ok);
-  const blocked = unchecked.length > 0;
+  // 시수 점검: 이 설계 학년이 속한 학년군의 두 학년 화면이 모두 이상없음이어야 문서를 만든다 (사용자 결정, 2026-10-31)
+  const hc = useHourChecks();
+  const current: DesignBrief = { id: designId ?? "current", name: doc.basic.name, grade: doc.basic.grade, semester: doc.basic.semester, hours: doc.basic.hours, subjectGroup: doc.basic.subjectGroup };
+  const briefs = [...hc.designs.filter((d) => d.id !== current.id), current];
+  const hours = bandStatus(doc.basic.grade, hc.checks, briefs);
+  const ownView = isViewGrade(doc.basic.grade) ? hc.checks[doc.basic.grade] : undefined;
+  const blocked = unchecked.length > 0 || !hours.complete;
+  const goHours = async (grade: number) => {
+    if (onSave) await onSave().catch(() => {});
+    window.location.href = `/hours?grade=${grade}`;
+  };
 
   const FORM_NOTICE = "내려받는 문서는 교육청에서 제공하는 양식과 다를 수 있습니다.\n한글(HWP)에서 열어 양식을 다듬어 쓰세요.";
   const download = async () => {
@@ -134,7 +148,9 @@ export function FinalStep({
     if (errors.length > 0 && !confirm(`아직 오류가 ${errors.length}개 있습니다. 그래도 문서를 내려받을까요?`)) return;
     setBusy(true);
     try {
-      const blob = await Packer.toBlob(buildDesignDocx(doc));
+      const blob = await Packer.toBlob(
+        buildDesignDocx(doc, ownView ? { input: ownView.input, years: viewYears(ownView.grade, ownView.schoolYear), grade: ownView.grade } : undefined),
+      );
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -201,7 +217,40 @@ export function FinalStep({
           {doc.basic.type === "subject"
             ? "[서식3] 신청서 + [서식4] 과목 교육과정 + [서식7] 체크리스트"
             : "[서식1] 활동 계획서 + [서식2] 활동 교육과정 + [서식6] 체크리스트"}
+          {" + 붙임: 교육과정 편성표(시수 점검표)"}
         </p>
+        <div className={`space-y-2 rounded-lg border p-3 text-sm ${hours.complete ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-700"}`}>
+          {hours.complete ? (
+            <p className="font-semibold">✓ 시수 점검 완료 — {doc.basic.grade}학년 시수 점검표가 문서 끝에 함께 들어가요.</p>
+          ) : (
+            <>
+              <p className="font-semibold">⚠ 시수 점검을 마쳐야 문서가 만들어집니다.</p>
+              <p>
+                {hours.views.map((v) => `${v.grade}학년 화면: ${v.ok ? "이상없음" : v.saved ? "점검 필요" : "아직 안 함"}`).join(" · ")}
+                {" "}— 학년군의 두 학년 화면이 모두 이상없음이어야 해요.
+              </p>
+              {hours.gradesWithoutDesign.length > 0 && (
+                <p>
+                  {hours.gradesWithoutDesign.join("·")}학년은 설계 현황에 설계가 없어 시수 점검에 자동으로 들어가지 않아요. 시수 점검 화면에서 {hours.gradesWithoutDesign.join("·")}학년 학교자율시간을 직접 입력해 주세요.
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {hours.views
+                  .filter((v) => !v.ok)
+                  .map((v) => (
+                    <button
+                      key={v.grade}
+                      type="button"
+                      onClick={() => void goHours(v.grade)}
+                      className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-700"
+                    >
+                      ⚠ {v.grade}학년 시수 점검하기
+                    </button>
+                  ))}
+              </div>
+            </>
+          )}
+        </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={download} disabled={busy || blocked} className="rounded-lg bg-brand-600 px-5 py-2 font-semibold text-white hover:bg-brand-700 disabled:bg-gray-300">
             {busy ? "만드는 중…" : "📄 문서 내려받기 (.docx)"}
@@ -224,7 +273,7 @@ export function FinalStep({
             </button>
           )}
         </div>
-        {blocked && (
+        {unchecked.length > 0 && (
           <div className="space-y-1 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             <p className="font-semibold">⚠ 체크리스트 내용을 모두 점검하고 체크해야 문서가 만들어집니다. (남은 항목 {unchecked.length}개)</p>
             <ul className="list-disc pl-5">

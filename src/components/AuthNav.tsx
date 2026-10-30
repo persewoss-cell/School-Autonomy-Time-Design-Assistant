@@ -15,7 +15,7 @@ export function AuthNav() {
     <nav className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
       <Link href="/designs/new" className={link}>새 설계</Link>
       <Link href="/hours" className={link}>시수 점검</Link>
-      {me?.user && <Link href="/designs" className={link}>내 설계</Link>}
+      {me?.user && <Link href="/designs" className={link}>설계 현황</Link>}
       {me?.user?.role === "admin" && <Link href="/admin" className={`${link} font-semibold text-brand-700`}>관리자</Link>}
       {me?.enabled && !me.user && (
         <>
