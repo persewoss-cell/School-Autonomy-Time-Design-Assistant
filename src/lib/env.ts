@@ -6,10 +6,10 @@ export const env = {
   mongodbDb: process.env.MONGODB_DB?.trim() || "school_autonomy",
   /** 로그인 세션 서명 비밀키 (32자 이상 무작위 문자열) */
   authSecret: process.env.AUTH_SECRET?.trim() || "",
-  /** 가입하면 바로 관리자가 되는 이메일 (쉼표로 구분) */
-  adminEmails: (process.env.ADMIN_EMAILS ?? "")
+  /** 가입하면 바로 관리자가 되는 학교 (정식 명칭, 쉼표로 구분) */
+  adminSchools: (process.env.ADMIN_SCHOOLS ?? "")
     .split(",")
-    .map((s) => s.trim().toLowerCase())
+    .map((s) => s.replace(/\s+/g, ""))
     .filter(Boolean),
 };
 

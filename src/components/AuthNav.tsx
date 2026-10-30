@@ -25,7 +25,7 @@ export function AuthNav() {
       )}
       {me?.user && (
         <span className="flex items-center gap-2">
-          <span className="text-gray-400">{me.user.name}</span>
+          <Link href="/account/password" className="text-gray-400 hover:text-brand-700" title="비밀번호 바꾸기">{me.user.schoolName}</Link>
           <button type="button" onClick={logout} className="text-gray-400 hover:text-red-600">로그아웃</button>
         </span>
       )}

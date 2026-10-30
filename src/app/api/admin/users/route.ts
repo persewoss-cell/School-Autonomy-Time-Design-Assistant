@@ -10,6 +10,7 @@ export const GET = handle(async () => {
   return json({
     users: users.map((u) => ({
       ...publicUser(u),
+      resetRequest: u.resetRequest,
       createdAt: u.createdAt,
       lastLoginAt: u.lastLoginAt,
       designCount: designs.filter((d) => d.ownerId === u.id).length,

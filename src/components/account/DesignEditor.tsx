@@ -35,6 +35,7 @@ export function NewDesign() {
         </p>
       )}
       <Wizard
+        defaultSchoolName={me?.user?.schoolName}
         onSave={
           loggedIn
             ? async (doc: DesignDoc) => {

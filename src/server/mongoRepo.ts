@@ -29,7 +29,9 @@ const summaryProjection = { doc: 0 } as const;
 let indexesReady: Promise<unknown> | null = null;
 function ensureIndexes(db: Db) {
   indexesReady ??= Promise.all([
-    db.collection("users").createIndex({ email: 1 }, { unique: true }),
+    // 예전(이메일 가입) 인덱스가 남아 있으면 이메일 없는 계정이 저장되지 않으므로 지운다
+    db.collection("users").dropIndex("email_1").catch(() => {}),
+    db.collection("users").createIndex({ schoolKey: 1 }, { unique: true, partialFilterExpression: { schoolKey: { $type: "string" } } }),
     db.collection("designs").createIndex({ ownerId: 1, updatedAt: -1 }),
     db.collection("designs").createIndex({ type: 1, schoolName: 1, schoolYear: 1, name: 1 }),
     db.collection("designVersions").createIndex({ designId: 1, savedAt: -1 }),
@@ -50,7 +52,7 @@ export function mongoRepo(db: Db): Repo {
 
   return {
     users: {
-      findByEmail: async (email) => toUser(await users.findOne({ email })),
+      findBySchoolKey: async (schoolKey) => toUser(await users.findOne({ schoolKey })),
       findById: async (id) => {
         const _id = oid(id);
         return _id ? toUser(await users.findOne({ _id })) : null;

@@ -45,9 +45,11 @@ export interface WizardProps {
   onDownloaded?: (doc: DesignDoc) => void;
   /** 브라우저 임시 보관 사용 여부 (새 설계일 때만) */
   useDraft?: boolean;
+  /** 로그인한 학교명: 계획서·신청서의 학교명이 비어 있으면 채움 */
+  defaultSchoolName?: string;
 }
 
-export function Wizard({ initial, onSave, onParseFail, onDownloaded, useDraft = !initial }: WizardProps) {
+export function Wizard({ initial, onSave, onParseFail, onDownloaded, useDraft = !initial, defaultSchoolName }: WizardProps) {
   const [doc, setDocState] = useState<DesignDoc>(() => initial ?? emptyDesign());
   const [stepKey, setStepKey] = useState<StepKey>(initial ? "final" : "type");
   const [maxIndex, setMaxIndex] = useState(initial ? 99 : 0);
@@ -79,6 +81,12 @@ export function Wizard({ initial, onSave, onParseFail, onDownloaded, useDraft = 
       /* 저장 공간을 못 쓰는 환경이면 무시 */
     }
   }, [doc, stepKey, maxIndex, useDraft]);
+
+  useEffect(() => {
+    if (defaultSchoolName && !doc.application.schoolName.trim()) {
+      setDocState((d) => ({ ...d, application: { ...d.application, schoolName: defaultSchoolName } }));
+    }
+  }, [defaultSchoolName, doc.application.schoolName]);
 
   const steps = stepsFor(doc);
   const index = Math.max(0, steps.findIndex((s) => s.key === stepKey));

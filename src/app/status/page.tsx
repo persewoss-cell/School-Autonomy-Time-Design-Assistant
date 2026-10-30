@@ -6,7 +6,7 @@ interface Health {
   db: "not_configured" | "ok" | "error" | "memory";
   dbError?: string;
   authSecret: "ok" | "short" | "missing";
-  adminEmails: number;
+  adminSchools: number;
 }
 
 function Row({ ok, title, desc }: { ok: boolean | null; title: string; desc: string }) {
@@ -54,9 +54,9 @@ export default function StatusPage() {
           desc={h?.authSecret === "ok" ? "설정됨" : h?.authSecret === "short" ? "너무 짧습니다. 32자 이상 무작위 문자열을 넣으세요." : "아직 없음 → 32자 이상 무작위 문자열을 넣으세요."}
         />
         <Row
-          ok={h ? h.adminEmails > 0 : null}
-          title="관리자 이메일 (ADMIN_EMAILS)"
-          desc={h && h.adminEmails > 0 ? `${h.adminEmails}개 설정됨 — 이 이메일로 가입하면 바로 관리자가 됩니다.` : "아직 없음 → 관리자가 될 이메일을 넣으세요. (여러 개는 쉼표로 구분)"}
+          ok={h ? h.adminSchools > 0 : null}
+          title="관리자 학교 (ADMIN_SCHOOLS)"
+          desc={h && h.adminSchools > 0 ? `${h.adminSchools}개 설정됨 — 이 학교명으로 가입하면 승인 없이 바로 관리자가 됩니다.` : "아직 없음 → 관리자가 될 학교의 정식 명칭을 넣으세요. (예: 광양중동초등학교, 여러 개는 쉼표로 구분)"}
         />
       </ul>
     </div>

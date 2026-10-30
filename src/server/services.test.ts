@@ -1,46 +1,96 @@
 import { describe, expect, it } from "vitest";
 import { sampleSubject } from "@/domain/sample";
 import { memoryRepo } from "./repo";
-import { adminStats, deleteDesign, getDesign, login, saveDesign, signup, updateUserByAdmin } from "./services";
+import {
+  adminStats,
+  changePassword,
+  deleteDesign,
+  getDesign,
+  login,
+  requestPasswordReset,
+  resetPasswordByAdmin,
+  saveDesign,
+  signup,
+  updateUserByAdmin,
+} from "./services";
 import { createSessionToken, readSessionToken } from "./session";
 
 const SECRET = "test-secret-test-secret-test-secret-123";
-const teacher = { email: "Kim@School.kr", password: "password1", name: "김교사", schoolName: "광양중동초등학교" };
+const school = (schoolName: string, region = "전남") => ({ region, schoolName, password: "password1", passwordConfirm: "password1" });
+const ADMIN_SCHOOLS = ["광양중동초등학교"];
 
 async function setup() {
   const repo = memoryRepo();
-  const admin = await signup(repo, { ...teacher, email: "admin@school.kr", name: "관리자" }, ["admin@school.kr"]);
-  const t = await signup(repo, teacher, ["admin@school.kr"]);
+  const admin = await signup(repo, school("광양중동초등학교"), ADMIN_SCHOOLS);
+  const t = await signup(repo, school("광양 마동 초등학교"), ADMIN_SCHOOLS);
   return { repo, admin, t };
 }
 
-describe("회원가입·로그인", () => {
-  it("관리자 이메일은 바로 관리자, 나머지는 승인 대기", async () => {
+describe("회원가입 (학교 단위)", () => {
+  it("관리자 학교는 바로 관리자, 나머지는 승인 대기. 학교명 띄어쓰기는 없앰", async () => {
     const { admin, t } = await setup();
     expect([admin.role, admin.status]).toEqual(["admin", "active"]);
-    expect([t.role, t.status, t.email]).toEqual(["teacher", "pending", "kim@school.kr"]);
+    expect([t.role, t.status, t.schoolName, t.region]).toEqual(["teacher", "pending", "광양마동초등학교", "전남"]);
   });
+  it("같은 학교는 다시 가입 신청 불가 (띄어쓰기만 달라도)", async () => {
+    const { repo } = await setup();
+    await expect(signup(repo, school("광양마동초등학교", "광주"), [])).rejects.toThrow("이미 가입된 학교");
+  });
+  it("정식 명칭이 아니면 거부", async () => {
+    const { repo } = await setup();
+    await expect(signup(repo, school("광양중동초"), [])).rejects.toThrow("정식 명칭");
+  });
+  it("비밀번호 확인이 다르거나 짧으면 거부, 지역은 전남·광주만", async () => {
+    const { repo } = await setup();
+    await expect(signup(repo, { ...school("순천남산초등학교"), passwordConfirm: "password2" }, [])).rejects.toThrow("서로 다릅니다");
+    await expect(signup(repo, { ...school("순천남산초등학교"), password: "short", passwordConfirm: "short" }, [])).rejects.toThrow("8자");
+    await expect(signup(repo, school("순천남산초등학교", "서울"), [])).rejects.toThrow("지역");
+  });
+});
+
+describe("로그인 (학교명 + 비밀번호)", () => {
   it("승인 전에는 로그인 불가, 승인 후 가능", async () => {
     const { repo, admin, t } = await setup();
-    await expect(login(repo, "kim@school.kr", "password1")).rejects.toThrow("승인");
+    await expect(login(repo, "광양마동초등학교", "password1")).rejects.toThrow("승인");
     await updateUserByAdmin(repo, admin, t.id, { status: "active" });
-    expect((await login(repo, "KIM@school.kr", "password1")).id).toBe(t.id);
+    expect((await login(repo, " 광양 마동초등학교 ", "password1")).id).toBe(t.id);
   });
   it("비밀번호가 틀리면 실패 (원문 저장 안 함)", async () => {
     const { repo } = await setup();
-    await expect(login(repo, "admin@school.kr", "wrong-pass")).rejects.toThrow("맞지 않습니다");
-    const u = await repo.users.findByEmail("admin@school.kr");
+    await expect(login(repo, "광양중동초등학교", "wrong-pass")).rejects.toThrow("맞지 않습니다");
+    const u = await repo.users.findBySchoolKey("광양중동초등학교");
     expect(u!.passwordHash).not.toContain("password1");
   });
-  it("중복 가입, 짧은 비밀번호 거부", async () => {
-    const { repo } = await setup();
-    await expect(signup(repo, teacher, [])).rejects.toThrow("이미 가입");
-    await expect(signup(repo, { ...teacher, email: "x@y.kr", password: "short" }, [])).rejects.toThrow("8자");
-  });
-  it("관리자는 자기 자신을 못 바꾸고, 교사는 관리 기능 불가", async () => {
+  it("관리자는 자기 자신을 못 바꾸고, 학교 계정은 관리 기능 불가", async () => {
     const { repo, admin, t } = await setup();
     await expect(updateUserByAdmin(repo, admin, admin.id, { role: "teacher" })).rejects.toThrow("자기 자신");
     await expect(updateUserByAdmin(repo, t, admin.id, { status: "blocked" })).rejects.toThrow("관리자만");
+  });
+});
+
+describe("비밀번호 재설정", () => {
+  it("신청 → 관리자가 임시 비밀번호 발급 → 임시 비밀번호로 로그인 → 새 비밀번호로 변경", async () => {
+    const { repo, admin, t } = await setup();
+    await updateUserByAdmin(repo, admin, t.id, { status: "active" });
+    await requestPasswordReset(repo, "광양마동초등학교", "061-000-0000");
+    expect((await repo.users.findById(t.id))!.resetRequest?.contact).toBe("061-000-0000");
+
+    const temp = await resetPasswordByAdmin(repo, admin, t.id);
+    expect(temp).toHaveLength(10);
+    await expect(login(repo, "광양마동초등학교", "password1")).rejects.toThrow("맞지 않습니다");
+    const u = await login(repo, "광양마동초등학교", temp);
+    expect(u.mustChangePassword).toBe(true);
+    expect(u.resetRequest).toBeNull();
+
+    await expect(changePassword(repo, u, { current: temp, password: "newpass12", passwordConfirm: "newpass13" })).rejects.toThrow("서로 다릅니다");
+    await changePassword(repo, u, { current: temp, password: "newpass12", passwordConfirm: "newpass12" });
+    expect((await login(repo, "광양마동초등학교", "newpass12")).mustChangePassword).toBe(false);
+  });
+  it("없는 학교여도 같은 방식으로 답함 (가입 여부 노출 안 함), 연락처는 필수", async () => {
+    const { repo, admin } = await setup();
+    await expect(requestPasswordReset(repo, "없는초등학교", "010")).resolves.toBeUndefined();
+    await expect(requestPasswordReset(repo, "광양중동초등학교", " ")).rejects.toThrow("연락처");
+    await expect(resetPasswordByAdmin(repo, { ...admin, role: "teacher" }, admin.id)).rejects.toThrow("관리자만");
   });
 });
 
@@ -67,7 +117,7 @@ describe("설계 저장·권한", () => {
   });
   it("다른 교사는 열기·고치기·삭제 불가, 관리자는 열기만 가능", async () => {
     const { repo, admin, t } = await setup();
-    const other = await signup(repo, { ...teacher, email: "lee@school.kr" }, []);
+    const other = await signup(repo, school("순천남산초등학교"), []);
     const { record } = await saveDesign(repo, t, sampleSubject());
     await expect(getDesign(repo, other, record.id)).rejects.toThrow("볼 수 없는");
     await expect(saveDesign(repo, other, sampleSubject(), record.id)).rejects.toThrow("내 설계만");
@@ -98,7 +148,7 @@ describe("관리자 통계", () => {
     await saveDesign(repo, t, sampleSubject());
     await repo.logs.add({ kind: "parse_fail", detail: "standards: JSON 형식이 깨져 있습니다." });
     const s = await adminStats(repo);
-    expect(s.users).toMatchObject({ total: 2, pending: 1 });
+    expect(s.users).toMatchObject({ total: 2, pending: 1, resetRequests: 0, byRegion: { 전남: 2 } });
     expect(s.designs).toMatchObject({ total: 1, complete: 1, byType: { 과목: 1 } });
     expect(s.week.parseFailByStep).toEqual({ standards: 1 });
   });

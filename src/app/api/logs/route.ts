@@ -11,7 +11,7 @@ export const POST = handle(async (req: Request) => {
   await repo.logs.add({
     kind: body.kind,
     userId: user?.id,
-    email: user?.email,
+    school: user?.schoolName,
     designId: typeof body.designId === "string" ? body.designId.slice(0, 40) : undefined,
     detail: typeof body.detail === "string" ? body.detail.slice(0, 200) : undefined,
   });

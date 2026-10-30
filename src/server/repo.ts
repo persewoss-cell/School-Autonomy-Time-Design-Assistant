@@ -8,14 +8,22 @@ import type { DesignDoc } from "@/domain/types";
 export type Role = "teacher" | "admin";
 export type UserStatus = "pending" | "active" | "blocked";
 
+/** 계정은 학교 단위: 한 학교당 1개. 로그인은 학교명 + 비밀번호. */
 export interface User {
   id: string;
-  email: string;
-  passwordHash: string;
-  name: string;
+  /** 지역 (전남, 광주) */
+  region: string;
+  /** 학교 정식 명칭 (띄어쓰기 없이 저장) */
   schoolName: string;
+  /** 중복 확인·로그인용 키 (= 띄어쓰기 없는 학교명) */
+  schoolKey: string;
+  passwordHash: string;
   role: Role;
   status: UserStatus;
+  /** 임시 비밀번호로 바꾼 뒤 첫 로그인에서 새 비밀번호로 바꾸게 함 */
+  mustChangePassword: boolean;
+  /** 비밀번호 재설정 요청 (관리자가 처리하면 지움) */
+  resetRequest: { requestedAt: Date; contact: string } | null;
   createdAt: Date;
   lastLoginAt: Date | null;
 }
@@ -37,13 +45,14 @@ export interface DesignRecord {
   updatedAt: Date;
 }
 
-export type LogKind = "signup" | "login" | "login_fail" | "save" | "delete" | "download" | "parse_fail";
+export type LogKind = "signup" | "login" | "login_fail" | "save" | "delete" | "download" | "parse_fail" | "reset_request" | "password_reset" | "password_change";
 
 export interface LogEntry {
   id: string;
   kind: LogKind;
   userId?: string;
-  email?: string;
+  /** 누가 (학교명) */
+  school?: string;
   designId?: string;
   /** 짧은 설명 (예: 답 읽기 실패 단계와 이유). 원문은 저장하지 않음 */
   detail?: string;
@@ -54,10 +63,10 @@ export type DesignSummary = Omit<DesignRecord, "doc">;
 
 export interface Repo {
   users: {
-    findByEmail(email: string): Promise<User | null>;
+    findBySchoolKey(schoolKey: string): Promise<User | null>;
     findById(id: string): Promise<User | null>;
     create(u: Omit<User, "id">): Promise<User>;
-    update(id: string, patch: Partial<Omit<User, "id" | "email">>): Promise<void>;
+    update(id: string, patch: Partial<Omit<User, "id" | "schoolKey">>): Promise<void>;
     list(): Promise<User[]>;
   };
   designs: {
@@ -90,7 +99,7 @@ export function memoryRepo(): Repo {
 
   return {
     users: {
-      findByEmail: async (email) => users.find((u) => u.email === email) ?? null,
+      findBySchoolKey: async (key) => users.find((u) => u.schoolKey === key) ?? null,
       findById: async (uid) => users.find((u) => u.id === uid) ?? null,
       create: async (u) => {
         const user = { ...u, id: id() };

@@ -54,7 +54,7 @@ function Breakdown({ title, data }: { title: string; data: Record<string, number
 }
 
 interface Stats {
-  users: { total: number; pending: number };
+  users: { total: number; pending: number; resetRequests: number; byRegion: Record<string, number> };
   designs: { total: number; complete: number; byType: Record<string, number>; byGrade: Record<string, number>; bySchool: Record<string, number> };
   week: { saves: number; downloads: number; logins: number; parseFails: number; parseFailByStep: Record<string, number> };
 }
@@ -70,8 +70,13 @@ export function AdminDashboard() {
           승인을 기다리는 가입 신청이 {data.users.pending}건 있어요 → 사용자 화면에서 승인하기
         </Link>
       )}
+      {data.users.resetRequests > 0 && (
+        <Link href="/admin/users" className="block rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+          비밀번호 재설정 신청이 {data.users.resetRequests}건 있어요 → 사용자 화면에서 임시 비밀번호 발급하기
+        </Link>
+      )}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="사용자" value={data.users.total} sub={`승인 대기 ${data.users.pending}`} />
+        <Stat label="가입 학교" value={data.users.total} sub={`승인 대기 ${data.users.pending}`} />
         <Stat label="설계" value={data.designs.total} sub={`완성(오류 0) ${data.designs.complete}`} />
         <Stat label="최근 7일 저장" value={data.week.saves} sub={`로그인 ${data.week.logins}`} />
         <Stat label="최근 7일 내려받기" value={data.week.downloads} sub={`AI 답 읽기 실패 ${data.week.parseFails}`} />
@@ -79,6 +84,7 @@ export function AdminDashboard() {
       <div className="grid gap-3 md:grid-cols-2">
         <Breakdown title="유형별 설계" data={data.designs.byType} />
         <Breakdown title="학년별 설계" data={data.designs.byGrade} />
+        <Breakdown title="지역별 가입 학교" data={data.users.byRegion} />
         <Breakdown title="학교별 설계" data={data.designs.bySchool} />
         <Breakdown title="AI 답 읽기 실패 단계 (최근 7일)" data={data.week.parseFailByStep} />
       </div>
@@ -88,11 +94,12 @@ export function AdminDashboard() {
 
 interface UserRow {
   id: string;
-  email: string;
-  name: string;
+  region: string;
   schoolName: string;
   role: "teacher" | "admin";
   status: "pending" | "active" | "blocked";
+  mustChangePassword: boolean;
+  resetRequest: { requestedAt: string; contact: string } | null;
   createdAt: string;
   lastLoginAt: string | null;
   designCount: number;
@@ -102,53 +109,101 @@ const STATUS_LABEL = { pending: "승인 대기", active: "사용 중", blocked: 
 export function AdminUsers() {
   const me = useMe();
   const { data, error, reload } = useLoad<{ users: UserRow[] }>("/api/admin/users");
+  const [temp, setTemp] = useState<{ school: string; password: string; contact?: string } | null>(null);
   const update = async (u: UserRow, patch: Partial<Pick<UserRow, "status" | "role">>) => {
     await api(`/api/admin/users/${u.id}`, { method: "PATCH", body: patch }).catch((e) => alert(e.message));
     reload();
   };
+  const issueTemp = async (u: UserRow) => {
+    if (!confirm(`${u.schoolName}의 비밀번호를 임시 비밀번호로 바꿀까요? 지금 비밀번호로는 더 이상 로그인할 수 없어요.`)) return;
+    try {
+      const r = await api<{ tempPassword: string }>(`/api/admin/users/${u.id}/reset-password`, { method: "POST" });
+      setTemp({ school: u.schoolName, password: r.tempPassword, contact: u.resetRequest?.contact });
+      reload();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "발급하지 못했습니다.");
+    }
+  };
   if (error) return <p className="text-red-700">{error}</p>;
   if (!data) return <p className="text-gray-500">불러오는 중…</p>;
+  const requests = data.users.filter((u) => u.resetRequest);
   return (
-    <Card className="overflow-x-auto">
-      <table className="w-full min-w-[760px] text-sm">
-        <thead className="text-left text-xs text-gray-500">
-          <tr>
-            <th className="p-2">이름 / 이메일</th>
-            <th className="p-2">학교</th>
-            <th className="p-2">상태</th>
-            <th className="p-2">권한</th>
-            <th className="p-2">설계</th>
-            <th className="p-2">가입 / 최근 로그인</th>
-            <th className="p-2">관리</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {data.users.map((u) => (
-            <tr key={u.id}>
-              <td className="p-2"><b>{u.name}</b><br /><span className="text-gray-500">{u.email}</span></td>
-              <td className="p-2">{u.schoolName}</td>
-              <td className="p-2">
-                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${u.status === "active" ? "bg-green-100 text-green-700" : u.status === "pending" ? "bg-amber-100 text-amber-700" : "bg-gray-200 text-gray-600"}`}>
-                  {STATUS_LABEL[u.status]}
-                </span>
-              </td>
-              <td className="p-2">{u.role === "admin" ? "관리자" : "교사"}</td>
-              <td className="p-2">{u.designCount}</td>
-              <td className="p-2 text-xs text-gray-500">{fmtDate(u.createdAt)}<br />{fmtDate(u.lastLoginAt)}</td>
-              <td className="space-x-2 p-2 text-xs">
-                {u.id === me?.user?.id ? <span className="text-gray-400">(나)</span> : <>
-                {u.status !== "active" && <button type="button" className="font-semibold text-brand-600" onClick={() => update(u, { status: "active" })}>승인</button>}
-                {u.status === "active" && <button type="button" className="text-gray-500 hover:text-red-600" onClick={() => confirm(`${u.name} 계정을 중지할까요?`) && update(u, { status: "blocked" })}>중지</button>}
-                <button type="button" className="text-gray-500 hover:text-brand-600" onClick={() => confirm("권한을 바꿀까요?") && update(u, { role: u.role === "admin" ? "teacher" : "admin" })}>
-                  {u.role === "admin" ? "교사로" : "관리자로"}
-                </button>
-                </>}
-              </td>
-            </tr>
+    <div className="space-y-4">
+      {temp && (
+        <Card className="space-y-2 border-2 border-brand-500">
+          <p className="font-bold">{temp.school} 임시 비밀번호</p>
+          <p className="font-mono text-2xl tracking-wider">{temp.password}</p>
+          <p className="text-sm text-gray-600">
+            이 비밀번호는 지금 한 번만 보여요. {temp.contact ? `연락처(${temp.contact})로 ` : ""}학교에 알려 주세요.
+            학교에서 이 비밀번호로 로그인하면 새 비밀번호로 바꾸는 화면이 나와요.
+          </p>
+          <button type="button" className="text-sm text-gray-500 underline" onClick={() => setTemp(null)}>닫기</button>
+        </Card>
+      )}
+      {requests.length > 0 && (
+        <Card className="space-y-2 bg-amber-50">
+          <h2 className="font-bold text-amber-800">비밀번호 재설정 신청 {requests.length}건</h2>
+          {requests.map((u) => (
+            <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span>
+                <b>{u.schoolName}</b> ({u.region}) · 연락처: {u.resetRequest!.contact} · {fmtDate(u.resetRequest!.requestedAt)}
+              </span>
+              <button type="button" className="rounded-lg bg-brand-600 px-3 py-1 font-semibold text-white" onClick={() => issueTemp(u)}>
+                임시 비밀번호 발급
+              </button>
+            </div>
           ))}
-        </tbody>
-      </table>
-    </Card>
+        </Card>
+      )}
+      <Card className="overflow-x-auto">
+        <table className="w-full min-w-[760px] text-sm">
+          <thead className="text-left text-xs text-gray-500">
+            <tr>
+              <th className="p-2">지역</th>
+              <th className="p-2">학교명</th>
+              <th className="p-2">상태</th>
+              <th className="p-2">권한</th>
+              <th className="p-2">설계</th>
+              <th className="p-2">가입 / 최근 로그인</th>
+              <th className="p-2">관리</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {data.users.map((u) => (
+              <tr key={u.id}>
+                <td className="p-2">{u.region || "-"}</td>
+                <td className="p-2">
+                  <b>{u.schoolName}</b>
+                  {u.mustChangePassword && <span className="ml-1 text-xs text-amber-600">(임시 비밀번호)</span>}
+                </td>
+                <td className="p-2">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${u.status === "active" ? "bg-green-100 text-green-700" : u.status === "pending" ? "bg-amber-100 text-amber-700" : "bg-gray-200 text-gray-600"}`}>
+                    {STATUS_LABEL[u.status]}
+                  </span>
+                </td>
+                <td className="p-2">{u.role === "admin" ? "관리자" : "학교"}</td>
+                <td className="p-2">{u.designCount}</td>
+                <td className="p-2 text-xs text-gray-500">{fmtDate(u.createdAt)}<br />{fmtDate(u.lastLoginAt)}</td>
+                <td className="space-x-2 p-2 text-xs">
+                  {u.id === me?.user?.id ? (
+                    <span className="text-gray-400">(나)</span>
+                  ) : (
+                    <>
+                      {u.status !== "active" && <button type="button" className="font-semibold text-brand-600" onClick={() => update(u, { status: "active" })}>가입 승인</button>}
+                      {u.status === "active" && <button type="button" className="text-gray-500 hover:text-red-600" onClick={() => confirm(`${u.schoolName} 계정을 중지할까요?`) && update(u, { status: "blocked" })}>중지</button>}
+                      <button type="button" className="text-gray-500 hover:text-brand-600" onClick={() => issueTemp(u)}>임시 비밀번호</button>
+                      <button type="button" className="text-gray-500 hover:text-brand-600" onClick={() => confirm("권한을 바꿀까요?") && update(u, { role: u.role === "admin" ? "teacher" : "admin" })}>
+                        {u.role === "admin" ? "일반으로" : "관리자로"}
+                      </button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+    </div>
   );
 }
 
@@ -168,7 +223,7 @@ export function AdminDesigns() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
-        <input className={`${inputClass} max-w-xs`} placeholder="이름·학교·작성자 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input className={`${inputClass} max-w-xs`} placeholder="설계 이름·학교 검색" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className={`${inputClass} max-w-40`} value={type} onChange={(e) => setType(e.target.value)}>
           <option value="">전체 유형</option>
           <option value="activity">활동</option>
@@ -182,8 +237,8 @@ export function AdminDesigns() {
             <tr>
               <th className="p-2">이름</th>
               <th className="p-2">유형·대상</th>
-              <th className="p-2">학교</th>
-              <th className="p-2">작성자</th>
+              <th className="p-2">문서상 학교</th>
+              <th className="p-2">계정</th>
               <th className="p-2">상태</th>
               <th className="p-2">마지막 저장</th>
             </tr>
@@ -240,7 +295,7 @@ export function AdminDesignView({ id }: { id: string }) {
   );
 }
 
-interface LogRow { id: string; kind: string; email?: string; detail?: string; designId?: string; createdAt: string }
+interface LogRow { id: string; kind: string; school?: string; detail?: string; designId?: string; createdAt: string }
 const KIND_LABEL: Record<string, string> = {
   signup: "가입",
   login: "로그인",
@@ -249,6 +304,9 @@ const KIND_LABEL: Record<string, string> = {
   delete: "삭제",
   download: "내려받기",
   parse_fail: "AI 답 읽기 실패",
+  reset_request: "비밀번호 재설정 신청",
+  password_reset: "임시 비밀번호 발급",
+  password_change: "비밀번호 변경",
 };
 
 export function AdminLogs() {
@@ -268,14 +326,14 @@ export function AdminLogs() {
       <Card className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
           <thead className="text-left text-xs text-gray-500">
-            <tr><th className="p-2">시각</th><th className="p-2">종류</th><th className="p-2">사용자</th><th className="p-2">내용</th></tr>
+            <tr><th className="p-2">시각</th><th className="p-2">종류</th><th className="p-2">학교</th><th className="p-2">내용</th></tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {rows.map((l) => (
               <tr key={l.id}>
                 <td className="p-2 text-xs text-gray-500">{fmtDate(l.createdAt)}</td>
                 <td className="p-2">{KIND_LABEL[l.kind] ?? l.kind}</td>
-                <td className="p-2 text-gray-600">{l.email ?? "-"}</td>
+                <td className="p-2 text-gray-600">{l.school ?? "-"}</td>
                 <td className="p-2 text-gray-600">
                   {l.detail}
                   {l.designId && <Link href={`/admin/designs/${l.designId}`} className="ml-2 text-xs text-brand-600">설계 보기</Link>}

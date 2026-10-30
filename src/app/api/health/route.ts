@@ -22,6 +22,6 @@ export async function GET() {
     db,
     dbError,
     authSecret: env.authSecret.length >= 32 ? "ok" : env.authSecret ? "short" : "missing",
-    adminEmails: env.adminEmails.length,
+    adminSchools: env.adminSchools.length,
   });
 }

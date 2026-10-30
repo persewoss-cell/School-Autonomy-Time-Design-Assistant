@@ -15,56 +15,119 @@ export class ServiceError extends Error {
   }
 }
 
-export const signupSchema = z.object({
-  email: z.string().trim().toLowerCase().email("이메일 형식이 맞지 않습니다."),
-  password: z.string().min(8, "비밀번호는 8자 이상이어야 합니다.").max(100),
-  name: z.string().trim().min(1, "이름을 입력해 주세요.").max(30),
-  schoolName: z.string().trim().min(2, "학교명을 입력해 주세요.").max(40),
-});
+/** 가입할 수 있는 지역 (지금은 전남·광주만) */
+export const REGIONS = ["전남", "광주"] as const;
 
-export type PublicUser = Pick<User, "id" | "email" | "name" | "schoolName" | "role" | "status">;
+/** 학교명: 띄어쓰기 없이 저장하고, 중복 확인·로그인에 쓴다 */
+export const schoolKeyOf = (name: string) => String(name ?? "").replace(/\s+/g, "");
+
+const schoolNameSchema = z
+  .string()
+  .transform(schoolKeyOf)
+  .pipe(
+    z
+      .string()
+      .min(4, "학교명을 입력해 주세요.")
+      .max(40, "학교명이 너무 깁니다.")
+      .regex(/^[가-힣0-9]+초등학교$/, "학교명은 정식 명칭으로 입력해 주세요. 예: 광양중동초등학교 (○○초 X)"),
+  );
+
+const passwordSchema = z.string().min(8, "비밀번호는 8자 이상이어야 합니다.").max(100, "비밀번호가 너무 깁니다.");
+
+export const signupSchema = z
+  .object({
+    region: z.enum(REGIONS, { message: "지역을 골라 주세요." }),
+    schoolName: schoolNameSchema,
+    password: passwordSchema,
+    passwordConfirm: z.string(),
+  })
+  .refine((v) => v.password === v.passwordConfirm, { message: "비밀번호와 비밀번호 확인이 서로 다릅니다.", path: ["passwordConfirm"] });
+
+export type PublicUser = Pick<User, "id" | "region" | "schoolName" | "role" | "status" | "mustChangePassword">;
 export const publicUser = (u: User): PublicUser => ({
   id: u.id,
-  email: u.email,
-  name: u.name,
+  region: u.region,
   schoolName: u.schoolName,
   role: u.role,
   status: u.status,
+  mustChangePassword: !!u.mustChangePassword,
 });
 
-/** 회원가입: ADMIN_EMAILS에 있는 이메일은 바로 관리자, 나머지는 관리자 승인 대기 */
-export async function signup(repo: Repo, raw: unknown, adminEmails: string[]): Promise<User> {
+/** 회원가입 신청: 한 학교당 1계정. ADMIN_SCHOOLS에 있는 학교는 바로 관리자, 나머지는 관리자 승인 대기 */
+export async function signup(repo: Repo, raw: unknown, adminSchools: string[]): Promise<User> {
   const r = signupSchema.safeParse(raw);
   if (!r.success) throw new ServiceError(400, r.error.issues[0].message);
-  const { email, password, name, schoolName } = r.data;
-  if (await repo.users.findByEmail(email)) throw new ServiceError(409, "이미 가입된 이메일입니다.");
-  const isAdmin = adminEmails.includes(email);
+  const { region, schoolName, password } = r.data;
+  if (await repo.users.findBySchoolKey(schoolName)) {
+    throw new ServiceError(409, "이미 가입된 학교입니다. 한 학교당 1개의 계정만 쓸 수 있어요. 비밀번호를 잊었다면 로그인 화면에서 재설정을 신청하세요.");
+  }
+  const isAdmin = adminSchools.map(schoolKeyOf).includes(schoolName);
   const user = await repo.users.create({
-    email,
-    passwordHash: await bcrypt.hash(password, 10),
-    name,
+    region,
     schoolName,
+    schoolKey: schoolName,
+    passwordHash: await bcrypt.hash(password, 10),
     role: isAdmin ? "admin" : "teacher",
     status: isAdmin ? "active" : "pending",
+    mustChangePassword: false,
+    resetRequest: null,
     createdAt: new Date(),
     lastLoginAt: null,
   });
-  await repo.logs.add({ kind: "signup", userId: user.id, email });
+  await repo.logs.add({ kind: "signup", userId: user.id, school: schoolName, detail: region });
   return user;
 }
 
-export async function login(repo: Repo, rawEmail: string, password: string): Promise<User> {
-  const email = String(rawEmail ?? "").trim().toLowerCase();
-  const user = await repo.users.findByEmail(email);
+/** 로그인: 학교명 + 비밀번호 */
+export async function login(repo: Repo, rawSchool: string, password: string): Promise<User> {
+  const key = schoolKeyOf(rawSchool);
+  const user = key ? await repo.users.findBySchoolKey(key) : null;
   if (!user || !(await bcrypt.compare(String(password ?? ""), user.passwordHash))) {
-    await repo.logs.add({ kind: "login_fail", email });
-    throw new ServiceError(401, "이메일 또는 비밀번호가 맞지 않습니다.");
+    await repo.logs.add({ kind: "login_fail", school: key });
+    throw new ServiceError(401, "학교명 또는 비밀번호가 맞지 않습니다.");
   }
   if (user.status === "pending") throw new ServiceError(403, "관리자 승인을 기다리고 있습니다. 승인 후 로그인할 수 있어요.");
   if (user.status === "blocked") throw new ServiceError(403, "사용이 중지된 계정입니다. 관리자에게 문의하세요.");
   await repo.users.update(user.id, { lastLoginAt: new Date() });
-  await repo.logs.add({ kind: "login", userId: user.id, email });
+  await repo.logs.add({ kind: "login", userId: user.id, school: user.schoolName });
   return user;
+}
+
+/** 비밀번호를 잊은 학교의 재설정 신청 (관리자가 임시 비밀번호를 발급해 연락처로 알려 줌) */
+export async function requestPasswordReset(repo: Repo, rawSchool: string, rawContact: string): Promise<void> {
+  const key = schoolKeyOf(rawSchool);
+  const contact = String(rawContact ?? "").trim().slice(0, 100);
+  if (!key) throw new ServiceError(400, "학교명을 입력해 주세요.");
+  if (!contact) throw new ServiceError(400, "임시 비밀번호를 받을 연락처(예: 교무실 전화번호)를 입력해 주세요.");
+  const user = await repo.users.findBySchoolKey(key);
+  // 가입 여부를 알려 주지 않도록, 없는 학교여도 같은 답을 준다
+  if (user) await repo.users.update(user.id, { resetRequest: { requestedAt: new Date(), contact } });
+  await repo.logs.add({ kind: "reset_request", userId: user?.id, school: key, detail: user ? "요청 접수" : "가입되지 않은 학교" });
+}
+
+/** 관리자: 임시 비밀번호 발급 (한 번만 보여 줌, 다음 로그인 때 새 비밀번호로 바꾸게 함) */
+export async function resetPasswordByAdmin(repo: Repo, admin: User, targetId: string): Promise<string> {
+  if (admin.role !== "admin") throw new ServiceError(403, "관리자만 할 수 있습니다.");
+  const target = await repo.users.findById(targetId);
+  if (!target) throw new ServiceError(404, "계정을 찾을 수 없습니다.");
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(10));
+  const temp = Array.from(bytes, (b) => chars[b % chars.length]).join("");
+  await repo.users.update(targetId, { passwordHash: await bcrypt.hash(temp, 10), mustChangePassword: true, resetRequest: null });
+  await repo.logs.add({ kind: "password_reset", userId: targetId, school: target.schoolName, detail: `관리자(${admin.schoolName})가 임시 비밀번호 발급` });
+  return temp;
+}
+
+/** 로그인한 학교가 비밀번호 바꾸기 */
+export async function changePassword(repo: Repo, user: User, raw: unknown): Promise<void> {
+  const r = z
+    .object({ current: z.string(), password: passwordSchema, passwordConfirm: z.string() })
+    .refine((v) => v.password === v.passwordConfirm, { message: "새 비밀번호와 비밀번호 확인이 서로 다릅니다." })
+    .safeParse(raw);
+  if (!r.success) throw new ServiceError(400, r.error.issues[0].message);
+  if (!(await bcrypt.compare(r.data.current, user.passwordHash))) throw new ServiceError(400, "지금 비밀번호가 맞지 않습니다.");
+  await repo.users.update(user.id, { passwordHash: await bcrypt.hash(r.data.password, 10), mustChangePassword: false });
+  await repo.logs.add({ kind: "password_change", userId: user.id, school: user.schoolName });
 }
 
 /** 저장할 설계 문서의 최소 형식 확인 (나머지는 화면에서 점검) */
@@ -119,7 +182,7 @@ export async function saveDesign(repo: Repo, user: User, rawDoc: unknown, id?: s
     record = await repo.designs.create({ ownerId: user.id, ...fields, createdAt: now, updatedAt: now });
   }
   await repo.designs.saveVersion(record.id, doc);
-  await repo.logs.add({ kind: "save", userId: user.id, email: user.email, designId: record.id, detail: fields.name });
+  await repo.logs.add({ kind: "save", userId: user.id, school: user.schoolName, designId: record.id, detail: fields.name });
 
   const duplicate =
     fields.type === "activity" && fields.name
@@ -142,7 +205,7 @@ export async function deleteDesign(repo: Repo, user: User, id: string): Promise<
   if (!d) throw new ServiceError(404, "설계를 찾을 수 없습니다.");
   if (d.ownerId !== user.id) throw new ServiceError(403, "내 설계만 삭제할 수 있습니다.");
   await repo.designs.delete(id);
-  await repo.logs.add({ kind: "delete", userId: user.id, email: user.email, designId: id, detail: d.name });
+  await repo.logs.add({ kind: "delete", userId: user.id, school: user.schoolName, designId: id, detail: d.name });
 }
 
 /** 관리자: 사용자 상태·권한 바꾸기 (자기 자신은 못 바꿈) */
@@ -165,6 +228,7 @@ export async function updateUserByAdmin(
 /** 관리자 대시보드 통계 */
 export async function adminStats(repo: Repo) {
   const [users, designs, logs] = await Promise.all([repo.users.list(), repo.designs.listAll(), repo.logs.list(500)]);
+  const resetRequests = users.filter((u) => u.resetRequest).length;
   const count = <T,>(xs: T[], key: (x: T) => string) =>
     xs.reduce<Record<string, number>>((acc, x) => {
       const k = key(x);
@@ -176,7 +240,13 @@ export async function adminStats(repo: Repo) {
   const saves = recent.filter((l) => l.kind === "save").length;
   const parseFails = recent.filter((l) => l.kind === "parse_fail");
   return {
-    users: { total: users.length, pending: users.filter((u) => u.status === "pending").length, byStatus: count(users, (u) => u.status) },
+    users: {
+      total: users.length,
+      pending: users.filter((u) => u.status === "pending").length,
+      resetRequests,
+      byStatus: count(users, (u) => u.status),
+      byRegion: count(users, (u) => u.region || "(지역 없음)"),
+    },
     designs: {
       total: designs.length,
       byType: count(designs, (d) => (d.type === "subject" ? "과목" : "활동")),
