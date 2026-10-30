@@ -67,4 +67,14 @@ describe("설계 문서에 시수 점검표 붙이기", () => {
     expect(text).toContain("동아리활동");
     expect(text).toContain("연간수업시간수");
   });
+  it("시수 점검을 마치지 않았으면 편성표 대신 빨간 안내가 들어간다", async () => {
+    const buf = await Packer.toBuffer(buildDesignDocx(sampleSubject(), { pending: true, grade: 3 }));
+    const { default: JSZip } = await import("jszip");
+    const xml = await (await JSZip.loadAsync(buf)).file("word/document.xml")!.async("string");
+    const text = xml.replace(/<[^>]+>/g, "");
+    expect(text).toContain("[붙임] (3)학년 교육과정 편성표");
+    expect(text).toContain("시수 점검을 마쳐야 편성표가 표시됩니다");
+    expect(text).not.toContain("연간수업시간수");
+    expect(xml).toContain("C00000");
+  });
 });

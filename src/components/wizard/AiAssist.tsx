@@ -44,7 +44,7 @@ export function AiAssist<T>({
       onParseFail?.(r.error);
       return;
     }
-    if (hasContent && !confirm("이 단계에 작성된 기존 내용을 삭제하고, 새 AI 답으로 덮어쓸까요?")) return;
+    if (hasContent && !confirm("이 단계에 이미 작성된 내용이 있어요.\n새 AI 답을 반영하면 기존 내용이 지워지고 새 답으로 바뀌어요. 계속할까요?")) return;
     setError("");
     setNotes(r.notes);
     setFollow(step.followUp?.(r.data, doc) ?? null);

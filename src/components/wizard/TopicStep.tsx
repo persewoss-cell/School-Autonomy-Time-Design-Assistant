@@ -57,16 +57,16 @@ export function TopicStep({
       <Field label="주제" hint="예: 세계시민으로 함께 살아가기, 우리 마을 생태 지킴이">
         <input className={inputClass} value={topic} onChange={(e) => setTopic(e.target.value)} />
       </Field>
-      <Field label="꼭 들어가야 할 내용 (한 줄에 하나씩)" hint="예: 세계와 연결된 나의 삶 / 문화 다양성 존중">
+      <Field label="꼭 들어가야 할 내용 (선택, 한 줄에 하나씩)" hint="예: 세계와 연결된 나의 삶 / 문화 다양성 존중">
         <textarea rows={4} className={inputClass} value={required} onChange={(e) => setRequired(e.target.value)} />
       </Field>
-      <Field label="하고 싶은 활동 (한 줄에 하나씩)" hint="예: 역할극 발표 / 마을학교 체험 / UCC 제작">
+      <Field label="하고 싶은 활동 (선택, 한 줄에 하나씩)" hint="예: 역할극 발표 / 마을학교 체험 / UCC 제작">
         <textarea rows={4} className={inputClass} value={desired} onChange={(e) => setDesired(e.target.value)} />
       </Field>
       <div className="space-y-3 rounded-xl border border-gray-200 p-4">
         <p className="text-sm font-semibold">내용 체계 영역 (선택 — 비워 두면 AI가 주제와 학년에 맞게 정해요)</p>
         <div className="grid gap-4 sm:grid-cols-[180px_1fr]">
-          <Field label="영역 수" hint="2~3개 권장">
+          <Field label="영역 수 (선택)" hint="2~3개 권장">
             <select className={inputClass} value={areaCount} onChange={(e) => setAreaCount(e.target.value)}>
               <option value="">알아서 (2~3개)</option>
               {[1, 2, 3, 4, 5].map((n) => (
@@ -76,7 +76,7 @@ export function TopicStep({
               ))}
             </select>
           </Field>
-          <Field label="정해 둔 영역명 (한 줄에 하나씩, 순서대로)" hint="일부만 적어도 돼요. 나머지는 AI가 정해요. 예: 세계시민의 이해 / 문화 다양성과 존중">
+          <Field label="정해 둔 영역명 (선택, 한 줄에 하나씩, 순서대로)" hint="일부만 적어도 돼요. 나머지는 AI가 정해요. 예: 세계시민의 이해 / 문화 다양성과 존중">
             <textarea rows={3} className={inputClass} value={areaNames} onChange={(e) => setAreaNames(e.target.value)} />
           </Field>
         </div>

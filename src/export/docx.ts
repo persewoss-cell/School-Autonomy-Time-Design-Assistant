@@ -469,7 +469,25 @@ export interface AllocationAttachment {
   schoolYear: number;
 }
 
-export function buildDesignDocx(doc: DesignDoc, allocation?: AllocationAttachment): Document {
+/** 시수 점검을 아직 마치지 않았을 때: 붙임 자리에 빨간 안내만 */
+export interface PendingAllocation {
+  pending: true;
+  grade: number;
+}
+
+function allocationAttachment(doc: DesignDoc, allocation: AllocationAttachment | PendingAllocation): (Paragraph | Table)[] {
+  const title = para(`[붙임] (${allocation.grade})학년 교육과정 편성표 (시수 점검표)`, { size: 9, line: 1, pageBreak: true, after: 2 });
+  if ("pending" in allocation) {
+    return [
+      title,
+      para("※ 시수 점검을 마쳐야 편성표가 표시됩니다.", { size: 11, bold: true, color: "C00000", before: 6 }),
+      para(`앱의 '시수 점검' 화면에서 ${allocation.grade}학년이 속한 학년군의 두 학년 화면을 모두 이상없음으로 맞춘 뒤 문서를 다시 내려받으세요.`, { size: 10, color: "C00000", before: 2 }),
+    ];
+  }
+  return [title, ...allocationChildren(allocation.input, { years: allocation.years, grade: allocation.grade, schoolYear: allocation.schoolYear, schoolName: schoolOf(doc), width: PAGE_WIDTH })];
+}
+
+export function buildDesignDocx(doc: DesignDoc, allocation?: AllocationAttachment | PendingAllocation): Document {
   const footer = new Footer({
     children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ children: ["- ", PageNumber.CURRENT, " -"], font: DOTUM, size: 20 })] })],
   });
@@ -486,9 +504,7 @@ export function buildDesignDocx(doc: DesignDoc, allocation?: AllocationAttachmen
       ...applicationForm(doc),
       ...curriculumDoc(doc),
       ...checklistDoc(doc),
-      ...(allocation
-        ? [para(`[붙임] (${allocation.grade})학년 교육과정 편성표 (시수 점검표)`, { size: 9, line: 1, pageBreak: true, after: 2 }), ...allocationChildren(allocation.input, { years: allocation.years, grade: allocation.grade, schoolYear: allocation.schoolYear, schoolName: schoolOf(doc), width: PAGE_WIDTH })]
-        : []),
+      ...(allocation ? allocationAttachment(doc, allocation) : []),
     ],
   };
   return new Document({

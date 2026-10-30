@@ -96,7 +96,7 @@ export function ApplicationStep({ doc, setDoc, onBack, onNext }: StepProps) {
             </label>
           ))}
         </div>
-        <Field label="기타 특이사항">
+        <Field label="기타 특이사항 (선택)">
           <textarea rows={2} className={inputClass} value={a.etc} onChange={(e) => set("etc", e.target.value)} />
         </Field>
       </Card>
@@ -129,14 +129,14 @@ export function FinalStep({
   const [busy, setBusy] = useState(false);
   // 체크리스트를 모두 점검·체크해야 문서를 만들 수 있다 (사용자 결정, 2026-10-31)
   const unchecked = checklist.filter((c) => !c.ok);
-  // 시수 점검: 이 설계 학년이 속한 학년군의 두 학년 화면이 모두 이상없음이어야 문서를 만든다 (사용자 결정, 2026-10-31)
+  // 시수 점검: 학년군의 두 학년 화면이 모두 이상없음이어야 편성표가 붙는다. 안 했어도 문서는 내려받되 붙임 자리에 빨간 안내 (사용자 결정, 2026-10-30)
   const hc = useHourChecks();
   const current: DesignBrief = { id: designId ?? "current", name: doc.basic.name, grade: doc.basic.grade, semester: doc.basic.semester, hours: doc.basic.hours, subjectGroup: doc.basic.subjectGroup, schoolYear: doc.application.startYear };
   const year = Number(doc.application.startYear) || 2027;
   const briefs = [...hc.designs.filter((d) => d.id !== current.id), current];
   const hours = bandStatus(doc.basic.grade, year, hc.checks, briefs);
   const ownView = isViewGrade(doc.basic.grade) ? hc.checks[checkKey(year, doc.basic.grade)] : undefined;
-  const blocked = unchecked.length > 0 || !hours.complete;
+  const blocked = unchecked.length > 0;
   const goHours = async (grade: number) => {
     if (onSave) await onSave().catch(() => {});
     window.location.href = `/hours?grade=${grade}&year=${year}`;
@@ -150,7 +150,12 @@ export function FinalStep({
     setBusy(true);
     try {
       const blob = await Packer.toBlob(
-        buildDesignDocx(doc, ownView ? { input: ownView.input, years: viewYears(ownView.grade, ownView.schoolYear), grade: ownView.grade, schoolYear: ownView.schoolYear } : undefined),
+        buildDesignDocx(
+          doc,
+          hours.complete && ownView
+            ? { input: ownView.input, years: viewYears(ownView.grade, ownView.schoolYear), grade: ownView.grade, schoolYear: ownView.schoolYear }
+            : { pending: true, grade: doc.basic.grade },
+        ),
       );
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -225,7 +230,8 @@ export function FinalStep({
             <p className="font-semibold">✓ 시수 점검 완료 — {doc.basic.grade}학년 시수 점검표가 문서 끝에 함께 들어가요.</p>
           ) : (
             <>
-              <p className="font-semibold">⚠ 시수 점검을 마쳐야 문서가 만들어집니다.</p>
+              <p className="font-semibold">⚠ 시수 점검을 마쳐야 문서가 완성됩니다.</p>
+              <p>지금 내려받으면 붙임(편성표) 자리에 &lsquo;시수 점검을 마쳐야 표시됩니다&rsquo;라는 빨간 안내가 들어가요.</p>
               <p>
                 {hours.views.map((v) => `${v.grade}학년 화면: ${v.ok ? "이상없음" : v.saved ? "점검 필요" : "아직 안 함"}`).join(" · ")}
                 {" "}— 학년군의 두 학년 화면이 모두 이상없음이어야 해요.

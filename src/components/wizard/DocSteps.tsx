@@ -233,7 +233,7 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
           "코드 번호는 자동으로 붙어요: [편성학년][편성교과 첫 글자][과목명 약어][영역 순서]-[영역 내 순서]",
         ]}
       >
-        <Field label="성취기준 코드에 쓸 과목명 약어 (2~3자)" hint={`예: 지구촌, 함께 걷는 우리 → 지구촌  ·  코드 예: [${doc.basic.grade}${doc.basic.subjectGroup.charAt(0)}${abbrev}01-01]`}>
+        <Field label="성취기준 코드에 쓸 과목명 약어 (선택, 2~3자)" hint={`비우면 과목명 앞 글자로 자동 · 예: 지구촌, 함께 걷는 우리 → 지구촌  ·  코드 예: [${doc.basic.grade}${doc.basic.subjectGroup.charAt(0)}${abbrev}01-01]`}>
           <input className={`${inputClass} max-w-40`} value={doc.abbrev} placeholder={defaultAbbrev(doc.basic.name)} onChange={(e) => setDoc((d) => void (d.abbrev = e.target.value.trim()))} />
         </Field>
       </StepHeader>
@@ -243,7 +243,7 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
           key={doc.standards.filter(standardNeedsRewrite).map((s) => s.id).join()}
           doc={{ ...doc, abbrev }}
           step={reviseStandardsPrompt}
-          hasContent={false}
+          hasContent
           defaultOpen
           title={`바뀐 성취기준 문장 고치기 (${doc.standards.filter(standardNeedsRewrite).length}개)`}
           onParseFail={(e) => onParseFail?.("standards", e)}

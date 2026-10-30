@@ -64,7 +64,10 @@ export function PlanStep(props: StepProps) {
           <button
             type="button"
             className="font-semibold text-brand-600 underline"
-            onClick={() => setDoc((d) => void (d.plan = { candidates: makeDemoPlans(d), demo: true, notes: [], selected: null }))}
+            onClick={() => {
+              if (doc.plan.candidates.length > 0 && !confirm("이미 받은 단원 지도계획 안이 있어요. 예시 3안으로 바꾸면 기존 내용이 지워져요. 계속할까요?")) return;
+              setDoc((d) => void (d.plan = { candidates: makeDemoPlans(d), demo: true, notes: [], selected: null }));
+            }}
           >
             예시 3안으로 체험하기
           </button>
