@@ -166,3 +166,24 @@ describe("영역 수·영역명과 학년 수준", () => {
     expect(planPrompt.build(d)).toContain("6학년(5~6학년군)");
   });
 });
+
+describe("영역별 성취기준 수", () => {
+  it("내용 요소 수로 추천: 5개→2, 4개→2, 9개→4, 최소 2", async () => {
+    const { recommendedStandardCount } = await import("@/domain/standardCounts");
+    const area = (n: number) => ({ name: "a", knowledge: Array(n).fill("x"), process: [], values: [] });
+    expect([5, 4, 9, 1, 0].map((n) => recommendedStandardCount(area(n)))).toEqual([2, 2, 4, 2, 2]);
+  });
+  it("정한 개수가 프롬프트에 들어가고, 다르게 오면 알림", () => {
+    const d = sampleSubject();
+    d.standardCounts = [3, null];
+    const p = standardsPrompt.build(d);
+    expect(p).toContain("- (1) 세계시민의 이해: 3개");
+    expect(p).toContain("- (2) 문화 다양성과 존중: 2개");
+    const r = standardsPrompt.parse(wrap({ standards: [{ area: 1, text: "가.", elements: ["세계와 연결된 나의 삶"] }, { area: 2, text: "나.", elements: ["세계의 다양한 문화"] }, { area: 2, text: "다.", elements: ["세계의 다양한 문화"] }] }), d);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.notes.join()).toContain("3개로 정했는데 AI가 1개");
+      expect(r.notes.join()).not.toContain("(2) 문화 다양성과 존중:");
+    }
+  });
+});

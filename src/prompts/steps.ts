@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { CATEGORIES, newId, planSchema, type Area, type AssessmentRow, type DesignDoc, type Intro, type Plan, type Standard, type Teaching } from "@/domain/types";
 import { categoryOf, codeMap } from "@/domain/codes";
+import { standardCountsFor } from "@/domain/standardCounts";
 import { COMMON_RULES, contextBlock, formatBlock, parseAiJson, toList, type AiParse } from "./common";
 
 /**
@@ -160,13 +161,17 @@ ${areasBlock(doc.areas)}
 ${doc.coreIdeas.map((s) => `- ${s}`).join("\n")}
 
 ## 할 일
-위 내용 체계로 성취기준을 영역마다 2개 이상 써 주세요.
+위 내용 체계로 성취기준을 써 주세요. 영역마다 아래 개수를 **정확히** 지킵니다.
+${standardCountsFor(doc)
+  .map((n, i) => `- (${i + 1}) ${doc.areas[i].name}: ${n}개`)
+  .join("\n")}
 
 ## 성취기준 작성 규칙
 1. 성취기준은 학습을 통해 학생이 할 수 있어야 할 결과 혹은 도달점으로 진술합니다.
 2. 지식·이해 / 과정·기능 / 가치·태도 세 범주 중 두 가지 이상을 결합해 한 문장으로 씁니다. 지식·이해 하나만으로 쓰지 않습니다.
    예: 코딩 로봇의 기본 요소와 사용법[지식·이해]을 익히고, 창의적인 작품을 만들 수 있다.[과정·기능]
-3. elements에는 그 성취기준이 다루는 내용 요소를 위 내용 체계에서 **글자 그대로 복사해서** 2개 이상 넣습니다. 내용 체계에 없는 내용 요소는 넣지 않습니다.
+3. elements에는 그 성취기준이 다루는 내용 요소를 그 영역의 내용 체계에서 **글자 그대로 복사해서** 2~3개 넣습니다. 내용 체계에 없는 내용 요소는 넣지 않습니다.
+   한 영역의 내용 요소가 그 영역의 성취기준들에 고루 나뉘어 빠짐없이 쓰이도록 합니다.
 4. area에는 영역 번호(1부터)를 씁니다.
 5. 문장은 '~한다.', '~할 수 있다.', '~갖는다.'처럼 '~다.'로 끝냅니다.
 6. 같은 도달점을 반복하지 않습니다.
@@ -208,11 +213,16 @@ ${formatBlock(`{
       data.push({ id: newId(), areaIndex, text: s.text.replace(/^\[[^\]]+\]\s*/, ""), elements: normalized });
     }
     if (data.length === 0) return { ok: false, error: "쓸 수 있는 성취기준이 없습니다. 영역 번호(area)를 확인하세요." };
+    standardCountsFor(doc).forEach((want, i) => {
+      const got = data.filter((s) => s.areaIndex === i).length;
+      if (got !== want) notes.push(`(${i + 1}) ${doc.areas[i].name}: ${want}개로 정했는데 AI가 ${got}개를 주었습니다. 아래에서 추가·삭제하거나 AI에게 다시 요청하세요.`);
+    });
     data.sort((a, b) => a.areaIndex - b.areaIndex);
     return { ok: true, data, notes };
   },
-  reminder: () =>
-    "- standards의 각 항목에 area(영역 번호), text(문장), elements(내용 체계에서 글자 그대로 복사한 내용 요소)가 있어야 합니다.",
+  reminder: (doc) =>
+    `- standards의 각 항목에 area(영역 번호), text(문장), elements(내용 체계에서 글자 그대로 복사한 내용 요소)가 있어야 합니다.
+- 영역별 개수: ${standardCountsFor(doc).map((n, i) => `(${i + 1}) ${n}개`).join(", ")}`,
 };
 
 /** 띄어쓰기만 다른 내용 요소를 내용 체계의 원래 문구로 바꾼다 */

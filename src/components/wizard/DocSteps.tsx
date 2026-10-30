@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { CATEGORIES, CATEGORY_KEYS, newId, type Area, type DesignDoc, type Standard } from "@/domain/types";
 import { codeMap, defaultAbbrev, standardCategories } from "@/domain/codes";
+import { elementCount, recommendedStandardCount, standardCountsFor } from "@/domain/standardCounts";
 import { contentSystemPrompt, coreIdeasPrompt, introPrompt, standardsPrompt, teachingPrompt } from "@/prompts/steps";
 import { checkContentSystem, checkCoreIdeas, checkIntro, checkStandards, checkTeaching } from "@/validation/design";
 import { AiAssist } from "./AiAssist";
@@ -54,6 +55,7 @@ function ContentTable({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">) {
     confirm("이 영역을 삭제할까요? 이 영역의 성취기준도 함께 삭제됩니다.") &&
     setDoc((d) => {
       d.areas.splice(i, 1);
+      d.standardCounts?.splice(i, 1);
       d.standards = d.standards.filter((s) => s.areaIndex !== i).map((s) => (s.areaIndex > i ? { ...s, areaIndex: s.areaIndex - 1 } : s));
     });
   const addArea = () => setDoc((d) => void d.areas.push(emptyArea()));
@@ -229,6 +231,7 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
           <input className={`${inputClass} max-w-40`} value={doc.abbrev} placeholder={defaultAbbrev(doc.basic.name)} onChange={(e) => setDoc((d) => void (d.abbrev = e.target.value.trim()))} />
         </Field>
       </StepHeader>
+      <StandardCountPicker doc={doc} setDoc={setDoc} />
       <AiAssist
         doc={{ ...doc, abbrev }}
         step={standardsPrompt}
@@ -297,6 +300,60 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
         }}
       />
     </div>
+  );
+}
+
+/** 영역별 성취기준 수 정하기 (내용 요소 수로 추천, 원하는 수로 바꾸기) */
+function StandardCountPicker({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">) {
+  const counts = standardCountsFor(doc);
+  const set = (i: number, n: number | null) =>
+    setDoc((d) => {
+      const list = d.areas.map((_, k) => d.standardCounts?.[k] ?? null);
+      list[i] = n;
+      d.standardCounts = list;
+    });
+  const customized = doc.areas.some((_, i) => typeof doc.standardCounts?.[i] === "number");
+  return (
+    <Card className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-bold">영역별 성취기준 수 정하기</h2>
+        {customized && (
+          <button type="button" className="text-sm text-gray-500 underline" onClick={() => setDoc((d) => void (d.standardCounts = []))}>
+            모두 추천대로
+          </button>
+        )}
+      </div>
+      <p className="text-sm text-gray-600">
+        성취기준 하나가 내용 요소 2~3개를 묶으므로, 내용 요소 수에 맞춰 추천했어요. 원하는 개수로 바꾸면 AI 프롬프트에 그대로 들어가요.
+      </p>
+      <div className="divide-y divide-gray-100">
+        {doc.areas.map((a, i) => {
+          const rec = recommendedStandardCount(a);
+          return (
+            <div key={i} className="flex flex-wrap items-center justify-between gap-2 py-2">
+              <div className="text-sm">
+                <b>
+                  ({i + 1}) {a.name}
+                </b>
+                <span className="ml-2 text-gray-500">
+                  내용 요소 {elementCount(a)}개 → 추천 {rec}개
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button type="button" aria-label="줄이기" disabled={counts[i] <= 1} onClick={() => set(i, counts[i] - 1)} className="h-8 w-8 rounded-lg border border-gray-300 text-lg leading-none disabled:opacity-30">
+                  −
+                </button>
+                <span className={`w-14 text-center font-semibold ${counts[i] === rec ? "" : "text-brand-700"}`}>{counts[i]}개</span>
+                <button type="button" aria-label="늘리기" disabled={counts[i] >= 8} onClick={() => set(i, counts[i] + 1)} className="h-8 w-8 rounded-lg border border-gray-300 text-lg leading-none disabled:opacity-30">
+                  +
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {counts.some((n) => n < 2) && <p className="text-xs text-amber-700">지침은 영역별로 성취기준 2가지 이상 개발을 권장해요.</p>}
+    </Card>
   );
 }
 
