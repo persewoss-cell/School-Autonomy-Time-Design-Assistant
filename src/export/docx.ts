@@ -82,7 +82,7 @@ function para(content: string | TextRun[], o: ParaOpts = {}): Paragraph {
   return new Paragraph({
     alignment: o.align ?? AlignmentType.BOTH,
     indent,
-    spacing: { before: pt(o.before ?? 0), after: pt(o.after ?? 0), line: Math.round((o.line ?? 1.25) * 240) },
+    spacing: { before: pt(o.before ?? 0), after: pt(o.after ?? 0), line: Math.round((o.line ?? 1.15) * 240) },
     pageBreakBefore: o.pageBreak,
     keepNext: o.keepNext,
     children: typeof content === "string" ? [run(content, o)] : content,
@@ -115,7 +115,7 @@ function cell(children: Paragraph[], o: CellOpts = {}): TableCell {
     width: o.w ? { size: o.w, type: WidthType.DXA } : undefined,
     shading: o.fill ? { type: ShadingType.CLEAR, fill: o.fill, color: "auto" } : undefined,
     verticalAlign: o.align ?? VerticalAlignTable.CENTER,
-    margins: { top: o.margins ?? 30, bottom: o.margins ?? 30, left: 70, right: 70 },
+    margins: { top: o.margins ?? 15, bottom: o.margins ?? 15, left: 50, right: 50 },
     borders: o.borders,
   });
 }
@@ -169,9 +169,9 @@ function applicationForm(doc: DesignDoc): (Paragraph | Table)[] {
   const t = applicationTexts(doc);
   // 왼쪽 제목 칸을 좁게 해서 한 쪽에 들어가게
   const w = [620, 820, 4226, 900, 2460];
-  const f = { size: 9, line: 1.1 };
-  const head = (s: string, o: CellOpts = {}) => cell(lines(s, { ...f, bold: true, align: AlignmentType.CENTER }), { fill: LIGHT, margins: 20, ...o });
-  const body = (s: string, o: CellOpts = {}) => cell(lines(s, { ...f, align: AlignmentType.LEFT }), { margins: 20, ...o });
+  const f = { size: 9, line: 1.0 };
+  const head = (s: string, o: CellOpts = {}) => cell(lines(s, { ...f, bold: true, align: AlignmentType.CENTER }), { fill: LIGHT, margins: 10, ...o });
+  const body = (s: string, o: CellOpts = {}) => cell(lines(s, { ...f, align: AlignmentType.LEFT }), { margins: 10, ...o });
   const groups = SUBJECT_GROUPS.map((g) => box(g === doc.basic.subjectGroup, g)).join("  ");
   const textbooks = TEXTBOOK_TYPES[doc.basic.type].map((x) => box(a.textbookType === x, x)).join("   ");
   const teachers = TEACHER_PLANS.map((x) => box(a.teacherPlans.includes(x), x)).join("\n");
@@ -231,7 +231,7 @@ function banner(doc: DesignDoc, pageBreak: boolean): (Paragraph | Table)[] {
     new Paragraph({
       tabStops: [{ type: TabStopType.RIGHT, position: PAGE_WIDTH - pt(6) }],
       indent: { left: pt(6) },
-      spacing: { before: pt(6), after: pt(14) },
+      spacing: { before: pt(4), after: pt(8) },
       children: [run(`학교자율시간 [${kindOf(doc)}]`, { size: 11, bold: true }), run(`\t${schoolOf(doc)} ${doc.basic.grade}학년 ${doc.basic.semester}학기`, { size: 11, bold: true })],
     }),
   ];
@@ -244,19 +244,19 @@ const h1 = (text: string, pageBreak = false): (Paragraph | Table)[] => [
     keepNext: true,
     shading: { type: ShadingType.CLEAR, fill: "E1E1E1", color: "auto" },
     indent: { left: pt(2), right: Math.round(PAGE_WIDTH * 0.08) },
-    spacing: { before: pt(4), after: pt(8), line: 300 },
+    spacing: { before: pt(2), after: pt(4), line: 276 },
     children: [run(` ${text}`, { size: 13 })],
   }),
 ];
-const h2 = (text: string, pageBreak = false) => para(text, { size: 12, align: AlignmentType.LEFT, before: pageBreak ? 0 : 10, after: 4, pageBreak, keepNext: true });
-const spacer = (n = 14) => para("", { size: 4, line: 1, after: n });
+const h2 = (text: string, pageBreak = false) => para(text, { size: 12, align: AlignmentType.LEFT, before: pageBreak ? 0 : 6, after: 2, pageBreak, keepNext: true });
+const spacer = (n = 8) => para("", { size: 4, line: 1, after: n });
 
 function ideasTable(doc: DesignDoc): Table {
   const ideas = doc.coreIdeas.filter((s) => s.trim());
   return table(
     [
       [cell([para("핵심아이디어", { size: 10.5, bold: true, align: AlignmentType.CENTER, font: DOTUM, keepNext: true })], { fill: GRAY, borders: { bottom: line(4, BorderStyle.DASHED) } })],
-      [cell(ideas.map((s) => para(`·${s}`, { size: 9.5, left: 8, first: -8, line: 1.15, keepNext: true })), { borders: { top: line(4, BorderStyle.DASHED) } })],
+      [cell(ideas.map((s) => para(`·${s}`, { size: 9.5, left: 8, first: -8, line: 1.0, keepNext: true })), { borders: { top: line(4, BorderStyle.DASHED) } })],
     ],
     [PAGE_WIDTH],
     { top: line(9, BorderStyle.SINGLE, "404040"), bottom: NONE },
@@ -270,12 +270,12 @@ function contentTable(doc: DesignDoc): Table {
   const areaW = Math.floor((PAGE_WIDTH - labelW) / n);
   const widths = [labelW, ...doc.areas.map(() => areaW)];
   // 내용 체계 표가 쪽 중간에서 나뉘지 않도록 모든 문단에 '다음 문단과 함께'
-  const th = (s: string, o: CellOpts = {}) => cell(lines(s, { size: 11, bold: true, align: AlignmentType.CENTER, line: 1.1, keepNext: true }), { fill: GRAY, ...o });
+  const th = (s: string, o: CellOpts = {}) => cell(lines(s, { size: 11, bold: true, align: AlignmentType.CENTER, line: 1.0, keepNext: true }), { fill: GRAY, margins: 20, ...o });
   const items = (xs: string[]) =>
     xs
       .map((s) => s.trim())
       .filter(Boolean)
-      .map((s) => para(`·${s}`, { size: 10.5, align: AlignmentType.LEFT, line: 1.25, keepNext: true }));
+      .map((s) => para(`·${s}`, { size: 10, align: AlignmentType.LEFT, line: 1.05, keepNext: true }));
   const catLabel = (s: string) => (subject ? s.split("·").join("\n‧\n") : s);
   const corner = subject
     ? cell([para("영역", { size: 11, bold: true, align: AlignmentType.RIGHT, keepNext: true }), para("", { keepNext: true }), para("범주", { size: 11, bold: true, align: AlignmentType.LEFT, keepNext: true })], {
@@ -293,7 +293,7 @@ function contentTable(doc: DesignDoc): Table {
     [
       [corner, th("내용 요소", { span: n })],
       doc.areas.map((a, i) => th(`(${i + 1}) ${a.name}`)),
-      ...cats.map(([lab, key]) => [th(catLabel(lab)), ...doc.areas.map((a) => cell(items(a[key]), { margins: 50 }))]),
+      ...cats.map(([lab, key]) => [th(catLabel(lab)), ...doc.areas.map((a) => cell(items(a[key]), { margins: 25 }))]),
     ],
     widths,
     { top: line(4), bottom: THIN },
@@ -305,9 +305,9 @@ function standardsBlock(doc: DesignDoc): (Paragraph | Table)[] {
   if (doc.basic.type === "subject") {
     const dotted = line(4, BorderStyle.DOTTED);
     return doc.areas.map((a, i) => keepTogether([
-      para(`(${i + 1}) ${a.name}`, { size: 12, align: AlignmentType.LEFT, before: 6, after: 4, keepNext: true }),
+      para(`(${i + 1}) ${a.name}`, { size: 12, align: AlignmentType.LEFT, before: 4, after: 2, keepNext: true }),
       table(
-        [[cell(doc.standards.filter((s) => s.areaIndex === i).map((s) => para(`${codes.get(s.id) ?? ""} ${s.text}`, { font: HCR, size: 10, left: 74, first: -74, line: 1.3, keepNext: true })), { margins: 40, borders: { left: dotted, right: dotted } })]],
+        [[cell(doc.standards.filter((s) => s.areaIndex === i).map((s) => para(`${codes.get(s.id) ?? ""} ${s.text}`, { font: HCR, size: 10, left: 74, first: -74, line: 1.1, keepNext: true })), { margins: 25, borders: { left: dotted, right: dotted } })]],
         [PAGE_WIDTH],
         { top: dotted, bottom: dotted, outer: false },
       ),
@@ -316,8 +316,8 @@ function standardsBlock(doc: DesignDoc): (Paragraph | Table)[] {
   return [
     table(
       doc.standards.map((s) => [
-        cell([para(codes.get(s.id) ?? "", { font: HCR, size: 9, align: AlignmentType.CENTER, line: 1.1 })], { fill: LIGHT }),
-        cell([para(s.text, { font: HCR, size: 10, line: 1.25 })]),
+        cell([para(codes.get(s.id) ?? "", { font: HCR, size: 9, align: AlignmentType.CENTER, line: 1.0 })], { fill: LIGHT }),
+        cell([para(s.text, { font: HCR, size: 10, line: 1.05 })]),
       ]),
       [1700, PAGE_WIDTH - 1700],
     ),
@@ -329,27 +329,28 @@ function standardParas(doc: DesignDoc, ids: string[]): Paragraph[] {
   return ids.flatMap((id, k) => {
     const s = doc.standards.find((x) => x.id === id);
     if (!s) return [];
-    return [...(k > 0 ? [para("", { size: 6, line: 1 })] : []), para(codes.get(id) ?? "", { size: 9, align: AlignmentType.CENTER, line: 1.15 }), para(s.text, { size: 9, align: AlignmentType.CENTER, line: 1.15 })];
+    return [...(k > 0 ? [para("", { size: 4, line: 1 })] : []), para(codes.get(id) ?? "", { size: 9, align: AlignmentType.CENTER, line: 1.0 }), para(s.text, { size: 9, align: AlignmentType.CENTER, line: 1.0 })];
   });
 }
 
 function unitPlanTable(doc: DesignDoc): Table | Paragraph {
   const plan = doc.plan.selected;
   if (!plan) return para("(단원 지도계획을 아직 정하지 않았습니다.)");
-  const widths = [785, 1345, 785, 1020, 4251, 840];
-  const th = (s: string) => cell([para(s, { size: 10.5, bold: true, align: AlignmentType.CENTER, line: 1.1 })], { fill: LIGHT, margins: 50 });
+  // 행 높이를 줄이려고 글이 긴 '학습 내용'을 가장 넓게, 짧은 차시·비고는 좁게
+  const widths = [740, 1250, 700, 1100, 4596, 640];
+  const th = (s: string) => cell([para(s, { size: 10, bold: true, align: AlignmentType.CENTER, line: 1.0 })], { fill: LIGHT, margins: 30 });
   const rows: TableCell[][] = [["단원명", "성취기준", "차시", "학습주제", "학습 내용", "비고"].map(th)];
   const labels = lessonLabels(plan.units, doc.basic.hours);
   const dotted = line(4, BorderStyle.DOTTED);
   plan.units.forEach((u, ui) => {
     u.lessons.forEach((l, li) => {
       const content = [
-        para(`· ${l.goal}`, { size: 10, bold: true, left: 9, first: -9, align: AlignmentType.LEFT, line: 1.15 }),
-        ...l.activities.filter((x) => x.trim()).map((x) => para(`- ${x}`, { size: 9, left: 9, first: -7, align: AlignmentType.LEFT, line: 1.15 })),
+        para(`· ${l.goal}`, { size: 9.5, bold: true, left: 9, first: -9, align: AlignmentType.LEFT, line: 1.0 }),
+        ...l.activities.filter((x) => x.trim()).map((x) => para(`- ${x}`, { size: 9, left: 9, first: -7, align: AlignmentType.LEFT, line: 1.0 })),
         ...(l.assessment.trim()
           ? [
               new Paragraph({
-                spacing: { before: pt(2), line: Math.round(1.15 * 240) },
+                spacing: { before: pt(1), line: 240 },
                 border: { top: dotted, bottom: dotted, left: dotted, right: dotted },
                 children: [run("[과정중심평가]", { size: 9.5, shade: "FFE7D8" }), run(` ${l.assessment}`, { size: 10 })],
               }),
@@ -358,14 +359,14 @@ function unitPlanTable(doc: DesignDoc): Table | Paragraph {
       ];
       const row: TableCell[] = [];
       if (li === 0) {
-        row.push(cell(lines(`${ui + 1}단원\n${u.unitName}`, { size: 10, bold: true, align: AlignmentType.CENTER, line: 1.2 }), { rows: u.lessons.length }));
+        row.push(cell(lines(`${ui + 1}단원\n${u.unitName}`, { size: 9.5, bold: true, align: AlignmentType.CENTER, line: 1.0 }), { rows: u.lessons.length }));
         row.push(cell(standardParas(doc, u.standardIds), { rows: u.lessons.length }));
       }
       row.push(
-        cell(lines(lessonLabel(labels[ui][li]), { size: 9.5, align: AlignmentType.CENTER, line: 1.1 })),
-        cell([para(l.topic, { size: 9.5, align: AlignmentType.CENTER, line: 1.15 })]),
+        cell(lines(lessonLabel(labels[ui][li]), { size: 9, align: AlignmentType.CENTER, line: 1.0 })),
+        cell([para(l.topic, { size: 9, align: AlignmentType.CENTER, line: 1.0 })]),
         cell(content, { align: VerticalAlignTable.TOP }),
-        cell(lines(l.note, { size: 9, align: AlignmentType.CENTER, line: 1.15 })),
+        cell(lines(l.note, { size: 8.5, align: AlignmentType.CENTER, line: 1.0 })),
       );
       rows.push(row);
     });
@@ -375,8 +376,9 @@ function unitPlanTable(doc: DesignDoc): Table | Paragraph {
 
 function assessmentTable(doc: DesignDoc): Table {
   const subject = doc.basic.type === "subject";
-  const widths = [840, 1445, 2058, 578, 3149, 956];
-  const th = (s: string, o: CellOpts = {}) => cell(lines(s, { size: 10.5, bold: true, align: AlignmentType.CENTER, line: 1.1 }), { fill: LIGHT, margins: 50, ...o });
+  // 긴 글이 들어가는 주안점·성취수준 칸을 넓히고 시기·등급·방법 칸은 좁게
+  const widths = [600, 1250, 2350, 400, 3526, 900];
+  const th = (s: string, o: CellOpts = {}) => cell(lines(s, { size: 10, bold: true, align: AlignmentType.CENTER, line: 1.0 }), { fill: LIGHT, margins: 30, ...o });
   const rows: TableCell[][] = [[th("시기"), th("성취기준"), th("수업·평가 방법,\n연계의 주안점"), th(subject ? "성취수준" : "평가 기준", { span: 2 }), th("방법")]];
   for (const a of doc.assessments) {
     (["A", "B", "C"] as const).forEach((lv, k) => {
@@ -385,11 +387,11 @@ function assessmentTable(doc: DesignDoc): Table {
         row.push(
           cell([para(a.month, { size: 10, align: AlignmentType.CENTER })], { rows: 3 }),
           cell(standardParas(doc, a.standardIds), { rows: 3 }),
-          cell(lines(a.focus, { size: 9.5, align: AlignmentType.LEFT, line: 1.2 }), { rows: 3 }),
+          cell(lines(a.focus, { size: 9, align: AlignmentType.LEFT, line: 1.0 }), { rows: 3 }),
         );
       }
-      row.push(cell([para(lv, { size: 9.5, align: AlignmentType.CENTER })]), cell([para(a.levels[lv], { size: 9.5, line: 1.15 })]));
-      if (k === 0) row.push(cell(a.methods.map((m) => para(m, { size: 9.5, align: AlignmentType.CENTER, line: 1.3 })), { rows: 3 }));
+      row.push(cell([para(lv, { size: 9, align: AlignmentType.CENTER, line: 1.0 })]), cell([para(a.levels[lv], { size: 9, line: 1.0 })]));
+      if (k === 0) row.push(cell(a.methods.map((m) => para(m, { size: 9, align: AlignmentType.CENTER, line: 1.0 })), { rows: 3 }));
       rows.push(row);
     });
   }
@@ -397,7 +399,7 @@ function assessmentTable(doc: DesignDoc): Table {
 }
 
 const numbered = (items: string[]) =>
-  items.filter((s) => s.trim()).map((s, i) => para(`(${i + 1}) ${s}`, { left: 25, first: -25, line: 1.3, after: 2 }));
+  items.filter((s) => s.trim()).map((s, i) => para(`(${i + 1}) ${s}`, { left: 25, first: -25, line: 1.15 }));
 
 function curriculumDoc(doc: DesignDoc): (Paragraph | Table)[] {
   const subject = doc.basic.type === "subject";
@@ -436,8 +438,8 @@ function curriculumDoc(doc: DesignDoc): (Paragraph | Table)[] {
 function checklistDoc(doc: DesignDoc): (Paragraph | Table)[] {
   const subject = doc.basic.type === "subject";
   const results = checklistResults(doc);
-  const widths = [1400, 6626, 1000];
-  const f = { size: 9.5, line: 1.1 };
+  const widths = [1200, 7026, 800];
+  const f = { size: 9.5, line: 1.0 };
   const rows: TableCell[][] = [["영역", "평가 지표", "검토 결과\n(○, X)"].map((h) => cell(lines(h, { ...f, bold: true, align: AlignmentType.CENTER }), { fill: LIGHT }))];
   const areas = [...new Set(results.map((r) => r.area))];
   for (const area of areas) {
@@ -476,7 +478,7 @@ export function buildDesignDocx(doc: DesignDoc): Document {
     creator: "학교자율시간 설계 도우미 앱",
     title: `${doc.basic.name} 학교자율시간 ${kindOf(doc)}`,
     styles: {
-      default: { document: { run: { font: BODY, size: 24 }, paragraph: { spacing: { line: 300 } } } },
+      default: { document: { run: { font: BODY, size: 24 }, paragraph: { spacing: { line: 276 } } } },
     },
     sections: [section],
   });
