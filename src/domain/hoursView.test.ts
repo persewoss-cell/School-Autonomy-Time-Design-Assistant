@@ -70,3 +70,16 @@ describe("학년별 시수 점검 화면", () => {
     expect(bandStatus(3, { 3: manual(3), 4: manual(4) }, only3).complete).toBe(true);
   });
 });
+
+describe("편성표 양식 줄 구성", () => {
+  it("교과(군)별로 묶고, 학교자율시간은 교과 아래 줄, 3~4학년 과학/실과에는 빈 실과 줄", async () => {
+    const { formModel } = await import("./allocationForm");
+    const c = initialCheck(3, 2026, designs);
+    const m = formModel(c.input);
+    const sci = m.groups.find((g) => g.label === "과학/실과")!;
+    expect(sci.lines.map((l) => (l.kind === "subject" ? l.key : l.kind === "course" ? l.name : `(${l.name})`))).toEqual(["과학", "디지털탐험대3", "(실과)"]);
+    expect(m.groups.find((g) => g.label === "수학")!.merged).toBe(true);
+    expect(m.groups.find((g) => g.label === "예술")).toMatchObject({ base: 272, min: 272, max: 326, noReduction: true });
+    expect(m.creative.parts.map((p) => p.name)).toEqual(["자율·자치활동", "동아리활동", "진로활동"]);
+  });
+});

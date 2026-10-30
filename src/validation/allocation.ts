@@ -10,7 +10,7 @@ import type { Issue } from "./types";
  * - 증감범위 상한 = ROUNDDOWN(기준시수 × 1.2)
  * - 편성시수 = 교과 편성시수 + 그 교과에 편성한 학교자율시간 시수
  * - 증감 범위는 지침 26쪽대로 교과(군) 단위로 본다 (국어, 사회/도덕, 수학, 과학/실과, 체육, 음악/미술, 영어)
- *   체육·음악·미술은 교과마다 기준시수보다 줄일 수 없다 (사용자 확인, 2026-10-31)
+ *   체육, 예술(음악/미술)은 교과(군) 기준시수보다 줄일 수 없다 (음악·미술은 교과군 합계로 봄, 사용자 확인 2026-10-31)
  * - 교과 소계·창체도 같은 범위로 점검, 총시수는 기준 총시수와 같아야 함
  */
 
@@ -194,9 +194,7 @@ export function checkAllocation(input: AllocationInput): AllocationResult {
   });
   const rows = subjectRows.map((r) => {
     const g = groups.find((x) => x.keys.includes(r.label))!;
-    const rule = b.subjects.find((s) => s.key === r.label);
-    const ownOk = !rule?.noReduction || r.planned >= r.baseHours;
-    return { ...r, min: g.min, max: g.max, ok: g.ok && ownOk };
+    return { ...r, min: g.min, max: g.max, ok: g.ok };
   });
 
   const subtotalBase = subjectRows.reduce((t, r) => t + r.baseHours, 0);
@@ -226,19 +224,6 @@ export function checkAllocation(input: AllocationInput): AllocationResult {
         field: r.label,
         message: `${r.label} 편성시수 ${r.planned}시간이 ${"keys" in r ? "교과(군) " : ""}증감 범위(${r.min}~${r.max}시간)를 ${r.planned - r.max}시간 넘습니다.`,
         fix: `${r.label} 시수를 ${r.planned - r.max}시간 이상 줄이거나, 학교자율시간을 다른 교과에 편성해 주세요.`,
-      });
-    }
-  }
-  // 체육·음악·미술: 교과마다 기준시수보다 줄일 수 없음 (교과군 합계가 맞아도)
-  for (const r of subjectRows) {
-    const rule = b.subjects.find((s) => s.key === r.label);
-    const g = groups.find((x) => x.keys.includes(r.label))!;
-    if (rule?.noReduction && r.planned < r.baseHours && g.keys.length > 1) {
-      issues.push({
-        level: "error",
-        field: r.label,
-        message: `${r.label}은(는) 기준시수(${r.baseHours}시간)보다 줄일 수 없습니다. 현재 편성시수는 ${r.planned}시간입니다. (학교자율시간 포함)`,
-        fix: `${r.label} 시수를 ${r.baseHours - r.planned}시간 늘려 주세요.`,
       });
     }
   }

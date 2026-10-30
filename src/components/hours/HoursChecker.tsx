@@ -18,16 +18,12 @@ import {
   type ViewGrade,
 } from "@/domain/hoursView";
 import { useHourChecks } from "./useHourChecks";
+import { AllocationFormTable } from "./AllocationFormTable";
 import {
   bandInfo,
-  CREATIVE_PARTS,
   autoReduce,
   checkAllocation,
-  creativePartsOf,
-  withCreativeParts,
-  oneWeekHours,
   type AllocationInput,
-  type FourSemesters,
   type SemesterIndex,
 } from "@/validation/allocation";
 import { Packer } from "docx";
@@ -37,7 +33,6 @@ import { Card, IssueList } from "../ui";
 const SEMS: SemesterIndex[] = [0, 1, 2, 3];
 const num = (v: string) => Math.max(0, Math.floor(Number(v) || 0));
 const cell = "w-16 rounded border border-gray-300 px-1 py-1 text-right text-sm focus:border-brand-500 focus:outline-none";
-const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 export function HoursChecker() {
   const params = useSearchParams();
@@ -104,7 +99,6 @@ export function HoursChecker() {
   };
   const info = bandInfo(a.band);
   const r = checkAllocation(a);
-  const parts = creativePartsOf(a);
   const mutate = (fn: (x: AllocationInput) => void) => {
     const next = structuredClone(a);
     fn(next);
@@ -314,140 +308,26 @@ export function HoursChecker() {
 
       <Card className="space-y-3">
         <h2 className="font-bold">② 교과·창체 편성표</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] text-sm">
-            <thead className="bg-brand-50 text-xs text-gray-600">
-              <tr>
-                <th className="p-2 text-left">교과(군)</th>
-                <th className="p-2 text-left">교과</th>
-                <th className="p-2">기준시수</th>
-                {SEMS.map((s) => (
-                  <th key={s} className="p-2">{label(s)}</th>
-                ))}
-                <th className="p-2">학교자율시간</th>
-                <th className="p-2">편성시수</th>
-                <th className="p-2">1주 수업시간</th>
-                <th className="p-2">증감범위</th>
-                <th className="p-2">이상유무</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {info.subjects.map((s, i) => {
-                const row = r.rows[i];
-                // 교과(군)의 첫 교과에서만 교과군 이름·범위·이상유무를 여러 줄로 묶어 보여 줌 (지침 26쪽: 범위는 교과군 단위)
-                const g = r.groups.find((x) => x.keys.includes(s.key))!;
-                const first = g.keys[0] === s.key;
-                const span = g.keys.length;
-                return (
-                  <tr key={s.key}>
-                    {first && (
-                      <td rowSpan={span} className="p-2 text-gray-500">
-                        {s.group}
-                      </td>
-                    )}
-                    <td className="p-2 font-medium">
-                      {s.key}
-                      {s.noReduction && <span className="ml-1 text-xs text-blue-600">(감축 불가)</span>}
-                    </td>
-                    <td className="p-2 text-center">
-                      <input
-                        type="number"
-                        className={cell}
-                        value={a.baseHours[s.key]}
-                        onChange={(e) => mutate((x) => (x.baseHours[s.key] = num(e.target.value)))}
-                      />
-                    </td>
-                    {SEMS.map((sem) => (
-                      <td key={sem} className="p-2 text-center">
-                        <input
-                          type="number"
-                          className={cell}
-                          value={a.subjectHours[s.key][sem]}
-                          onChange={(e) => mutate((x) => ((x.subjectHours[s.key] as FourSemesters)[sem] = num(e.target.value)))}
-                        />
-                      </td>
-                    ))}
-                    <td className="p-2 text-center">{row.autonomy || "-"}</td>
-                    <td className="p-2 text-center font-semibold">{row.planned}</td>
-                    <td className="p-2 text-center">{fmt(row.oneWeek)}</td>
-                    {first && (
-                      <td rowSpan={span} className="p-2 text-center text-gray-500">
-                        {g.min}~{g.max}
-                        {span > 1 && <span className="block text-xs">(교과군 {g.planned})</span>}
-                      </td>
-                    )}
-                    {first ? (
-                      <td rowSpan={span} className="p-2 text-center">
-                        <Status ok={r.rows.filter((x) => g.keys.includes(x.label)).every((x) => x.ok)} />
-                      </td>
-                    ) : null}
-                  </tr>
-                );
-              })}
-              <tr className="bg-gray-50 font-semibold">
-                <td className="p-2" colSpan={2}>교과 소계</td>
-                <td className="p-2 text-center">{r.subtotal.baseHours}</td>
-                <td colSpan={4} />
-                <td className="p-2 text-center">{r.subtotal.autonomy || "-"}</td>
-                <td className="p-2 text-center">{r.subtotal.planned}</td>
-                <td className="p-2 text-center">{fmt(r.subtotal.oneWeek)}</td>
-                <td className="p-2 text-center text-gray-500">{r.subtotal.min}~{r.subtotal.max}</td>
-                <td className="p-2 text-center"><Status ok={r.subtotal.ok} /></td>
-              </tr>
-              {CREATIVE_PARTS.map(([key, name], k) => (
-                <tr key={key}>
-                  {k === 0 && (
-                    <td rowSpan={3} className="p-2 font-medium">
-                      창의적 체험활동
-                    </td>
-                  )}
-                  <td className="p-2">{name}</td>
-                  {k === 0 && (
-                    <td rowSpan={3} className="p-2 text-center">
-                      <input
-                        type="number"
-                        className={cell}
-                        value={a.creativeBaseHours}
-                        onChange={(e) => mutate((x) => (x.creativeBaseHours = num(e.target.value)))}
-                      />
-                    </td>
-                  )}
-                  {SEMS.map((sem) => (
-                    <td key={sem} className="p-2 text-center">
-                      <input
-                        type="number"
-                        className={cell}
-                        value={parts[key][sem]}
-                        onChange={(e) => {
-                          const next = structuredClone(parts);
-                          next[key][sem] = num(e.target.value);
-                          setA(withCreativeParts(a, next));
-                        }}
-                      />
-                    </td>
-                  ))}
-                  {k === 0 && (
-                    <>
-                      <td rowSpan={3} className="p-2 text-center">-</td>
-                      <td rowSpan={3} className="p-2 text-center font-semibold">{r.creative.planned}</td>
-                      <td rowSpan={3} className="p-2 text-center">{fmt(r.creative.oneWeek)}</td>
-                      <td rowSpan={3} className="p-2 text-center text-gray-500">{r.creative.min}~{r.creative.max}</td>
-                      <td rowSpan={3} className="p-2 text-center"><Status ok={r.creative.ok} /></td>
-                    </>
-                  )}
-                </tr>
-              ))}
-              <tr className="bg-brand-50 font-bold">
-                <td className="p-2" colSpan={2}>학년군 총 수업 시간 수</td>
-                <td className="p-2 text-center">{r.total.baseHours}</td>
-                <td colSpan={5} />
-                <td className="p-2 text-center">{r.total.planned}</td>
-                <td colSpan={2} className="p-2 text-center text-xs font-normal text-gray-500">기준과 같아야 함</td>
-                <td className="p-2 text-center"><Status ok={r.total.ok} /></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <p className="text-sm text-gray-600">
+          학교 편성표 양식 그대로예요. 흰 칸(편성 시수)에 숫자를 넣으면 증감·계·합계가 자동 계산돼요. 학교자율시간은 ①에서 넣으면 주황 줄로 들어가요.
+          증감 범위는 지침대로 교과(군) 단위로 보고, 범위를 벗어나면 학년군 합계 칸이 빨갛게 바뀌어요.
+        </p>
+        <AllocationFormTable a={a} setA={setA} yearOf={(s) => viewYears(grade, check.schoolYear)[s]} />
+        <details className="text-sm">
+          <summary className="cursor-pointer text-gray-600">기준시수 고치기 (학교 상황에 맞게)</summary>
+          <div className="mt-2 flex flex-wrap gap-3">
+            {info.subjects.map((sub) => (
+              <label key={sub.key} className="flex items-center gap-1">
+                {sub.key}
+                <input type="number" className={cell} value={a.baseHours[sub.key]} onChange={(e) => mutate((x) => (x.baseHours[sub.key] = num(e.target.value)))} />
+              </label>
+            ))}
+            <label className="flex items-center gap-1">
+              창의적 체험활동
+              <input type="number" className={cell} value={a.creativeBaseHours} onChange={(e) => mutate((x) => (x.creativeBaseHours = num(e.target.value)))} />
+            </label>
+          </div>
+        </details>
       </Card>
 
       <Card className="space-y-3">
@@ -472,13 +352,5 @@ export function HoursChecker() {
         <p className="text-xs text-gray-500">계획서·신청서의 붙임 &lsquo;( )학년 교육과정 편성표&rsquo;로 쓸 수 있어요.</p>
       </Card>
     </div>
-  );
-}
-
-function Status({ ok }: { ok: boolean }) {
-  return (
-    <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-bold ${ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-      {ok ? "이상없음" : "점검필요"}
-    </span>
   );
 }

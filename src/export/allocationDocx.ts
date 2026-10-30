@@ -13,7 +13,8 @@ import {
   VerticalAlignTable,
   WidthType,
 } from "docx";
-import { bandInfo, checkAllocation, creativePartsOf, CREATIVE_PARTS, type AllocationInput, type SemesterIndex } from "@/validation/allocation";
+import type { AllocationInput, SemesterIndex } from "@/validation/allocation";
+import { formModel, signed, vertical } from "@/domain/allocationForm";
 
 /**
  * 시수 점검 결과 → '( )학년 교육과정 편성표' (.docx). 계획서·신청서 붙임.
@@ -26,11 +27,11 @@ const FONT = "맑은 고딕";
 const SIZE = 15; // 7.5pt
 const RED = "E00000";
 const BLUE = "1F3FBF";
-const HEAD = "F2F2F2";
+const HEAD = "DCE3EE";
 const COURSE = "FCE4D6";
-const SEMS: SemesterIndex[] = [0, 1, 2, 3];
 const line = { style: BorderStyle.SINGLE, size: 4, color: "000000" };
 const thick = { style: BorderStyle.SINGLE, size: 12, color: "000000" };
+const redLine = { style: BorderStyle.SINGLE, size: 12, color: RED };
 
 interface C {
   text?: string | number;
@@ -40,10 +41,11 @@ interface C {
   color?: string;
   fill?: string;
   diag?: boolean;
+  /** 학교자율시간 칸: 빨간 테두리 */
+  red?: boolean;
 }
 
 const n = (v: number) => v.toLocaleString("ko-KR");
-const signed = (v: number) => (v === 0 ? "" : v > 0 ? `+${v}` : String(v));
 
 function cell(c: C, width: number): TableCell {
   const lines = String(c.text ?? "").split("\n");
@@ -54,7 +56,7 @@ function cell(c: C, width: number): TableCell {
     verticalAlign: VerticalAlignTable.CENTER,
     shading: c.fill ? { type: ShadingType.CLEAR, fill: c.fill, color: "auto" } : undefined,
     margins: { top: 10, bottom: 10, left: 25, right: 25 },
-    borders: c.diag ? { diagonalDown: line } : undefined,
+    borders: c.diag ? { diagonalDown: line } : c.red ? { top: redLine, bottom: redLine, left: redLine, right: redLine } : undefined,
     children: c.diag
       ? [
           new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { line: 220 }, children: [new TextRun({ text: "학년", size: SIZE, font: FONT, bold: true })] }),
@@ -83,23 +85,19 @@ export interface AllocationMeta {
   width?: number;
 }
 
-/** 편성표 본문 (설계 문서 .docx의 붙임으로도 쓰임) */
+/** 편성표 본문 (설계 문서 .docx의 붙임으로도 쓰임). 줄 구성은 시수 점검 화면과 같은 formModel */
 export function allocationChildren(a: AllocationInput, meta: AllocationMeta = {}): (Paragraph | Table)[] {
-  const info = bandInfo(a.band);
-  const r = checkAllocation(a);
-  const parts = creativePartsOf(a);
-  const g0 = info.grades[0];
-  const g1 = info.grades[1];
+  const m = formModel(a);
+  const [g0, g1] = m.grades;
   const years = meta.years;
 
-  // 열 너비 (양식 비율). 18열: 교과 | 교과군 | 교과 | 기준 | 범위 | (배당 증감 편성 증감 편성 계)×2 | 합계
-  const raw = [300, 760, 1150, 820, 760, ...[0, 1].flatMap(() => [430, 400, 430, 400, 430, 470]), 560];
+  // 18열: 교과 | 교과군 | 교과 | 기준 | 범위 | (배당 증감 편성 증감 편성 계)×2 | 합계  (양식 비율)
+  const raw = [260, 300, 1000, 640, 520, ...[0, 1].flatMap(() => [440, 420, 440, 420, 440, 480]), 560];
   const total = meta.width ?? 9026;
   const sum = raw.reduce((x, y) => x + y, 0);
   const W = raw.map((w) => Math.floor((w * total) / sum));
   const widthOf = (col: number, span = 1) => W.slice(col, col + span).reduce((x, y) => x + y, 0);
 
-  /** 행 만들기: 각 칸이 몇 번째 열에서 시작하는지 알려 줘야 너비를 정확히 넣을 수 있다 */
   const rows: TableRow[] = [];
   const push = (cells: [number, C][], minHeight?: number) =>
     rows.push(
@@ -109,6 +107,9 @@ export function allocationChildren(a: AllocationInput, meta: AllocationMeta = {}
         children: cells.map(([col, c]) => cell(c, widthOf(col, c.span))),
       }),
     );
+  const vert = (t: string) => vertical(t).join("\n");
+  const stackBase = (base: number, plus: boolean, d: number) => `${n(base)}\n(${plus ? "+" : "±"}${d})`;
+  const stackRange = (lo: number, hi: number) => `${lo}\n~\n${hi}`;
 
   // ── 머리글 3줄
   const yearHead = (g: number, y?: number) => `${g}학년${y ? `(${y}학년도)` : ""}`;
@@ -135,144 +136,126 @@ export function allocationChildren(a: AllocationInput, meta: AllocationMeta = {}
     ]),
   );
 
-  // ── 교과: 교과(군)마다 교과 줄 + 그 교과에 편성한 학교자율시간 줄
-  type Line = { kind: "subject"; key: string } | { kind: "course"; i: number };
-  const groupLines = r.groups.map((g) => ({
-    g,
-    lines: g.keys.flatMap((k): Line[] => [
-      { kind: "subject", key: k },
-      ...a.courses.flatMap((c, i): Line[] => (c.subjectKey === k ? [{ kind: "course", i }] : [])),
-    ]),
-  }));
-  const subjectLineCount = groupLines.reduce((t, x) => t + x.lines.length, 0);
-  const rule = (k: string) => info.subjects.find((s) => s.key === k)!;
-  let firstSubjectLine = true;
-
-  for (const { g, lines } of groupLines) {
-    const delta = g.max - g.baseHours;
-    const noReduction = g.keys.some((k) => rule(k).noReduction);
-    lines.forEach((ln, li) => {
+  // ── 교과
+  const subjectLineCount = m.groups.reduce((t, g) => t + g.lines.length, 0);
+  let firstLine = true;
+  for (const g of m.groups) {
+    g.lines.forEach((ln, li) => {
       const cells: [number, C][] = [];
-      if (firstSubjectLine) {
-        cells.push([0, { text: "교\n\n과", rows: subjectLineCount + 1, bold: true }]);
-        firstSubjectLine = false;
-      }
-      const single = lines.length === 1 && ln.kind === "subject";
-      if (li === 0) {
-        if (single) cells.push([1, { text: g.label, span: 2, bold: true }]);
-        else cells.push([1, { text: g.label, rows: lines.length, bold: true }]);
-      }
-      if (ln.kind === "subject") {
-        if (!single) cells.push([2, { text: ln.key }]);
-      } else {
-        cells.push([2, { text: a.courses[ln.i].name || "학교자율시간", fill: COURSE, bold: true }]);
+      if (firstLine) {
+        cells.push([0, { text: vert("교과"), rows: subjectLineCount + 1, bold: true }]);
+        firstLine = false;
       }
       if (li === 0) {
-        cells.push([3, { text: `${n(g.baseHours)}(${noReduction ? "+" : "±"}${delta})`, rows: lines.length, color: BLUE }]);
-        cells.push([4, { text: `${g.min}~${g.max}`, rows: lines.length, color: BLUE }]);
+        if (g.merged) cells.push([1, { text: vertical(g.label).join(" "), span: 2, bold: true }]);
+        else cells.push([1, { text: vert(g.label), rows: g.lines.length, bold: true }]);
+      }
+      if (!g.merged) {
+        cells.push([2, ln.kind === "course" ? { text: ln.name, fill: COURSE, bold: true, red: true } : { text: ln.kind === "subject" ? ln.key : ln.name }]);
+      }
+      if (li === 0) {
+        cells.push([3, { text: stackBase(g.base, g.noReduction, g.delta), rows: g.lines.length, color: BLUE }]);
+        cells.push([4, { text: stackRange(g.min, g.max), rows: g.lines.length, color: BLUE }]);
       }
       for (const y of [0, 1]) {
         const col = 5 + y * 6;
-        const semA = (y * 2) as SemesterIndex;
-        const semB = (y * 2 + 1) as SemesterIndex;
+        const A = (y * 2) as SemesterIndex;
+        const B = (y * 2 + 1) as SemesterIndex;
         if (ln.kind === "subject") {
-          const base = a.baseHours[ln.key] ?? rule(ln.key).baseHours;
-          const h = a.subjectHours[ln.key] ?? [0, 0, 0, 0];
-          const quarter = base / 4;
+          const q = ln.base / 4;
           cells.push(
-            [col, { text: base / 2 }],
-            [col + 1, { text: signed(h[semA] - quarter), color: RED }],
-            [col + 2, { text: h[semA] }],
-            [col + 3, { text: signed(h[semB] - quarter), color: RED }],
-            [col + 4, { text: h[semB] }],
-            [col + 5, { text: h[semA] + h[semB] }],
+            [col, { text: ln.base / 2 }],
+            [col + 1, { text: signed(ln.hours[A] - q), color: RED }],
+            [col + 2, { text: ln.hours[A] }],
+            [col + 3, { text: signed(ln.hours[B] - q), color: RED }],
+            [col + 4, { text: ln.hours[B] }],
+            [col + 5, { text: ln.hours[A] + ln.hours[B] }],
           );
-        } else {
-          const c = a.courses[ln.i];
-          const at = (s: SemesterIndex) => (c.semester === s ? c.hours : 0);
+        } else if (ln.kind === "course") {
+          const at = (s: SemesterIndex) => (ln.semester === s ? ln.hours : 0);
           cells.push(
             [col, { text: "-", fill: COURSE }],
-            [col + 1, { text: signed(at(semA)), color: RED, fill: COURSE }],
-            [col + 2, { text: at(semA) || "", fill: COURSE }],
-            [col + 3, { text: signed(at(semB)), color: RED, fill: COURSE }],
-            [col + 4, { text: at(semB) || "", fill: COURSE }],
-            [col + 5, { text: at(semA) + at(semB) || "", fill: COURSE }],
+            [col + 1, { text: signed(at(A)), color: RED, bold: true, fill: COURSE }],
+            [col + 2, { text: at(A) || "", fill: COURSE }],
+            [col + 3, { text: signed(at(B)), color: RED, bold: true, fill: COURSE }],
+            [col + 4, { text: at(B) || "", fill: COURSE }],
+            [col + 5, { text: at(A) + at(B) || "", fill: COURSE }],
           );
+        } else {
+          cells.push([col, { text: y === 0 ? "-" : "" }], ...[1, 2, 3, 4, 5].map((k): [number, C] => [col + k, {}]));
         }
       }
-      if (li === 0) cells.push([17, { text: n(g.planned), rows: lines.length, bold: true, color: BLUE }]);
+      if (li === 0) cells.push([17, { text: n(g.planned), rows: g.lines.length, bold: true, color: BLUE }]);
       push(cells);
     });
   }
 
-  // 교과 소계 (학교자율시간 포함)
-  const semTotal = (s: SemesterIndex) =>
-    info.subjects.reduce((t, x) => t + (a.subjectHours[x.key]?.[s] ?? 0), 0) + a.courses.filter((c) => c.semester === s).reduce((t, c) => t + c.hours, 0);
-  const sumCells = (base: number, at: (s: SemesterIndex) => number, bold = true): [number, C][] =>
+  const sumCells = (base: number, at: (s: SemesterIndex) => number, showDelta = true): [number, C][] =>
     [0, 1].flatMap((y): [number, C][] => {
       const col = 5 + y * 6;
       const A = at((y * 2) as SemesterIndex);
       const B = at((y * 2 + 1) as SemesterIndex);
       return [
-        [col, { text: n(base / 2), bold }],
-        [col + 1, { text: signed(A + B - base / 2), color: RED, bold }],
-        [col + 2, { text: n(A), bold }],
-        [col + 3, { text: "", bold }],
-        [col + 4, { text: n(B), bold }],
-        [col + 5, { text: n(A + B), bold }],
+        [col, { text: n(base / 2), bold: true }],
+        [col + 1, { text: showDelta ? signed(A + B - base / 2) : "", color: RED, bold: true }],
+        [col + 2, { text: n(A), bold: true }],
+        [col + 3, {}],
+        [col + 4, { text: n(B), bold: true }],
+        [col + 5, { text: n(A + B), bold: true }],
       ];
     });
   push([
     [1, { text: "소   계", span: 2, bold: true }],
-    [3, { text: n(r.subtotal.baseHours), bold: true, color: BLUE }],
-    [4, { text: "" }],
-    ...sumCells(r.subtotal.baseHours, semTotal),
-    [17, { text: n(r.subtotal.planned), bold: true, color: BLUE }],
+    [3, { text: n(m.subtotal.base), bold: true, color: BLUE }],
+    [4, {}],
+    ...sumCells(m.subtotal.base, (s) => m.subjectSem[s]),
+    [17, { text: n(m.subtotal.planned), bold: true, color: BLUE }],
   ]);
 
-  // ── 창의적 체험활동: 자율·자치 / 동아리 / 진로 + 소계
-  const cb = a.creativeBaseHours;
-  const cDelta = Math.floor(cb * 0.2);
-  CREATIVE_PARTS.forEach(([key, name], k) => {
+  // ── 창의적 체험활동
+  const c = m.creative;
+  c.parts.forEach((p, k) => {
     const cells: [number, C][] = [];
-    if (k === 0) cells.push([0, { text: "창\n의\n적\n체\n험\n활\n동", rows: 4, bold: true }]);
-    cells.push([1, { text: name, span: 2 }]);
+    if (k === 0) cells.push([0, { text: vert("창의적체험활동"), rows: 4, bold: true }]);
+    cells.push([1, { text: p.name, span: 2 }]);
     if (k === 0) {
-      cells.push([3, { text: `${n(cb)}(±${cDelta})`, rows: 3, color: BLUE }]);
-      cells.push([4, { text: `${r.creative.min}~${r.creative.max}`, rows: 3, color: BLUE }]);
+      cells.push([3, { text: stackBase(c.base, false, c.delta), rows: 3, color: BLUE }]);
+      cells.push([4, { text: stackRange(c.min, c.max), rows: 3, color: BLUE }]);
     }
     for (const y of [0, 1]) {
       const col = 5 + y * 6;
-      const semA = (y * 2) as SemesterIndex;
-      const semB = (y * 2 + 1) as SemesterIndex;
+      const A = (y * 2) as SemesterIndex;
+      const B = (y * 2 + 1) as SemesterIndex;
       if (k === 0) {
-        cells.push([col, { text: cb / 2, rows: 3 }]);
-        cells.push([col + 1, { text: signed(a.creativeHours[semA] - cb / 4), rows: 3, color: RED }]);
+        cells.push([col, { text: c.base / 2, rows: 3 }]);
+        cells.push([col + 1, { text: signed(m.creativeSem[A] - c.base / 4), rows: 3, color: RED }]);
       }
-      cells.push([col + 2, { text: parts[key][semA] }]);
-      if (k === 0) cells.push([col + 3, { text: signed(a.creativeHours[semB] - cb / 4), rows: 3, color: RED }]);
-      cells.push([col + 4, { text: parts[key][semB] }]);
-      if (k === 0) cells.push([col + 5, { text: a.creativeHours[semA] + a.creativeHours[semB], rows: 3 }]);
+      cells.push([col + 2, { text: p.hours[A] }]);
+      if (k === 0) cells.push([col + 3, { text: signed(m.creativeSem[B] - c.base / 4), rows: 3, color: RED }]);
+      cells.push([col + 4, { text: p.hours[B] }]);
+      if (k === 0) cells.push([col + 5, { text: m.creativeSem[A] + m.creativeSem[B], rows: 3 }]);
     }
-    if (k === 0) cells.push([17, { text: n(r.creative.planned), rows: 3, bold: true, color: BLUE }]);
-    // 세로 글자(창의적체험활동) 높이를 네 줄에 고르게 나눠 마지막 줄만 길어지지 않게
-    push(cells, 400);
+    if (k === 0) cells.push([17, { text: n(c.planned), rows: 3, bold: true, color: BLUE }]);
+    // 세로 글자 높이를 네 줄에 고르게 나눠 마지막 줄만 길어지지 않게
+    push(cells, 420);
   });
-  push([
-    [1, { text: "소   계", span: 2, bold: true }],
-    [3, { text: n(cb), bold: true, color: BLUE }],
-    [4, { text: "" }],
-    ...sumCells(cb, (s) => a.creativeHours[s]),
-    [17, { text: n(r.creative.planned), bold: true, color: BLUE }],
-  ], 400);
+  push(
+    [
+      [1, { text: "소   계", span: 2, bold: true }],
+      [3, { text: n(c.base), bold: true, color: BLUE }],
+      [4, {}],
+      ...sumCells(c.base, (s) => m.creativeSem[s]),
+      [17, { text: n(c.planned), bold: true, color: BLUE }],
+    ],
+    420,
+  );
 
-  // 연간 수업 시간 수
   push([
     [0, { text: "연간수업시간수", span: 3, bold: true }],
-    [3, { text: n(r.total.baseHours), bold: true, color: BLUE }],
-    [4, { text: "" }],
-    ...sumCells(r.total.baseHours, (s) => semTotal(s) + a.creativeHours[s]).map(([c, x]): [number, C] => [c, (c - 5) % 6 === 1 ? { ...x, text: "" } : x]),
-    [17, { text: n(r.total.planned), bold: true, color: BLUE }],
+    [3, { text: n(m.total.base), bold: true, color: BLUE }],
+    [4, {}],
+    ...sumCells(m.total.base, (s) => m.subjectSem[s] + m.creativeSem[s], false),
+    [17, { text: n(m.total.planned), bold: true, color: BLUE }],
   ]);
 
   const grade = meta.grade ?? g0;

@@ -94,11 +94,13 @@ describe("checkAllocation", () => {
     a.subjectHours["사회"] = [30, 30, 30, 30]; // 사회/도덕 160 < 218
     expect(checkAllocation(a).issues.some((i) => i.field === "사회/도덕" && i.message.includes("교과(군) 증감 범위"))).toBe(true);
   });
-  it("음악·미술은 교과마다 기준시수보다 줄일 수 없음 (교과군 합계가 맞아도)", () => {
+  it("예술(음악/미술)도 교과군 합계로: 음악을 줄여도 미술로 채우면 통과, 합계가 272 미만이면 오류", () => {
     const a = validPlan();
     a.subjectHours["음악"] = a.subjectHours["음악"].map((h, i) => (i === 0 ? h - 2 : h)) as typeof a.subjectHours["음악"];
     a.subjectHours["미술"] = a.subjectHours["미술"].map((h, i) => (i === 0 ? h + 2 : h)) as typeof a.subjectHours["미술"];
-    expect(checkAllocation(a).issues.some((i) => i.field === "음악" && i.message.includes("줄일 수 없습니다"))).toBe(true);
+    expect(checkAllocation(a).issues.some((i) => i.field === "음악" || i.field === "음악/미술")).toBe(false);
+    a.subjectHours["미술"] = a.subjectHours["미술"].map((h, i) => (i === 0 ? h - 2 : h)) as typeof a.subjectHours["미술"];
+    expect(checkAllocation(a).issues.some((i) => i.field === "음악/미술" && i.message.includes("줄일 수 없습니다"))).toBe(true);
   });
 
   it("학년별 한 학기 이상 운영해야 함", () => {
