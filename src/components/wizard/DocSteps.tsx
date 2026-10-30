@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useRef } from "react";
 import { CATEGORIES, CATEGORY_KEYS, newId, standardNeedsRewrite, type Area, type DesignDoc, type Standard } from "@/domain/types";
+import { CATEGORY_STYLE } from "../categoryStyle";
 import { categoryOf, codeMap, defaultAbbrev, hasSameCategory, standardCategories } from "@/domain/codes";
 import { categoryCounts, categorySplit, elementCount, recommendedStandardCount, splitProblem, standardCountRange, standardCountsFor } from "@/domain/standardCounts";
 import { contentSystemPrompt, coreIdeasPrompt, introPrompt, reviseStandardsPrompt, standardsPrompt, teachingPrompt } from "@/prompts/steps";
@@ -104,10 +105,11 @@ function ContentTable({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">) {
             <tbody>
               {CATEGORY_KEYS.map((c) => (
                 <tr key={c}>
-                  <th className={`${th} whitespace-nowrap`}>{CATEGORIES[c]}</th>
+                  <th className={`border border-gray-300 p-2 text-sm font-semibold whitespace-nowrap ${CATEGORY_STYLE[c].head}`}>{CATEGORIES[c]}</th>
                   {doc.areas.map((a, i) => (
-                    <td key={i} className="border border-gray-300 p-2 align-top">
+                    <td key={i} className={`border border-gray-300 p-2 align-top ${CATEGORY_STYLE[c].cell}`}>
                       <CellList
+                        boxClass={CATEGORY_STYLE[c].box}
                         items={a[c]}
                         placeholder={placeholder[c]}
                         onChange={(items) => setDoc((d) => void (d.areas[i][c] = items))}
@@ -125,7 +127,7 @@ function ContentTable({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">) {
 }
 
 /** 글 길이에 맞춰 높이가 저절로 늘어나는 입력 칸 */
-function AutoTextarea({ value, placeholder, onChange }: { value: string; placeholder: string; onChange: (v: string) => void }) {
+function AutoTextarea({ value, placeholder, onChange, className = "border-transparent hover:border-gray-200" }: { value: string; placeholder: string; onChange: (v: string) => void; className?: string }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;
@@ -137,7 +139,7 @@ function AutoTextarea({ value, placeholder, onChange }: { value: string; placeho
     <textarea
       ref={ref}
       rows={1}
-      className="w-full resize-none overflow-hidden rounded border border-transparent px-1.5 py-1 text-sm hover:border-gray-200 focus:border-brand-500 focus:outline-none"
+      className={`w-full resize-none overflow-hidden rounded border px-1.5 py-1 text-sm focus:border-brand-500 focus:outline-none ${className}`}
       value={value}
       placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
@@ -146,13 +148,14 @@ function AutoTextarea({ value, placeholder, onChange }: { value: string; placeho
 }
 
 /** 표 칸 안의 내용 요소 목록: 한 줄에 하나, 앞에 · 표시 */
-function CellList({ items, onChange, placeholder }: { items: string[]; onChange: (items: string[]) => void; placeholder: string }) {
+function CellList({ items, onChange, placeholder, boxClass }: { items: string[]; onChange: (items: string[]) => void; placeholder: string; boxClass?: string }) {
   return (
     <div className="space-y-1">
       {items.map((v, j) => (
         <div key={j} className="flex items-start gap-1">
           <span className="pt-1.5 text-gray-400">·</span>
           <AutoTextarea
+            className={boxClass}
             value={v}
             placeholder={placeholder}
             onChange={(t) => onChange(items.map((x, k) => (k === j ? t.replace(/\n/g, "") : x)))}
@@ -285,7 +288,14 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
                       {codes.get(s.id)}
                     </span>
                     <span className="text-xs text-gray-500">
-                      결합 범주: {cats.length ? cats.map((c) => CATEGORIES[c]).join(" + ") : "없음"}
+                      결합 범주:{" "}
+                      {cats.length
+                        ? cats.map((c) => (
+                            <span key={c} className={`ml-1 rounded px-1.5 py-0.5 ${CATEGORY_STYLE[c].badge}`}>
+                              {CATEGORIES[c]}
+                            </span>
+                          ))
+                        : "없음"}
                       <button
                         type="button"
                         className="ml-3 text-gray-400 hover:text-red-600"
@@ -328,6 +338,10 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
                           {o}
                         </>
                       );
+                    }}
+                    tone={(o) => {
+                      const c = categoryOf(doc.areas, o);
+                      return c ? { on: CATEGORY_STYLE[c].chipOn, off: CATEGORY_STYLE[c].chipOff } : null;
                     }}
                     selected={s.elements}
                     disabled={(o) => {
