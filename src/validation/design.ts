@@ -448,7 +448,6 @@ export function checkApplication(doc: Pick<DesignDoc, "basic" | "application">):
   const issues: Issue[] = [];
   if (!a.schoolName.trim()) issues.push({ level: "error", field: "학교명", message: "학교명이 비어 있습니다.", fix: "학교명을 적어 주세요." });
   if (!a.textbookType) issues.push({ level: "error", field: "교재 활용 계획", message: "교재 구분을 고르지 않았습니다.", fix: "교재 구분을 골라 주세요." });
-  if (!a.textbookName.trim()) issues.push({ level: "warning", field: "교재/자료명", message: "교재/자료명이 비어 있습니다.", fix: "사용할 교재나 자료 이름을 적어 주세요." });
   if (a.teacherPlans.length === 0) issues.push({ level: "error", field: "지도교사 확보 방안", message: "지도교사 확보 방안을 고르지 않았습니다.", fix: "1안~3안 중 하나 이상 골라 주세요." });
   if (doc.basic.type === "subject" && !a.englishName.trim()) {
     issues.push({ level: "warning", field: "영문 과목명", message: "신청서에 영문 과목명 칸이 있습니다.", fix: "영문 과목명을 적어 주세요." });

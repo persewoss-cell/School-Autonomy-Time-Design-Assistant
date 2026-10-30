@@ -6,6 +6,7 @@ import { TEACHER_PLANS, TEXTBOOK_TYPES, type DesignDoc } from "@/domain/types";
 import { applicationTexts } from "@/domain/summary";
 import { codeMap } from "@/domain/codes";
 import { buildDesignDocx, docxFileName } from "@/export/docx";
+import { buildPrintHtml } from "@/export/printHtml";
 import { checkApplication, checklistResults, validateDesign } from "@/validation/design";
 import type { Issue, StepKey } from "@/validation/types";
 import type { StepProps } from "./DocSteps";
@@ -24,7 +25,6 @@ export function ApplicationStep({ doc, setDoc, onBack, onNext }: StepProps) {
         title={subject ? "고시 외 과목 신설 승인 신청서 항목 (서식3)" : "학교자율시간 활동 계획서 항목 (서식1)"}
         tips={[
           "앞 단계에서 쓴 내용으로 개설 필요성·목표·내용이 자동으로 채워져요. 고치고 싶으면 칸에 직접 쓰세요.",
-          subject ? "과목 신설 승인 신청: 2026. 9. 11.(금)까지 학교 → 교육지원청" : "활동 개설 결과 제출: 2027. 2. 12.(금)까지 학교 → 교육지원청",
         ]}
       />
       <Card className="space-y-4">
@@ -83,7 +83,7 @@ export function ApplicationStep({ doc, setDoc, onBack, onNext }: StepProps) {
             </label>
           ))}
         </div>
-        <Field label="교재/자료명">
+        <Field label="교재/자료명 (선택)" hint="정해 둔 교재나 자료가 있으면 적어요. 비워도 돼요.">
           <input className={inputClass} value={a.textbookName} onChange={(e) => set("textbookName", e.target.value)} />
         </Field>
         <h2 className="font-bold">지도교사 확보 방안</h2>
@@ -125,7 +125,9 @@ export function FinalStep({
   const checklist = checklistResults(doc);
   const [busy, setBusy] = useState(false);
 
+  const FORM_NOTICE = "내려받는 문서는 교육청에서 제공하는 양식과 다를 수 있습니다.\n한글(HWP)에서 열어 양식을 다듬어 쓰세요.";
   const download = async () => {
+    if (!confirm(`${FORM_NOTICE}\n\n확인을 누르면 내려받습니다.`)) return;
     if (errors.length > 0 && !confirm(`아직 오류가 ${errors.length}개 있습니다. 그래도 문서를 내려받을까요?`)) return;
     setBusy(true);
     try {
@@ -142,6 +144,20 @@ export function FinalStep({
     } finally {
       setBusy(false);
     }
+  };
+
+  /** 예시안 모양의 인쇄 화면을 새 창으로 열고 인쇄 창을 띄움 → 'PDF로 저장' */
+  const printPdf = () => {
+    if (errors.length > 0 && !confirm(`아직 오류가 ${errors.length}개 있습니다. 그래도 PDF로 만들까요?`)) return;
+    const w = window.open("", "_blank");
+    if (!w) {
+      alert("새 창이 막혀 있어요. 브라우저 주소창 오른쪽의 '팝업 차단'을 풀고 다시 눌러 주세요.");
+      return;
+    }
+    w.document.open();
+    w.document.write(buildPrintHtml(doc));
+    w.document.close();
+    onDownloaded?.();
   };
 
   return (
@@ -196,11 +212,16 @@ export function FinalStep({
           {doc.basic.type === "subject"
             ? "[서식3] 신청서 + [서식4] 과목 교육과정 + [서식7] 체크리스트"
             : "[서식1] 활동 계획서 + [서식2] 활동 교육과정 + [서식6] 체크리스트"}
-          가 한 파일(.docx)에 들어 있어요. 한글(HWP)에서 열어 양식을 다듬어 쓰세요.
+        </p>
+        <p className="text-xs text-gray-500">
+          PDF로 받기: 예시안과 같은 모양의 인쇄 화면이 새 창으로 열려요. 인쇄 창의 대상(프린터)에서 &lsquo;PDF로 저장&rsquo;을 고르세요. 한글(HWP)이 깔린 컴퓨터에서 가장 예시안과 비슷하게 나와요.
         </p>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={download} disabled={busy} className="rounded-lg bg-brand-600 px-5 py-2 font-semibold text-white hover:bg-brand-700 disabled:bg-gray-300">
             {busy ? "만드는 중…" : "📄 문서 내려받기 (.docx)"}
+          </button>
+          <button type="button" onClick={printPdf} disabled={busy} className="rounded-lg bg-brand-600 px-5 py-2 font-semibold text-white hover:bg-brand-700 disabled:bg-gray-300">
+            🖨 PDF로 받기
           </button>
           {onSave && (
             <button
