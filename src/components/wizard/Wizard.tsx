@@ -56,6 +56,35 @@ function readDraft(key: string): Draft | null {
   }
 }
 
+/** 단계에 작성한 내용이 있는지 (없으면 단계 버튼을 회색으로) */
+function stepStarted(doc: DesignDoc, key: StepKey): boolean {
+  switch (key) {
+    case "type":
+      return true;
+    case "basic":
+      return !!doc.basic.name.trim();
+    case "topic":
+      return !!doc.input.topic.trim();
+    case "content":
+      return doc.areas.some((a) => a.name.trim() || a.knowledge.length || a.process.length || a.values.length);
+    case "coreIdeas":
+      return doc.coreIdeas.some((s) => s.trim());
+    case "standards":
+      return doc.standards.length > 0;
+    case "intro":
+      return !!(doc.intro.rationale.trim() || doc.intro.overallGoal.trim());
+    case "plan":
+      return !!doc.plan.selected || doc.plan.candidates.length > 0;
+    case "assessment":
+      return doc.assessments.length > 0;
+    case "teaching":
+      return Object.values(doc.teaching).some((l) => l.length > 0);
+    default:
+      // 계획서·신청서, 점검·내려받기: 들어가 본 적이 있으면 진행한 것으로
+      return true;
+  }
+}
+
 /** 저장된 진행 위치가 없을 때: 아직 오류가 남은 첫 단계부터 */
 function resumeStep(doc: DesignDoc): StepKey {
   if (doc.progress?.stepKey) return doc.progress.stepKey as StepKey;
@@ -171,6 +200,7 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
 
   const steps = stepsFor(doc);
   const index = Math.max(0, steps.findIndex((s) => s.key === stepKey));
+  const errorSteps = new Set(validateDesign(doc).filter((i) => i.level === "error").map((i) => i.step));
   /** 단계 이동: 진행 위치를 문서에 적고, 로그인했으면 서버에 자동 저장 */
   const goIndex = (i: number) => {
     const list = stepsFor(docRef.current);
@@ -238,25 +268,37 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
             )}
           </div>
         </div>
-        <ol className="flex flex-wrap gap-1.5 text-xs">
-          {steps.map((s, i) => (
-            <li key={s.key}>
-              <button
-                type="button"
-                disabled={i > maxIndex}
-                onClick={() => goIndex(i)}
-                className={`rounded-full px-2.5 py-1 ${
-                  i === index
-                    ? "bg-brand-600 font-semibold text-white"
-                    : i <= maxIndex
-                      ? "bg-brand-100 text-brand-700 hover:bg-brand-50"
-                      : "bg-gray-100 text-gray-400"
-                }`}
-              >
-                {i + 1}. {s.label}
-              </button>
-            </li>
-          ))}
+        <ol
+          className="grid grid-cols-4 gap-1 sm:grid-cols-6 md:[grid-template-columns:repeat(var(--steps),minmax(0,1fr))]"
+          style={{ "--steps": steps.length } as React.CSSProperties}
+        >
+          {steps.map((s, i) => {
+            const state = i > maxIndex || !stepStarted(doc, s.key) ? "todo" : errorSteps.has(s.key) ? "error" : "done";
+            const current = i === index;
+            const color = current
+              ? state === "error"
+                ? "bg-red-600 text-white"
+                : "bg-brand-600 text-white"
+              : state === "error"
+                ? "bg-red-50 text-red-700 ring-1 ring-red-300 hover:bg-red-100"
+                : state === "done"
+                  ? "bg-brand-100 text-brand-700 hover:bg-brand-50"
+                  : "bg-gray-100 text-gray-400 hover:bg-gray-200";
+            return (
+              <li key={s.key} className="min-w-0">
+                <button
+                  type="button"
+                  disabled={i > maxIndex}
+                  onClick={() => goIndex(i)}
+                  title={state === "error" ? `${s.label}: 고칠 오류가 있어요` : state === "todo" ? `${s.label}: 아직 작성하지 않았어요` : s.label}
+                  className={`flex h-full w-full flex-col items-center justify-center rounded-md px-0.5 py-1.5 text-center leading-tight disabled:cursor-not-allowed ${color} ${current ? "font-bold shadow-sm" : "font-medium"}`}
+                >
+                  <span className="text-[10px] opacity-75">{i + 1}{state === "error" ? " ⚠" : ""}</span>
+                  <span className="w-full truncate text-[12px] tracking-tighter md:text-[11px] lg:text-[12px]">{s.label}</span>
+                </button>
+              </li>
+            );
+          })}
         </ol>
         {restoredNote && <p className="rounded-lg bg-blue-50 p-2 text-xs text-blue-800">{restoredNote}</p>}
       </div>
