@@ -14,6 +14,10 @@ import {
 } from "@/domain/types";
 import { checkBasicHours, checkSemesterBudget, semesterHours } from "@/validation/hours";
 import { bandInfo, bandOfGrade } from "@/validation/allocation";
+import { checkActivityName, nameKey } from "@/validation/names";
+
+/** 에듀넷 티-클리어 '교육감 승인 과목' 목록 (교사 로그인해야 보임) */
+const APPROVED_SUBJECTS_URL = "https://www.edunet.net/sprApprSbjct/list/11";
 import { Card, Field, IssueList, NavButtons, inputClass } from "../ui";
 
 interface SavedDesign {
@@ -62,11 +66,19 @@ export function BasicStep({
   const set = <K extends keyof BasicInfo>(k: K, v: BasicInfo[K]) => setB((s) => ({ ...s, [k]: v }));
 
   // 같은 학기에 다른 설계가 있으면 '혼자 운영한다면 …' 안내 대신 학기 합계로 알려 준다
+  const sameYearActivities = saved.filter((d) => d.id !== designId && d.type === "activity" && (d.schoolYear || "2027") === year);
+  const nameIssues = b.type === "activity" ? checkActivityName(b.name, sameYearActivities) : [];
   const issues = [...checkSemesterBudget(b, others), ...checkBasicHours(b).filter((i) => !(others.length && i.level === "warning"))];
   const submit = () => {
     const r = basicInfoSchema.safeParse(b);
     if (!r.success) return setErrors(r.error.issues.map((i) => i.message));
     if (!/^\d{4}$/.test(year)) return setErrors(["운영 학년도를 2027처럼 네 자리 숫자로 적어 주세요."]);
+    if (nameIssues.length) {
+      const msg = `${nameIssues[0].message}\n→ ${nameIssues[0].fix}`;
+      alert(msg);
+      document.getElementById("design-name")?.focus();
+      return setErrors([msg]);
+    }
     if (issues.some((i) => i.level === "error")) return setErrors(["시수 점검의 오류를 먼저 고쳐 주세요."]);
     setErrors([]);
     onNext(r.data, year);
@@ -76,16 +88,41 @@ export function BasicStep({
     <Card className="space-y-5">
       <h1 className="text-xl font-bold">기본 정보 ({kind})</h1>
 
-      <Field
-        label={`${kind}명`}
-        hint={
-          b.type === "activity"
-            ? "같은 학교·같은 학년도에 같은 활동명은 쓸 수 없어요. (예: 자전거 하이킹3, 자전거 하이킹4처럼 구분)"
-            : "전국 초·중·고 과목명과 겹치면 안 돼요. 에듀넷 티클리어 '교육감 승인 과목'에서 미리 확인하세요."
-        }
-      >
-        <input className={inputClass} value={b.name} onChange={(e) => set("name", e.target.value)} placeholder="예: 지구마을 첫걸음" />
-      </Field>
+      <div className="space-y-1">
+        <label htmlFor="design-name" className="text-sm font-semibold">
+          {kind}명
+        </label>
+        <div className="flex gap-2">
+          <input
+            id="design-name"
+            className={`${inputClass} ${nameIssues.length ? "border-red-400" : ""}`}
+            value={b.name}
+            onChange={(e) => set("name", e.target.value)}
+            placeholder="예: 지구마을 첫걸음"
+          />
+          {b.type === "subject" && (
+            <a
+              href={APPROVED_SUBJECTS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex shrink-0 items-center rounded-lg border border-brand-500 px-3 text-sm font-semibold text-brand-700 hover:bg-brand-50"
+            >
+              교육감 승인 과목 확인 ↗
+            </a>
+          )}
+        </div>
+        {nameIssues.length > 0 ? (
+          <p className="text-xs font-semibold text-red-600">
+            ⚠ 같은 학년도에 이미 「{sameYearActivities.find((d) => nameKey(d.name) === nameKey(b.name))?.name}」 활동이 있어요. 학년이 달라도 같은 이름은 쓸 수 없어요 (띄어쓰기 무시). 예: 자전거 하이킹3, 자전거 하이킹4
+          </p>
+        ) : (
+          <p className="text-xs text-gray-500">
+            {b.type === "activity"
+              ? "같은 학교·같은 학년도에는 학년이 달라도 같은 활동명을 쓸 수 없어요 (띄어쓰기는 무시하고 비교). 예: 자전거 하이킹3, 자전거 하이킹4"
+              : "전국 초·중·고 과목명과 겹치면 안 돼요. 버튼 → 에듀넷 티-클리어(교사 로그인 필요)에서 과목명을 검색해 겹치는지 확인하세요."}
+          </p>
+        )}
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="운영 학년도" hint="다음 해에는 설계 현황에서 복제해 고쳐 써요">

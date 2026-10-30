@@ -1,3 +1,4 @@
+import { nameKey } from "@/validation/names";
 import type { DesignDoc } from "@/domain/types";
 
 /**
@@ -153,7 +154,7 @@ export function memoryRepo(): Repo {
       listAll: async () => designs.map(summary).sort(byUpdated),
       findSameActivity: async (schoolName, schoolYear, name, excludeId) => {
         const d = designs.find(
-          (x) => x.type === "activity" && x.schoolName === schoolName && x.schoolYear === schoolYear && x.name === name && x.id !== excludeId,
+          (x) => x.type === "activity" && x.schoolName === schoolName && x.schoolYear === schoolYear && nameKey(x.name) === nameKey(name) && x.id !== excludeId,
         );
         return d ? summary(d) : null;
       },

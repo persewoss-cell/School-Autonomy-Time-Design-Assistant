@@ -1,5 +1,6 @@
 import "server-only";
 import { ObjectId, type Db, type WithId, type Document } from "mongodb";
+import { nameKey } from "@/validation/names";
 import type { DesignRecord, DesignSummary, HourCheckRecord, LogEntry, Repo, User } from "./repo";
 
 /**
@@ -94,10 +95,12 @@ export function mongoRepo(db: Db): Repo {
         (await designs.find({ ownerId }, { projection: summaryProjection }).sort({ updatedAt: -1 }).toArray()).map(toSummary),
       listAll: async () => (await designs.find({}, { projection: summaryProjection }).sort({ updatedAt: -1 }).limit(1000).toArray()).map(toSummary),
       findSameActivity: async (schoolName, schoolYear, name, excludeId) => {
-        const filter: Document = { type: "activity", schoolName, schoolYear, name };
+        // 띄어쓰기는 무시하고 비교 (같은 학교·학년도 활동만 불러와 코드로 비교)
+        const filter: Document = { type: "activity", schoolName, schoolYear };
         const ex = excludeId ? oid(excludeId) : null;
         if (ex) filter._id = { $ne: ex };
-        const d = await designs.findOne(filter, { projection: summaryProjection });
+        const list = await designs.find(filter, { projection: summaryProjection }).toArray();
+        const d = list.find((x) => nameKey(String(x.name ?? "")) === nameKey(name));
         return d ? toSummary(d) : null;
       },
       saveVersion: async (designId, doc) => {
