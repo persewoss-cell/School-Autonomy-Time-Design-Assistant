@@ -6,7 +6,6 @@ import { TEACHER_PLANS, TEXTBOOK_TYPES, type DesignDoc } from "@/domain/types";
 import { applicationTexts } from "@/domain/summary";
 import { codeMap } from "@/domain/codes";
 import { buildDesignDocx, docxFileName } from "@/export/docx";
-import { buildPrintHtml } from "@/export/printHtml";
 import { checkApplication, checklistResults, validateDesign } from "@/validation/design";
 import type { Issue, StepKey } from "@/validation/types";
 import type { StepProps } from "./DocSteps";
@@ -150,21 +149,6 @@ export function FinalStep({
     }
   };
 
-  /** 예시안 모양의 인쇄 화면을 새 창으로 열고 인쇄 창을 띄움 → 'PDF로 저장' */
-  const printPdf = () => {
-    if (blocked) return;
-    if (errors.length > 0 && !confirm(`아직 오류가 ${errors.length}개 있습니다. 그래도 PDF로 만들까요?`)) return;
-    const w = window.open("", "_blank");
-    if (!w) {
-      alert("새 창이 막혀 있어요. 브라우저 주소창 오른쪽의 '팝업 차단'을 풀고 다시 눌러 주세요.");
-      return;
-    }
-    w.document.open();
-    w.document.write(buildPrintHtml(doc));
-    w.document.close();
-    onDownloaded?.();
-  };
-
   return (
     <div className="space-y-4">
       <StepHeader title="최종 점검 · 내려받기">
@@ -218,15 +202,9 @@ export function FinalStep({
             ? "[서식3] 신청서 + [서식4] 과목 교육과정 + [서식7] 체크리스트"
             : "[서식1] 활동 계획서 + [서식2] 활동 교육과정 + [서식6] 체크리스트"}
         </p>
-        <p className="text-xs text-gray-500">
-          PDF로 받기: 예시안과 같은 모양의 인쇄 화면이 새 창으로 열려요. 인쇄 창의 대상(프린터)에서 &lsquo;PDF로 저장&rsquo;을 고르세요. 한글(HWP)이 깔린 컴퓨터에서 가장 예시안과 비슷하게 나와요.
-        </p>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={download} disabled={busy || blocked} className="rounded-lg bg-brand-600 px-5 py-2 font-semibold text-white hover:bg-brand-700 disabled:bg-gray-300">
             {busy ? "만드는 중…" : "📄 문서 내려받기 (.docx)"}
-          </button>
-          <button type="button" onClick={printPdf} disabled={busy || blocked} className="rounded-lg bg-brand-600 px-5 py-2 font-semibold text-white hover:bg-brand-700 disabled:bg-gray-300">
-            🖨 PDF로 받기
           </button>
           {onSave && (
             <button

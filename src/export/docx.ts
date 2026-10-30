@@ -26,7 +26,7 @@ import { checklistResults } from "@/validation/design";
  * 설계 문서 → .docx (한글에서 열림)
  * - 활동: [서식1] 활동 계획서, [서식2] 활동 교육과정, [서식6] 체크리스트
  * - 과목: [서식3] 고시 외 과목 신설 승인 신청서, [서식4] 과목 교육과정, [서식7] 체크리스트
- * 교육과정 문서는 광양중동초 예시안의 모양(글꼴·크기·기호·표 선·줄 간격)을 따른다. 인쇄용 HTML(printHtml.ts)과 같은 규칙.
+ * 교육과정 문서는 광양중동초 예시안의 모양(글꼴·크기·기호·표 선)을 따르되, 쪽 수가 늘지 않게 줄 간격·칸 여백은 좁게 한다.
  */
 
 /** 예시안 글꼴: 본문 휴먼명조, 제목 HY울릉도M, 성취기준 함초롬바탕, 쪽 번호 함초롬돋움 */
@@ -82,7 +82,7 @@ function para(content: string | TextRun[], o: ParaOpts = {}): Paragraph {
   return new Paragraph({
     alignment: o.align ?? AlignmentType.BOTH,
     indent,
-    spacing: { before: pt(o.before ?? 0), after: pt(o.after ?? 0), line: Math.round((o.line ?? 1.36) * 240) },
+    spacing: { before: pt(o.before ?? 0), after: pt(o.after ?? 0), line: Math.round((o.line ?? 1.25) * 240) },
     pageBreakBefore: o.pageBreak,
     keepNext: o.keepNext,
     children: typeof content === "string" ? [run(content, o)] : content,
@@ -115,7 +115,7 @@ function cell(children: Paragraph[], o: CellOpts = {}): TableCell {
     width: o.w ? { size: o.w, type: WidthType.DXA } : undefined,
     shading: o.fill ? { type: ShadingType.CLEAR, fill: o.fill, color: "auto" } : undefined,
     verticalAlign: o.align ?? VerticalAlignTable.CENTER,
-    margins: { top: o.margins ?? 60, bottom: o.margins ?? 60, left: 100, right: 100 },
+    margins: { top: o.margins ?? 30, bottom: o.margins ?? 30, left: 70, right: 70 },
     borders: o.borders,
   });
 }
@@ -145,10 +145,11 @@ function applicationForm(doc: DesignDoc): (Paragraph | Table)[] {
   const subject = doc.basic.type === "subject";
   const a = doc.application;
   const t = applicationTexts(doc);
-  const w = [990, 1170, 3446, 1080, 2340];
-  const f = { size: 9, line: 1.3 };
-  const head = (s: string, o: CellOpts = {}) => cell(lines(s, { ...f, bold: true, align: AlignmentType.CENTER }), { fill: LIGHT, margins: 30, ...o });
-  const body = (s: string, o: CellOpts = {}) => cell(lines(s, { ...f, align: AlignmentType.LEFT }), { margins: 30, ...o });
+  // 왼쪽 제목 칸을 좁게 해서 한 쪽에 들어가게
+  const w = [620, 820, 4226, 900, 2460];
+  const f = { size: 9, line: 1.1 };
+  const head = (s: string, o: CellOpts = {}) => cell(lines(s, { ...f, bold: true, align: AlignmentType.CENTER }), { fill: LIGHT, margins: 20, ...o });
+  const body = (s: string, o: CellOpts = {}) => cell(lines(s, { ...f, align: AlignmentType.LEFT }), { margins: 20, ...o });
   const groups = SUBJECT_GROUPS.map((g) => box(g === doc.basic.subjectGroup, g)).join("  ");
   const textbooks = TEXTBOOK_TYPES[doc.basic.type].map((x) => box(a.textbookType === x, x)).join("   ");
   const teachers = TEACHER_PLANS.map((x) => box(a.teacherPlans.includes(x), x)).join("\n");
@@ -173,31 +174,31 @@ function applicationForm(doc: DesignDoc): (Paragraph | Table)[] {
   rows.push([head("기타 특이사항", { span: 2 }), body(a.etc, { span: 3 })]);
 
   return [
-    para(subject ? "[서식3]" : "[서식1]", { size: 9, after: 4 }),
+    para(subject ? "[서식3]" : "[서식1]", { size: 9, line: 1, after: 2 }),
     formTitle(subject ? "고시 외 과목 신설 승인 신청서【초등학교용】" : "학교자율시간 활동 계획서"),
     table(rows, w),
     para(
       subject ? "위와 같이 과목을 개설･운영하고자 하오니 승인하여 주시기 바랍니다." : "학교자율시간 설계･운영 지침에 의거, 위와 같이 활동을 계획하여 운영하고자 합니다.",
-      { size: 10.5, align: AlignmentType.CENTER, before: 10, after: 8, keepNext: true },
+      { size: 10, align: AlignmentType.CENTER, before: 6, after: 4, keepNext: true },
     ),
-    para(`붙임 1. (${doc.basic.name}) ${subject ? "교육과정" : "활동 세부 지도계획안"} 1부.`, { size: 10, align: AlignmentType.LEFT, keepNext: true }),
-    para(`       2. (${doc.basic.grade})학년 교육과정 편성표 1부.`, { size: 10, align: AlignmentType.LEFT, keepNext: true }),
-    para("년      월      일", { size: 10.5, align: AlignmentType.CENTER, before: 8, keepNext: true }),
-    para(`${schoolOf(doc)}장  ${subject ? "(직인)" : "(직인 생략)"}`, { size: 10.5, bold: true, align: AlignmentType.RIGHT, before: 8, keepNext: true }),
-    para(subject ? "전남광주통합특별시교육감 귀하" : `${schoolOf(doc)}운영위원장 귀하`, { size: 12, bold: true, align: AlignmentType.LEFT, before: 10 }),
+    para(`붙임 1. (${doc.basic.name}) ${subject ? "교육과정" : "활동 세부 지도계획안"} 1부.`, { size: 9.5, line: 1.1, align: AlignmentType.LEFT, keepNext: true }),
+    para(`       2. (${doc.basic.grade})학년 교육과정 편성표 1부.`, { size: 9.5, line: 1.1, align: AlignmentType.LEFT, keepNext: true }),
+    para("년      월      일", { size: 10, line: 1.1, align: AlignmentType.CENTER, before: 4, keepNext: true }),
+    para(`${schoolOf(doc)}장  ${subject ? "(직인)" : "(직인 생략)"}`, { size: 10, line: 1.1, bold: true, align: AlignmentType.RIGHT, before: 4, keepNext: true }),
+    para(subject ? "전남광주통합특별시교육감 귀하" : `${schoolOf(doc)}운영위원장 귀하`, { size: 11, line: 1.1, bold: true, align: AlignmentType.LEFT, before: 6 }),
   ];
 }
 
 /** 서식 제목: 테두리 상자 */
 const formTitle = (text: string) =>
-  table([[cell([para(text, { size: 16, bold: true, align: AlignmentType.CENTER })], { margins: 120 })]], [PAGE_WIDTH], { top: THIN, bottom: THIN, outer: true });
+  table([[cell([para(text, { size: 15, bold: true, align: AlignmentType.CENTER, line: 1.1 })], { margins: 60 })]], [PAGE_WIDTH], { top: THIN, bottom: THIN, outer: true });
 
 // ───────────── 교육과정 문서(서식2 / 서식4) — 예시안 모양 ─────────────
 /** 제목 띠: 회색 칸에 「과목명」(HY울릉도M 21pt), 과목은 오른쪽에 개설 형태 꼬리표 */
 function banner(doc: DesignDoc, pageBreak: boolean): (Paragraph | Table)[] {
   const subject = doc.basic.type === "subject";
   const noBorder = { top: NONE, bottom: NONE, left: NONE, right: NONE };
-  const titleCell = cell([para(`「${doc.basic.name}」`, { font: TITLE, size: 21, align: AlignmentType.CENTER, line: 1.2 })], { fill: "DCDCDC", borders: noBorder, margins: 80 });
+  const titleCell = cell([para(`「${doc.basic.name}」`, { font: TITLE, size: 21, align: AlignmentType.CENTER, line: 1.2 })], { fill: "DCDCDC", borders: noBorder, margins: 50 });
   const badge = subject
     ? [cell([para([run(` ${doc.basic.openingType.replace(/\s/g, "")} `, { font: TITLE, size: 12, color: "FFFFFF", shade: "595959" })], { align: AlignmentType.RIGHT, line: 1.2 })], { fill: "DCDCDC", borders: noBorder, align: VerticalAlignTable.BOTTOM })]
     : [];
@@ -208,30 +209,32 @@ function banner(doc: DesignDoc, pageBreak: boolean): (Paragraph | Table)[] {
     new Paragraph({
       tabStops: [{ type: TabStopType.RIGHT, position: PAGE_WIDTH - pt(6) }],
       indent: { left: pt(6) },
-      spacing: { before: pt(9), after: pt(30) },
+      spacing: { before: pt(6), after: pt(14) },
       children: [run(`학교자율시간 [${kindOf(doc)}]`, { size: 11, bold: true }), run(`\t${schoolOf(doc)} ${doc.basic.grade}학년 ${doc.basic.semester}학기`, { size: 11, bold: true })],
     }),
   ];
 }
 
-/** 큰 제목: 회색 상자 13.6pt */
+/** 큰 제목: 회색 바탕 13pt. 표가 아닌 문단이라 '다음 문단과 함께'가 잘 지켜져 쪽 끝에 제목만 남지 않는다 */
 const h1 = (text: string, pageBreak = false): (Paragraph | Table)[] => [
-  ...(pageBreak ? [para("", { pageBreak: true, line: 1 })] : []),
-  table([[cell([para(text, { size: 13.5, align: AlignmentType.LEFT, line: 1.2, left: 4, keepNext: true })], { fill: "E1E1E1", margins: 90, borders: { top: NONE, bottom: NONE, left: NONE, right: NONE } })]], [Math.round(PAGE_WIDTH * 0.92)], {
-    top: NONE,
-    bottom: NONE,
+  new Paragraph({
+    pageBreakBefore: pageBreak,
+    keepNext: true,
+    shading: { type: ShadingType.CLEAR, fill: "E1E1E1", color: "auto" },
+    indent: { left: pt(2), right: Math.round(PAGE_WIDTH * 0.08) },
+    spacing: { before: pt(4), after: pt(8), line: 300 },
+    children: [run(` ${text}`, { size: 13 })],
   }),
-  para("", { line: 1, after: 10, keepNext: true }),
 ];
-const h2 = (text: string, pageBreak = false) => para(text, { size: 12, align: AlignmentType.LEFT, before: pageBreak ? 0 : 20, after: 6, pageBreak, keepNext: true });
-const spacer = (n = 30) => para("", { line: 1, after: n });
+const h2 = (text: string, pageBreak = false) => para(text, { size: 12, align: AlignmentType.LEFT, before: pageBreak ? 0 : 10, after: 4, pageBreak, keepNext: true });
+const spacer = (n = 14) => para("", { size: 4, line: 1, after: n });
 
 function ideasTable(doc: DesignDoc): Table {
   const ideas = doc.coreIdeas.filter((s) => s.trim());
   return table(
     [
       [cell([para("핵심아이디어", { size: 10.5, bold: true, align: AlignmentType.CENTER, font: DOTUM, keepNext: true })], { fill: GRAY, borders: { bottom: line(4, BorderStyle.DASHED) } })],
-      [cell(ideas.map((s) => para(`·${s}`, { size: 9.5, left: 8, first: -8, line: 1.3, keepNext: true })), { borders: { top: line(4, BorderStyle.DASHED) } })],
+      [cell(ideas.map((s) => para(`·${s}`, { size: 9.5, left: 8, first: -8, line: 1.15, keepNext: true })), { borders: { top: line(4, BorderStyle.DASHED) } })],
     ],
     [PAGE_WIDTH],
     { top: line(9, BorderStyle.SINGLE, "404040"), bottom: NONE },
@@ -245,12 +248,12 @@ function contentTable(doc: DesignDoc): Table {
   const areaW = Math.floor((PAGE_WIDTH - labelW) / n);
   const widths = [labelW, ...doc.areas.map(() => areaW)];
   // 내용 체계 표가 쪽 중간에서 나뉘지 않도록 모든 문단에 '다음 문단과 함께'
-  const th = (s: string, o: CellOpts = {}) => cell(lines(s, { size: 11, bold: true, align: AlignmentType.CENTER, line: 1.3, keepNext: true }), { fill: GRAY, ...o });
+  const th = (s: string, o: CellOpts = {}) => cell(lines(s, { size: 11, bold: true, align: AlignmentType.CENTER, line: 1.1, keepNext: true }), { fill: GRAY, ...o });
   const items = (xs: string[]) =>
     xs
       .map((s) => s.trim())
       .filter(Boolean)
-      .map((s) => para(`·${s}`, { size: 10.5, align: AlignmentType.LEFT, line: 1.6, keepNext: true }));
+      .map((s) => para(`·${s}`, { size: 10.5, align: AlignmentType.LEFT, line: 1.25, keepNext: true }));
   const catLabel = (s: string) => (subject ? s.split("·").join("\n‧\n") : s);
   const corner = subject
     ? cell([para("영역", { size: 11, bold: true, align: AlignmentType.RIGHT, keepNext: true }), para("", { keepNext: true }), para("범주", { size: 11, bold: true, align: AlignmentType.LEFT, keepNext: true })], {
@@ -268,7 +271,7 @@ function contentTable(doc: DesignDoc): Table {
     [
       [corner, th("내용 요소", { span: n })],
       doc.areas.map((a, i) => th(`(${i + 1}) ${a.name}`)),
-      ...cats.map(([lab, key]) => [th(catLabel(lab)), ...doc.areas.map((a) => cell(items(a[key]), { margins: 120 }))]),
+      ...cats.map(([lab, key]) => [th(catLabel(lab)), ...doc.areas.map((a) => cell(items(a[key]), { margins: 50 }))]),
     ],
     widths,
     { top: line(4), bottom: THIN },
@@ -280,9 +283,9 @@ function standardsBlock(doc: DesignDoc): (Paragraph | Table)[] {
   if (doc.basic.type === "subject") {
     const dotted = line(4, BorderStyle.DOTTED);
     return doc.areas.flatMap((a, i) => [
-      para(`(${i + 1}) ${a.name}`, { size: 12, align: AlignmentType.LEFT, before: 14, after: 8, keepNext: true }),
+      para(`(${i + 1}) ${a.name}`, { size: 12, align: AlignmentType.LEFT, before: 6, after: 4, keepNext: true }),
       table(
-        [[cell(doc.standards.filter((s) => s.areaIndex === i).map((s) => para(`${codes.get(s.id) ?? ""} ${s.text}`, { font: HCR, size: 10, left: 74, first: -74, line: 1.6, keepNext: true })), { margins: 80 })]],
+        [[cell(doc.standards.filter((s) => s.areaIndex === i).map((s) => para(`${codes.get(s.id) ?? ""} ${s.text}`, { font: HCR, size: 10, left: 74, first: -74, line: 1.3, keepNext: true })), { margins: 40 })]],
         [PAGE_WIDTH],
         { top: dotted, bottom: dotted, outer: false },
       ),
@@ -292,7 +295,7 @@ function standardsBlock(doc: DesignDoc): (Paragraph | Table)[] {
     table(
       doc.standards.map((s) => [
         cell([para(codes.get(s.id) ?? "", { font: HCR, size: 9.5, align: AlignmentType.CENTER })], { fill: LIGHT }),
-        cell([para(s.text, { font: HCR, size: 10, line: 1.5 })]),
+        cell([para(s.text, { font: HCR, size: 10, line: 1.25 })]),
       ]),
       [1180, PAGE_WIDTH - 1180],
     ),
@@ -304,7 +307,7 @@ function standardParas(doc: DesignDoc, ids: string[]): Paragraph[] {
   return ids.flatMap((id, k) => {
     const s = doc.standards.find((x) => x.id === id);
     if (!s) return [];
-    return [...(k > 0 ? [para("", { size: 9 })] : []), para(codes.get(id) ?? "", { size: 9, align: AlignmentType.CENTER, line: 1.7 }), para(s.text, { size: 9, align: AlignmentType.CENTER, line: 1.7 })];
+    return [...(k > 0 ? [para("", { size: 6, line: 1 })] : []), para(codes.get(id) ?? "", { size: 9, align: AlignmentType.CENTER, line: 1.15 }), para(s.text, { size: 9, align: AlignmentType.CENTER, line: 1.15 })];
   });
 }
 
@@ -312,19 +315,19 @@ function unitPlanTable(doc: DesignDoc): Table | Paragraph {
   const plan = doc.plan.selected;
   if (!plan) return para("(단원 지도계획을 아직 정하지 않았습니다.)");
   const widths = [785, 1345, 785, 1020, 4251, 840];
-  const th = (s: string) => cell([para(s, { size: 11, bold: true, align: AlignmentType.CENTER })], { fill: LIGHT });
+  const th = (s: string) => cell([para(s, { size: 10.5, bold: true, align: AlignmentType.CENTER, line: 1.1 })], { fill: LIGHT, margins: 50 });
   const rows: TableCell[][] = [["단원명", "성취기준", "차시", "학습주제", "학습 내용", "비고"].map(th)];
   const labels = lessonLabels(plan.units, doc.basic.hours);
   const dotted = line(4, BorderStyle.DOTTED);
   plan.units.forEach((u, ui) => {
     u.lessons.forEach((l, li) => {
       const content = [
-        para(`· ${l.goal}`, { size: 10, bold: true, left: 9, first: -9, align: AlignmentType.LEFT, line: 1.45 }),
-        ...l.activities.filter((x) => x.trim()).map((x) => para(`- ${x}`, { size: 9, left: 9, first: -7, align: AlignmentType.LEFT, line: 1.45 })),
+        para(`· ${l.goal}`, { size: 10, bold: true, left: 9, first: -9, align: AlignmentType.LEFT, line: 1.15 }),
+        ...l.activities.filter((x) => x.trim()).map((x) => para(`- ${x}`, { size: 9, left: 9, first: -7, align: AlignmentType.LEFT, line: 1.15 })),
         ...(l.assessment.trim()
           ? [
               new Paragraph({
-                spacing: { before: pt(3), line: Math.round(1.5 * 240) },
+                spacing: { before: pt(2), line: Math.round(1.15 * 240) },
                 border: { top: dotted, bottom: dotted, left: dotted, right: dotted },
                 children: [run("[과정중심평가]", { size: 9.5, shade: "FFE7D8" }), run(` ${l.assessment}`, { size: 10 })],
               }),
@@ -333,14 +336,14 @@ function unitPlanTable(doc: DesignDoc): Table | Paragraph {
       ];
       const row: TableCell[] = [];
       if (li === 0) {
-        row.push(cell(lines(`${ui + 1}단원\n${u.unitName}`, { size: 10, bold: true, align: AlignmentType.CENTER, line: 1.6 }), { rows: u.lessons.length }));
+        row.push(cell(lines(`${ui + 1}단원\n${u.unitName}`, { size: 10, bold: true, align: AlignmentType.CENTER, line: 1.2 }), { rows: u.lessons.length }));
         row.push(cell(standardParas(doc, u.standardIds), { rows: u.lessons.length }));
       }
       row.push(
         cell([para(labels[ui][li], { size: 10, align: AlignmentType.CENTER })]),
-        cell([para(l.topic, { size: 9.5, align: AlignmentType.CENTER, line: 1.5 })]),
+        cell([para(l.topic, { size: 9.5, align: AlignmentType.CENTER, line: 1.15 })]),
         cell(content, { align: VerticalAlignTable.TOP }),
-        cell(lines(l.note, { size: 9, align: AlignmentType.CENTER })),
+        cell(lines(l.note, { size: 9, align: AlignmentType.CENTER, line: 1.15 })),
       );
       rows.push(row);
     });
@@ -351,7 +354,7 @@ function unitPlanTable(doc: DesignDoc): Table | Paragraph {
 function assessmentTable(doc: DesignDoc): Table {
   const subject = doc.basic.type === "subject";
   const widths = [840, 1445, 2058, 578, 3149, 956];
-  const th = (s: string, o: CellOpts = {}) => cell(lines(s, { size: 11, bold: true, align: AlignmentType.CENTER, line: 1.25 }), { fill: LIGHT, ...o });
+  const th = (s: string, o: CellOpts = {}) => cell(lines(s, { size: 10.5, bold: true, align: AlignmentType.CENTER, line: 1.1 }), { fill: LIGHT, margins: 50, ...o });
   const rows: TableCell[][] = [[th("시기"), th("성취기준"), th("수업·평가 방법,\n연계의 주안점"), th(subject ? "성취수준" : "평가 기준", { span: 2 }), th("방법")]];
   for (const a of doc.assessments) {
     (["A", "B", "C"] as const).forEach((lv, k) => {
@@ -360,11 +363,11 @@ function assessmentTable(doc: DesignDoc): Table {
         row.push(
           cell([para(a.month, { size: 10, align: AlignmentType.CENTER })], { rows: 3 }),
           cell(standardParas(doc, a.standardIds), { rows: 3 }),
-          cell(lines(a.focus, { size: 10, align: AlignmentType.LEFT, line: 1.8 }), { rows: 3 }),
+          cell(lines(a.focus, { size: 9.5, align: AlignmentType.LEFT, line: 1.2 }), { rows: 3 }),
         );
       }
-      row.push(cell([para(lv, { size: 9.5, align: AlignmentType.CENTER })]), cell([para(a.levels[lv], { size: 9.5, line: 1.5 })]));
-      if (k === 0) row.push(cell(a.methods.map((m) => para(m, { size: 10, align: AlignmentType.CENTER, line: 1.9 })), { rows: 3 }));
+      row.push(cell([para(lv, { size: 9.5, align: AlignmentType.CENTER })]), cell([para(a.levels[lv], { size: 9.5, line: 1.15 })]));
+      if (k === 0) row.push(cell(a.methods.map((m) => para(m, { size: 9.5, align: AlignmentType.CENTER, line: 1.3 })), { rows: 3 }));
       rows.push(row);
     });
   }
@@ -372,37 +375,37 @@ function assessmentTable(doc: DesignDoc): Table {
 }
 
 const numbered = (items: string[]) =>
-  items.filter((s) => s.trim()).map((s, i) => para(`(${i + 1}) ${s}`, { left: 41, first: -41, line: 2.02 }));
+  items.filter((s) => s.trim()).map((s, i) => para(`(${i + 1}) ${s}`, { left: 25, first: -25, line: 1.3, after: 2 }));
 
 function curriculumDoc(doc: DesignDoc): (Paragraph | Table)[] {
   const subject = doc.basic.type === "subject";
-  const out: (Paragraph | Table)[] = [para(subject ? "[서식4]" : "[서식2]", { size: 9, pageBreak: true, after: 4 }), ...banner(doc, false)];
+  const out: (Paragraph | Table)[] = [para(subject ? "[서식4]" : "[서식2]", { size: 9, line: 1, pageBreak: true, after: 2 }), ...banner(doc, false)];
   const rationale = paras(doc.intro.rationale).map((s) => para(s, { first: 9 }));
   const goals = doc.intro.detailGoals.filter((g) => g.trim());
   let n = 1;
   if (subject) {
-    out.push(...h1(`${n++}. 성격`), ...rationale, spacer(40));
-    out.push(...h1(`${n++}. 목표`), para(doc.intro.overallGoal, { after: 16 }), ...goals.map((g, i) => para(`(${i + 1}) ${g}`, { left: 34, first: -20 })), spacer(40));
+    out.push(...h1(`${n++}. 성격`), ...rationale, spacer());
+    out.push(...h1(`${n++}. 목표`), para(doc.intro.overallGoal, { after: 6 }), ...goals.map((g, i) => para(`(${i + 1}) ${g}`, { left: 34, first: -20 })), spacer());
   } else {
-    out.push(...h1(`${n++}. 필요성 및 목표`), ...rationale, para(doc.intro.overallGoal, { first: 9, before: 12 }), ...goals.map((g) => para(`·${g}`)), spacer(40));
+    out.push(...h1(`${n++}. 필요성 및 목표`), ...rationale, para(doc.intro.overallGoal, { first: 9, before: 6 }), ...goals.map((g) => para(`·${g}`)), spacer());
   }
-  out.push(...h1(`${n++}. 내용 체계`), ideasTable(doc), para("", { line: 1, after: 10, keepNext: true }), contentTable(doc), spacer(40));
-  out.push(...h1(`${n++}. 성취기준`), ...standardsBlock(doc), spacer(40));
+  out.push(...h1(`${n++}. 내용 체계`), ideasTable(doc), para("", { size: 4, line: 1, after: 4, keepNext: true }), contentTable(doc), spacer());
+  out.push(...h1(`${n++}. 성취기준`), ...standardsBlock(doc), spacer());
   if (subject) {
-    // 예시안처럼 큰 제목 5·6과 두 표(단원 지도 계획, 평가 계획)는 새 쪽에서 시작
+    // 쪽 수를 줄이려고 억지 쪽 나눔은 하지 않는다 (표 머리줄은 쪽마다 반복)
     const t = doc.teaching;
-    out.push(...h1(`${n++}. 교수‧학습 방향 및 방법`, true));
+    out.push(spacer(), ...h1(`${n++}. 교수‧학습 방향 및 방법`));
     out.push(h2("가. 교수·학습의 방향"), ...numbered(t.teachingDirection));
     out.push(h2("나. 교수·학습의 방법"), ...numbered(t.teachingMethods));
-    out.push(h2("다. 단원 지도 계획", true), unitPlanTable(doc));
-    out.push(...h1(`${n++}. 평가 방향 및 방법`, true));
+    out.push(h2("다. 단원 지도 계획"), unitPlanTable(doc));
+    out.push(spacer(), ...h1(`${n++}. 평가 방향 및 방법`));
     out.push(h2("가. 평가의 방향"), ...numbered(t.assessDirection));
     out.push(h2("나. 평가의 방법"), ...numbered(t.assessMethods));
-    out.push(h2("다. 평가 계획", true), assessmentTable(doc));
+    out.push(h2("다. 평가 계획"), assessmentTable(doc));
   } else {
     out.push(...h1(`${n++}. 지도의 실제`));
     out.push(h2("가. 단원 지도계획"), unitPlanTable(doc));
-    out.push(h2("나. 평가 계획", true), assessmentTable(doc));
+    out.push(h2("나. 평가 계획"), assessmentTable(doc));
   }
   return out;
 }
@@ -412,7 +415,7 @@ function checklistDoc(doc: DesignDoc): (Paragraph | Table)[] {
   const subject = doc.basic.type === "subject";
   const results = checklistResults(doc);
   const widths = [1400, 6626, 1000];
-  const f = { size: 10, line: 1.4 };
+  const f = { size: 9.5, line: 1.1 };
   const rows: TableCell[][] = [["영역", "평가 지표", "검토 결과\n(○, X)"].map((h) => cell(lines(h, { ...f, bold: true, align: AlignmentType.CENTER }), { fill: LIGHT }))];
   const areas = [...new Set(results.map((r) => r.area))];
   for (const area of areas) {
@@ -425,9 +428,9 @@ function checklistDoc(doc: DesignDoc): (Paragraph | Table)[] {
     });
   }
   return [
-    para(subject ? "[서식7]" : "[서식6]", { size: 9, pageBreak: true, after: 4 }),
+    para(subject ? "[서식7]" : "[서식6]", { size: 9, line: 1, pageBreak: true, after: 2 }),
     formTitle(`학교자율시간 「${kindOf(doc)}」 개설 체크리스트`),
-    para(`${kindOf(doc)}명: ${doc.basic.name} (${doc.basic.grade}학년 ${doc.basic.semester}학기, ${doc.basic.hours}시간)`, { size: 10.5, before: 6, after: 8, align: AlignmentType.LEFT }),
+    para(`${kindOf(doc)}명: ${doc.basic.name} (${doc.basic.grade}학년 ${doc.basic.semester}학기, ${doc.basic.hours}시간)`, { size: 10, line: 1.1, before: 4, after: 4, align: AlignmentType.LEFT }),
     table(rows, widths, { headerRows: 1 }),
   ];
 }
@@ -451,7 +454,7 @@ export function buildDesignDocx(doc: DesignDoc): Document {
     creator: "학교자율시간 설계 도우미 앱",
     title: `${doc.basic.name} 학교자율시간 ${kindOf(doc)}`,
     styles: {
-      default: { document: { run: { font: BODY, size: 24 }, paragraph: { spacing: { line: 326 } } } },
+      default: { document: { run: { font: BODY, size: 24 }, paragraph: { spacing: { line: 300 } } } },
     },
     sections: [section],
   });
