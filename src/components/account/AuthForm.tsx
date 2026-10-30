@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/lib/api";
-import { REGION_GROUPS } from "@/domain/regions";
+import { REGION_VALUES } from "@/domain/regions";
 import { Card, Field, inputClass } from "../ui";
 import { useMe } from "../useMe";
 
@@ -72,14 +72,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
                     <option value="" disabled>
                       지역을 고르세요
                     </option>
-                    {REGION_GROUPS.map((g) => (
-                      <optgroup key={g.short} label={g.label}>
-                        {g.areas.map((a) => (
-                          <option key={a} value={`${g.short} ${a}`}>
-                            {g.short} {a}
-                          </option>
-                        ))}
-                      </optgroup>
+                    {REGION_VALUES.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
                     ))}
                   </select>
                 </Field>

@@ -16,7 +16,7 @@ import {
 import { createSessionToken, readSessionToken } from "./session";
 
 const SECRET = "test-secret-test-secret-test-secret-123";
-const school = (schoolName: string, region = "전남 광양시") => ({ region, schoolName, password: "password1", passwordConfirm: "password1" });
+const school = (schoolName: string, region = "광양시") => ({ region, schoolName, password: "password1", passwordConfirm: "password1" });
 const ADMIN_SCHOOLS = ["광양중동초등학교"];
 
 async function setup() {
@@ -30,11 +30,11 @@ describe("회원가입 (학교 단위)", () => {
   it("관리자 학교는 바로 관리자, 나머지는 승인 대기. 학교명 띄어쓰기는 없앰", async () => {
     const { admin, t } = await setup();
     expect([admin.role, admin.status]).toEqual(["admin", "active"]);
-    expect([t.role, t.status, t.schoolName, t.region]).toEqual(["teacher", "pending", "광양마동초등학교", "전남 광양시"]);
+    expect([t.role, t.status, t.schoolName, t.region]).toEqual(["teacher", "pending", "광양마동초등학교", "광양시"]);
   });
   it("같은 학교는 다시 가입 신청 불가 (띄어쓰기만 달라도)", async () => {
     const { repo } = await setup();
-    await expect(signup(repo, school("광양마동초등학교", "광주 서구"), [])).rejects.toThrow("이미 가입된 학교");
+    await expect(signup(repo, school("광양마동초등학교", "서구"), [])).rejects.toThrow("이미 가입된 학교");
   });
   it("정식 명칭이 아니면 거부", async () => {
     const { repo } = await setup();
@@ -44,9 +44,9 @@ describe("회원가입 (학교 단위)", () => {
     const { repo } = await setup();
     await expect(signup(repo, { ...school("순천남산초등학교"), passwordConfirm: "password2" }, [])).rejects.toThrow("서로 다릅니다");
     await expect(signup(repo, { ...school("순천남산초등학교"), password: "short", passwordConfirm: "short" }, [])).rejects.toThrow("8자");
-    await expect(signup(repo, school("순천남산초등학교", "서울 강남구"), [])).rejects.toThrow("지역");
-    await expect(signup(repo, school("순천남산초등학교", "전남"), [])).rejects.toThrow("시·군·구");
-    expect((await signup(repo, school("순천남산초등학교", "전남 순천시"), [])).region).toBe("전남 순천시");
+    await expect(signup(repo, school("순천남산초등학교", "강남구"), [])).rejects.toThrow("지역");
+    await expect(signup(repo, school("순천남산초등학교", "전남 순천시"), [])).rejects.toThrow("시·군·구");
+    expect((await signup(repo, school("순천남산초등학교", "순천시"), [])).region).toBe("순천시");
   });
 });
 
@@ -150,7 +150,7 @@ describe("관리자 통계", () => {
     await saveDesign(repo, t, sampleSubject());
     await repo.logs.add({ kind: "parse_fail", detail: "standards: JSON 형식이 깨져 있습니다." });
     const s = await adminStats(repo);
-    expect(s.users).toMatchObject({ total: 2, pending: 1, resetRequests: 0, byRegion: { "전남 광양시": 2 }, bySido: { 전남: 2 } });
+    expect(s.users).toMatchObject({ total: 2, pending: 1, resetRequests: 0, byRegion: { 광양시: 2 } });
     expect(s.designs).toMatchObject({ total: 1, complete: 1, byType: { 과목: 1 } });
     expect(s.week.parseFailByStep).toEqual({ standards: 1 });
   });

@@ -245,7 +245,6 @@ export async function adminStats(repo: Repo) {
       resetRequests,
       byStatus: count(users, (u) => u.status),
       byRegion: count(users, (u) => u.region || "(지역 없음)"),
-      bySido: count(users, (u) => (u.region ? u.region.split(" ")[0] : "(지역 없음)")),
     },
     designs: {
       total: designs.length,

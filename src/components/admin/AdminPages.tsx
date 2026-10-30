@@ -54,7 +54,7 @@ function Breakdown({ title, data }: { title: string; data: Record<string, number
 }
 
 interface Stats {
-  users: { total: number; pending: number; resetRequests: number; byRegion: Record<string, number>; bySido: Record<string, number> };
+  users: { total: number; pending: number; resetRequests: number; byRegion: Record<string, number> };
   designs: { total: number; complete: number; byType: Record<string, number>; byGrade: Record<string, number>; bySchool: Record<string, number> };
   week: { saves: number; downloads: number; logins: number; parseFails: number; parseFailByStep: Record<string, number> };
 }
@@ -84,7 +84,6 @@ export function AdminDashboard() {
       <div className="grid gap-3 md:grid-cols-2">
         <Breakdown title="유형별 설계" data={data.designs.byType} />
         <Breakdown title="학년별 설계" data={data.designs.byGrade} />
-        <Breakdown title="시·도별 가입 학교" data={data.users.bySido} />
         <Breakdown title="시·군·구별 가입 학교" data={data.users.byRegion} />
         <Breakdown title="학교별 설계" data={data.designs.bySchool} />
         <Breakdown title="AI 답 읽기 실패 단계 (최근 7일)" data={data.week.parseFailByStep} />
