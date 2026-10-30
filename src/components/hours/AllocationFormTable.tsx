@@ -1,7 +1,7 @@
 "use client";
 
 import { formModel, signed } from "@/domain/allocationForm";
-import { withCreativeParts, type AllocationInput, type CreativePart, type FourSemesters, type SemesterIndex } from "@/validation/allocation";
+import { bandInfo, withCreativeParts, type AllocationInput, type CreativePart, type FourSemesters, type SemesterIndex } from "@/validation/allocation";
 
 /**
  * 시수 점검 편성표 — 학교 '( )학년 교육과정 편성표' 양식과 같은 줄 구성을 보기 쉽게 정리한 화면용 표.
@@ -10,17 +10,24 @@ import { withCreativeParts, type AllocationInput, type CreativePart, type FourSe
 
 const cellBase = "border-b border-gray-100 px-2 py-1.5 text-center whitespace-nowrap";
 const th = "px-2 py-2 text-center text-xs font-semibold text-gray-600 whitespace-nowrap";
+/** 숫자 칸: 마우스를 올리면 오른쪽에 올림·내림 단추가 보인다 */
 const input =
-  "w-12 rounded-md border border-gray-300 bg-white px-1 py-1 text-center text-sm [appearance:textfield] focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 [&::-webkit-inner-spin-button]:appearance-none";
+  "w-16 rounded-md border border-gray-300 bg-white py-1 pl-2 pr-0.5 text-center text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100";
 const num = (v: string) => Math.max(0, Math.floor(Number(v) || 0));
 const n = (v: number) => v.toLocaleString("ko-KR");
 
 /** 증감 표시: 줄면 빨강, 늘면 파랑, 0이면 숨김 */
-function Delta({ v, strong = false }: { v: number; strong?: boolean }) {
-  if (v === 0) return <span className="inline-block w-8" />;
+function Delta({ v }: { v: number }) {
+  if (v === 0) return null;
+  return <span className={`absolute left-full top-1/2 ml-1 -translate-y-1/2 text-[11px] ${v < 0 ? "text-red-600" : "text-blue-600"}`}>{signed(v)}</span>;
+}
+
+/** 가운데 정렬을 유지하면서 증감을 오른쪽에 붙임 */
+function WithDelta({ v, children }: { v: number; children: React.ReactNode }) {
   return (
-    <span className={`inline-block w-8 text-left text-[11px] ${strong ? "font-bold" : ""} ${v < 0 ? "text-red-600" : "text-blue-600"}`}>
-      {signed(v)}
+    <span className="relative inline-block">
+      {children}
+      <Delta v={v} />
     </span>
   );
 }
@@ -64,6 +71,7 @@ export function AllocationFormTable({
   const years = [0, 1] as const;
   const semOf = (y: number, k: 0 | 1) => (y * 2 + k) as SemesterIndex;
   const yearBorder = "border-l border-gray-200";
+  const noReduction = (key: string) => !!bandInfo(a.band).subjects.find((x) => x.key === key)?.noReduction;
 
   /** 학년별 칸: 배당 | 1학기 | 2학기 | 계 */
   const SumYear = ({ base, A, B, bold = true }: { base: number; A: number; B: number; bold?: boolean }) => (
@@ -72,18 +80,11 @@ export function AllocationFormTable({
       <td className={`${cellBase} ${bold ? "font-semibold" : ""}`}>{n(A)}</td>
       <td className={`${cellBase} ${bold ? "font-semibold" : ""}`}>{n(B)}</td>
       <td className={`${cellBase} font-semibold`}>
-        {n(A + B)} <Delta v={A + B - base / 2} />
+        <WithDelta v={A + B - base / 2}>{n(A + B)}</WithDelta>
       </td>
     </>
   );
 
-  const sectionRow = (label: string) => (
-    <tr>
-      <td colSpan={12} className="bg-gray-50 px-3 py-1.5 text-left text-xs font-bold tracking-wide text-gray-500">
-        {label}
-      </td>
-    </tr>
-  );
 
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200">
@@ -116,7 +117,6 @@ export function AllocationFormTable({
           </tr>
         </thead>
         <tbody>
-          {sectionRow("교과")}
           {m.groups.flatMap((g) =>
             g.lines.map((ln, li) => {
               const last = li === g.lines.length - 1;
@@ -136,10 +136,12 @@ export function AllocationFormTable({
                   {!g.merged && (
                     <td className={`${cellBase} text-left ${tint} ${ln.kind === "placeholder" ? "text-gray-300" : ""}`}>
                       {ln.kind === "subject" ? (
-                        ln.key
+                        <>
+                          {ln.key}
+                          {noReduction(ln.key) && <span className="ml-1 text-xs text-blue-600">(감축 불가)</span>}
+                        </>
                       ) : ln.kind === "course" ? (
                         <span className="inline-flex items-center gap-1 font-semibold text-orange-800">
-                          <span className="rounded bg-orange-200 px-1 text-[10px] text-orange-900">학자시</span>
                           {ln.name}
                         </span>
                       ) : (
@@ -164,10 +166,9 @@ export function AllocationFormTable({
                         <td key={`p${y}`} className={`${cellBase} ${yearBorder} text-gray-500`}>{ln.base / 2}</td>,
                         ...[A, B].map((s) => (
                           <td key={`h${s}`} className={cellBase}>
-                            <span className="inline-flex items-center gap-1">
+                            <WithDelta v={ln.hours[s] - q}>
                               <input type="number" aria-label={`${ln.key} ${s}`} className={input} value={ln.hours[s]} onChange={(e) => setSubject(ln.key, s, num(e.target.value))} />
-                              <Delta v={ln.hours[s] - q} />
-                            </span>
+                            </WithDelta>
                           </td>
                         )),
                         <td key={`t${y}`} className={`${cellBase} font-semibold`}>{ln.hours[A] + ln.hours[B]}</td>,
@@ -211,7 +212,6 @@ export function AllocationFormTable({
               <GroupTotal value={m.subtotal.planned} ok={m.subtotal.ok} range="" />
             </td>
           </tr>
-          {sectionRow("창의적 체험활동")}
           {m.creative.parts.map((p, k) => (
             <tr key={p.key} className={k === 2 ? "border-b border-gray-200" : ""}>
               <td colSpan={2} className={`${cellBase} text-left`}>{p.name}</td>
@@ -237,7 +237,7 @@ export function AllocationFormTable({
                   )),
                   k === 0 ? (
                     <td key={`t${y}`} rowSpan={3} className={`${cellBase} font-semibold`}>
-                      {m.creativeSem[A] + m.creativeSem[B]} <Delta v={m.creativeSem[A] + m.creativeSem[B] - m.creative.base / 2} />
+                      <WithDelta v={m.creativeSem[A] + m.creativeSem[B] - m.creative.base / 2}>{m.creativeSem[A] + m.creativeSem[B]}</WithDelta>
                     </td>
                   ) : null,
                 ];
@@ -249,6 +249,16 @@ export function AllocationFormTable({
               )}
             </tr>
           ))}
+          <tr className="border-b-2 border-gray-200 bg-gray-50">
+            <td colSpan={2} className={`${cellBase} text-left font-bold`}>창체 소계</td>
+            <td className={`${cellBase} font-bold`}>{n(m.creative.base)}</td>
+            {years.map((y) => (
+              <SumYear key={y} base={m.creative.base} A={m.creativeSem[semOf(y, 0)]} B={m.creativeSem[semOf(y, 1)]} />
+            ))}
+            <td className={`${cellBase} ${yearBorder}`}>
+              <GroupTotal value={m.creative.planned} ok={m.creative.ok} range={`${m.creative.min}~${m.creative.max}`} />
+            </td>
+          </tr>
           <tr className="bg-brand-50 font-bold">
             <td colSpan={2} className={`${cellBase} text-left font-bold`}>연간 수업 시간 수</td>
             <td className={`${cellBase} font-bold`}>{n(m.total.base)}</td>
