@@ -31,7 +31,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           method: "POST",
           body: { schoolName: form.schoolName, password: form.password },
         });
-        window.location.href = r.user.mustChangePassword ? "/account/password?first=1" : "/designs";
+        // 로그인 뒤 돌아갈 곳 (?next=/hours 등, 앱 안 주소만)
+        const next = new URLSearchParams(window.location.search).get("next");
+        const back = next && next.startsWith("/") && !next.startsWith("//") ? next : "/designs";
+        window.location.href = r.user.mustChangePassword ? "/account/password?first=1" : back;
       } else {
         const r = await api<{ user: { status: string } }>("/api/auth/signup", { method: "POST", body: form });
         if (r.user.status === "active") window.location.href = "/designs";

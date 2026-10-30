@@ -7,6 +7,7 @@ import { categoryOf, codeMap, defaultAbbrev, hasSameCategory, standardCategories
 import { categoryCounts, categorySplit, elementCount, recommendedStandardCount, splitProblem, standardCountRange, standardCountsFor } from "@/domain/standardCounts";
 import { contentSystemPrompt, coreIdeasPrompt, introPrompt, reviseStandardsPrompt, standardsPrompt, teachingPrompt } from "@/prompts/steps";
 import { checkContentSystem, checkCoreIdeas, checkIntro, checkStandards, checkTeaching } from "@/validation/design";
+import { manualAreas, manualCoreIdeas, manualStandards, manualTeaching } from "@/domain/manual";
 import { AiAssist } from "./AiAssist";
 import { Card, Chips, Field, ListEditor, NavButtons, StepHeader, StepIssues, inputClass, toggle } from "../ui";
 
@@ -42,6 +43,7 @@ export function ContentStep({ doc, setDoc, onBack, onNext, onParseFail }: StepPr
         hasContent={doc.areas.some((a) => a.name.trim())}
         onParseFail={(e) => onParseFail?.("content", e)}
         onApply={(areas) => setDoc((d) => void (d.areas = areas))}
+        onManual={() => setDoc((d) => void (d.areas = manualAreas(d)))}
         onReset={() => setDoc((d) => void (d.areas = []))}
       />
       <ContentTable doc={doc} setDoc={setDoc} />
@@ -201,6 +203,7 @@ export function CoreIdeasStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
         hasContent={doc.coreIdeas.some((s) => s.trim())}
         onParseFail={(e) => onParseFail?.("coreIdeas", e)}
         onApply={(ideas) => setDoc((d) => void (d.coreIdeas = ideas))}
+        onManual={() => setDoc((d) => void (d.coreIdeas = manualCoreIdeas(d)))}
         onReset={() => setDoc((d) => void (d.coreIdeas = []))}
       />
       <Card>
@@ -269,6 +272,12 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
           setDoc((d) => {
             d.abbrev = d.abbrev || abbrev;
             d.standards = standards;
+          })
+        }
+        onManual={() =>
+          setDoc((d) => {
+            d.abbrev = d.abbrev || abbrev;
+            d.standards = manualStandards(d);
           })
         }
         onReset={() => setDoc((d) => void (d.standards = []))}
@@ -479,6 +488,7 @@ export function IntroStep({ doc, setDoc, onBack, onNext, onParseFail }: StepProp
         hasContent={!!(doc.intro.rationale.trim() || doc.intro.overallGoal.trim() || doc.intro.detailGoals.some((g) => g.trim()))}
         onParseFail={(e) => onParseFail?.("intro", e)}
         onApply={(intro) => setDoc((d) => void (d.intro = intro))}
+        onManual={() => {}}
         onReset={() => setDoc((d) => void (d.intro = { rationale: "", overallGoal: "", detailGoals: ["", "", ""] }))}
       />
       <Card className="space-y-4">
@@ -517,6 +527,7 @@ export function TeachingStep({ doc, setDoc, onBack, onNext, onParseFail }: StepP
         hasContent={Object.values(doc.teaching).some((l) => l.length > 0)}
         onParseFail={(e) => onParseFail?.("teaching", e)}
         onApply={(t) => setDoc((d) => void (d.teaching = t))}
+        onManual={() => setDoc((d) => void (d.teaching = manualTeaching()))}
         onReset={() => setDoc((d) => void (d.teaching = { teachingDirection: [], teachingMethods: [], assessDirection: [], assessMethods: [] }))}
       />
       {parts.map(([key, label, hint]) => (

@@ -36,6 +36,7 @@ import {
 import { Packer } from "docx";
 import { buildAllocationDocx } from "@/export/allocationDocx";
 import { Card, IssueList } from "../ui";
+import { GuestBanner, GUEST_LIMIT } from "../LoginGate";
 
 const SEMS: SemesterIndex[] = [0, 1, 2, 3];
 const num = (v: string) => Math.max(0, Math.floor(Number(v) || 0));
@@ -47,6 +48,8 @@ export function HoursChecker() {
   const q = Number(params.get("grade"));
   const grade: ViewGrade = isViewGrade(q) ? q : 3;
   const { checks, designs, loaded, save, loggedIn, me } = useHourChecks();
+  // 로그인하지 않은 체험: 점검은 되지만 이 브라우저에만 저장되고 문서는 못 받는다
+  const guest = !!me?.enabled && !loggedIn;
   // 학년도: 주소에 있으면 그것, 없으면 가장 최근 설계 학년도(없으면 올해)
   const designYears = designs.map((d) => Number(d.schoolYear)).filter((y) => y > 2000);
   const thisYear = schoolYearOf(new Date());
@@ -162,7 +165,7 @@ export function HoursChecker() {
           </div>
           <div className="flex items-center gap-3 text-sm">
             <span className="text-xs text-gray-500">
-              {!loggedIn ? "로그인하지 않아 이 브라우저에만 저장 · " : ""}
+              {!loggedIn ? <b className="text-red-600">로그인하지 않아 이 브라우저에만 저장 · </b> : ""}
               {saveState === "saving" ? "저장 중…" : saveState === "saved" ? "✓ 저장됨" : saveState === "error" ? "⚠ 저장 실패" : "아직 저장 안 됨"}
             </span>
             <button
@@ -175,6 +178,8 @@ export function HoursChecker() {
           </div>
         </div>
       </div>
+
+      <GuestBanner />
 
       <Card className="space-y-2">
         <ol className="list-decimal space-y-0.5 pl-5 text-sm text-gray-600">
@@ -436,8 +441,11 @@ export function HoursChecker() {
         <IssueList issues={r.issues} />
         <button
           type="button"
-          className="rounded-lg border-2 border-brand-600 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50"
+          disabled={guest}
+          title={guest ? GUEST_LIMIT : undefined}
+          className="rounded-lg border-2 border-brand-600 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400 disabled:hover:bg-transparent"
           onClick={async () => {
+            if (guest) return;
             const url = URL.createObjectURL(await Packer.toBlob(buildAllocationDocx(a, { years: viewYears(grade, year), grade, schoolYear: year, schoolName: me?.user?.schoolName })));
             const link = document.createElement("a");
             link.href = url;
@@ -450,7 +458,9 @@ export function HoursChecker() {
         >
           📄 편성표 내려받기 (.docx)
         </button>
-        <p className="text-xs text-gray-500">계획서·신청서의 붙임 &lsquo;( )학년 교육과정 편성표&rsquo;로 쓸 수 있어요.</p>
+        <p className={`text-xs ${guest ? "font-semibold text-red-600" : "text-gray-500"}`}>
+          {guest ? "로그인해야 편성표를 내려받을 수 있어요." : "계획서·신청서의 붙임 '( )학년 교육과정 편성표'로 쓸 수 있어요."}
+        </p>
       </Card>
     </div>
   );

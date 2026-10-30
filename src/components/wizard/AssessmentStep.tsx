@@ -4,6 +4,7 @@ import type { AssessmentRow } from "@/domain/types";
 import { codeMap } from "@/domain/codes";
 import { ASSESS_METHODS, assessmentPrompt } from "@/prompts/steps";
 import { checkAssessments } from "@/validation/design";
+import { manualAssessments } from "@/domain/manual";
 import { AiAssist } from "./AiAssist";
 import type { StepProps } from "./DocSteps";
 import { Card, Chips, Field, NavButtons, StepHeader, StepIssues, inputClass, toggle } from "../ui";
@@ -34,6 +35,7 @@ export function AssessmentStep({ doc, setDoc, onBack, onNext, onParseFail }: Ste
         hasContent={doc.assessments.length > 0}
         onParseFail={(e) => onParseFail?.("assessment", e)}
         onApply={(rows) => setDoc((d) => void (d.assessments = rows))}
+        onManual={() => setDoc((d) => void (d.assessments = manualAssessments(d)))}
         onReset={() => setDoc((d) => void (d.assessments = []))}
       />
       {doc.assessments.map((r, i) => (

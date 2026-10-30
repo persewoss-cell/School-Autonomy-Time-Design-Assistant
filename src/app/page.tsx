@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LoginGateLink } from "@/components/LoginGate";
 
 const steps = [
   ["기본 정보", "학년·학기를 고르면 시수가 자동으로 채워져요"],
@@ -19,18 +19,18 @@ export default function Home() {
           주제와 원하는 활동을 입력하면 평소 쓰는 AI에 붙여 넣을 프롬프트를 만들어 드려요.
           AI가 준 단원 지도계획 3안을 붙여 넣으면, 시수·양식 같은 지침 준수 여부는 프로그램이 자동으로 점검합니다.
         </p>
-        <Link
+        <LoginGateLink
           href="/designs/new"
           className="mt-6 inline-block rounded-lg bg-brand-600 px-5 py-3 font-semibold text-white hover:bg-brand-700"
         >
           새 설계 시작하기
-        </Link>
-        <Link
+        </LoginGateLink>
+        <LoginGateLink
           href="/hours"
           className="ml-2 mt-6 inline-block rounded-lg border border-brand-500 px-5 py-3 font-semibold text-brand-700 hover:bg-brand-50"
         >
           시수 편성 점검하기
-        </Link>
+        </LoginGateLink>
       </section>
 
       <section>

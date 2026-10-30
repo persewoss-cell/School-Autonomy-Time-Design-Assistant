@@ -136,7 +136,9 @@ export function FinalStep({
   const briefs = [...hc.designs.filter((d) => d.id !== current.id), current];
   const hours = bandStatus(doc.basic.grade, year, hc.checks, briefs);
   const ownView = isViewGrade(doc.basic.grade) ? hc.checks[checkKey(year, doc.basic.grade)] : undefined;
-  const blocked = unchecked.length > 0;
+  // 로그인하지 않은 체험: 문서를 내려받을 수 없다 (사용자 결정, 2026-10-30)
+  const guest = !!hc.me?.enabled && !hc.loggedIn;
+  const blocked = unchecked.length > 0 || guest;
   const goHours = async (grade: number) => {
     if (onSave) await onSave().catch(() => {});
     window.location.href = `/hours?grade=${grade}&year=${year}`;
@@ -258,6 +260,11 @@ export function FinalStep({
             </>
           )}
         </div>
+        {guest && (
+          <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
+            ⚠ 로그인하지 않아 문서를 내려받을 수 없어요. 로그인한 뒤 「새 설계」를 열면 이 브라우저에 임시 저장된 내용이 이어져요.
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={download} disabled={busy || blocked} className="rounded-lg bg-brand-600 px-5 py-2 font-semibold text-white hover:bg-brand-700 disabled:bg-gray-300">
             {busy ? "만드는 중…" : "📄 문서 내려받기 (.docx)"}

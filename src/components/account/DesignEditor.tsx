@@ -6,6 +6,7 @@ import { api, sendLog } from "@/lib/api";
 import { Wizard } from "../wizard/Wizard";
 import { Card } from "../ui";
 import { useMe } from "../useMe";
+import { GuestBanner } from "../LoginGate";
 
 interface SaveResponse {
   record: { id: string };
@@ -52,11 +53,7 @@ export function NewDesign() {
 
   return (
     <div className="space-y-3">
-      {me?.enabled && !me.user && (
-        <p className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
-          로그인하면 설계가 서버에 자동 저장되어 다른 컴퓨터에서도 이어서 쓸 수 있어요. 로그인하지 않아도 이 브라우저에 임시로 보관되고, 문서는 내려받을 수 있어요.
-        </p>
-      )}
+      <GuestBanner />
       <Wizard
         designId={designId}
         defaultSchoolName={me?.user?.schoolName}

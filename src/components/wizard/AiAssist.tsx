@@ -5,6 +5,7 @@ import type { DesignDoc } from "@/domain/types";
 import type { StepPrompt } from "@/prompts/steps";
 import { buildFixPrompt } from "@/prompts/common";
 import { Card, CopyBox, inputClass } from "../ui";
+import { Modal } from "../Modal";
 
 /**
  * "AI에게 초안 받기" 패널.
@@ -18,6 +19,7 @@ export function AiAssist<T>({
   title = "AI에게 초안 받기",
   defaultOpen,
   onParseFail,
+  onManual,
   onReset,
 }: {
   doc: DesignDoc;
@@ -28,6 +30,8 @@ export function AiAssist<T>({
   title?: string;
   defaultOpen?: boolean;
   onParseFail?: (error: string) => void;
+  /** 'AI 없이 직접 입력하기': 이 단계의 빈칸 틀을 만든다 (내용이 없을 때만 보임) */
+  onManual?: () => void;
   /** 'AI 답변 초기화': 이 단계에서 AI가 만든 결과를 지운다 */
   onReset?: () => void;
 }) {
@@ -36,6 +40,8 @@ export function AiAssist<T>({
   const [error, setError] = useState("");
   const [notes, setNotes] = useState<string[]>([]);
   const [follow, setFollow] = useState<{ title: string; prompt: string } | null>(null);
+  const [checkWarn, setCheckWarn] = useState(false);
+  const [manualDone, setManualDone] = useState(false);
 
   const read = () => {
     const r = step.parse(answer, doc);
@@ -50,6 +56,7 @@ export function AiAssist<T>({
     setFollow(step.followUp?.(r.data, doc) ?? null);
     setAnswer("");
     onApply(r.data, r.notes);
+    setCheckWarn(true);
   };
 
   const reset = () => {
@@ -67,6 +74,19 @@ export function AiAssist<T>({
           <span className="font-bold text-brand-700">🤖 {title}</span>
           <span className="text-sm text-gray-400">{open ? "접기 ▲" : "펼치기 ▼"}</span>
         </button>
+        {onManual && !hasContent && !manualDone && (
+          <button
+            type="button"
+            onClick={() => {
+              onManual();
+              setManualDone(true);
+              setOpen(false);
+            }}
+            className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            ✍️ AI 없이 직접 입력하기
+          </button>
+        )}
         {onReset && hasContent && (
           <button
             type="button"
@@ -102,7 +122,7 @@ export function AiAssist<T>({
               <b>프롬프트 복사</b>를 누르고, 평소 쓰는 AI(ChatGPT, Claude, Gemini, 뤼튼 등)에 붙여 넣어 보냅니다.
             </li>
             <li>AI의 답을 전부 복사해 아래 칸에 붙여 넣고 <b>AI 답 반영하기</b>를 누릅니다. (이미 내용이 있으면 덮어쓸지 물어봐요)</li>
-            <li>읽어 온 내용은 아래에서 자유롭게 고칠 수 있어요. AI 없이 직접 써도 됩니다.</li>
+            <li>읽어 온 내용은 아래에서 자유롭게 고칠 수 있어요. AI 없이 쓰려면 위의 <b>AI 없이 직접 입력하기</b>를 누르세요.</li>
           </ol>
           <p className="text-xs text-amber-700">AI에게 학생 이름 등 개인정보는 보내지 마세요.</p>
           <CopyBox text={step.build(doc)} label="프롬프트 복사" rows={6} />
@@ -131,6 +151,37 @@ export function AiAssist<T>({
             AI 답 반영하기
           </button>
         </div>
+      )}
+      {checkWarn && (
+        <Modal
+          title="AI가 만든 내용, 반드시 직접 점검하세요"
+          onClose={() => setCheckWarn(false)}
+          actions={
+            <button type="button" onClick={() => setCheckWarn(false)} className="rounded-lg bg-red-600 px-5 py-2 font-bold text-white hover:bg-red-700">
+              직접 읽고 점검할게요
+            </button>
+          }
+        >
+          <p className="font-semibold">AI의 답은 그럴듯해 보여도 틀릴 수 있어요. 문서에 쓰기 전에 한 줄씩 읽어 보세요.</p>
+          <ul className="list-disc space-y-0.5 pl-5 text-sm">
+            <li>
+              <b>사실과 다른 내용</b> (지어낸 자료·통계·기관명·출처)
+            </li>
+            <li>
+              <b>문법·맞춤법 오류</b>, 어색한 문장
+            </li>
+            <li>
+              <b>지침·성취기준과 맞지 않는 표현</b>, 학년 수준에 맞지 않는 내용
+            </li>
+            <li>
+              <b>우리 학교·지역 실정과 다른 내용</b>
+            </li>
+            <li>
+              <b>다른 자료를 그대로 옮긴 문장</b> (저작권), 치우친 관점
+            </li>
+          </ul>
+          <p className="text-sm font-bold text-red-600">최종 책임은 작성한 선생님께 있어요.</p>
+        </Modal>
       )}
     </Card>
   );

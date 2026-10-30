@@ -10,6 +10,7 @@ import { checkPlanHours, checkUnitHours, lessonLabels, totalLessonHours } from "
 import { recommendedUnitHours, unitHoursFor } from "@/domain/unitHours";
 import type { PlanRequest } from "@/domain/types";
 import { AiAssist } from "./AiAssist";
+import { manualPlan } from "@/domain/manual";
 import type { StepProps } from "./DocSteps";
 import { Card, Chips, Field, IssueList, NavButtons, StepHeader, StepIssues, inputClass, toggle } from "../ui";
 
@@ -55,6 +56,7 @@ export function PlanStep(props: StepProps) {
                 d.plan = { candidates: plans, demo: false, notes, selected: null };
               })
             }
+            onManual={() => setDoc((d) => void (d.plan = { candidates: [], demo: false, notes: [], selected: manualPlan(d) }))}
             onReset={() => setDoc((d) => void (d.plan = { candidates: [], demo: false, notes: [], selected: null }))}
           />
         )}

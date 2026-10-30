@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useMe } from "./useMe";
+import { LoginGateLink } from "./LoginGate";
 
 export function AuthNav() {
   const me = useMe();
@@ -13,8 +14,8 @@ export function AuthNav() {
   const link = "hover:text-brand-700";
   return (
     <nav className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
-      <Link href="/designs/new" className={link}>새 설계</Link>
-      <Link href="/hours" className={link}>시수 점검</Link>
+      <LoginGateLink href="/designs/new" className={link}>새 설계</LoginGateLink>
+      <LoginGateLink href="/hours" className={link}>시수 점검</LoginGateLink>
       {me?.user && <Link href="/designs" className={link}>설계 현황</Link>}
       {me?.user?.role === "admin" && <Link href="/admin" className={`${link} font-semibold text-brand-700`}>관리자</Link>}
       {me?.enabled && !me.user && (
