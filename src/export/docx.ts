@@ -131,6 +131,28 @@ function table(rows: TableCell[][], widths: number[], o: { headerRows?: number; 
   });
 }
 
+/**
+ * 쪽 중간에서 나뉘면 안 되는 묶음(내용 체계 표, 성취기준 표 등)을 테두리 없는 한 칸 표에 넣는다.
+ * 나뉠 수 없는 행(cantSplit)이라 한글·워드 모두 묶음 전체를 다음 쪽으로 넘긴다. ('다음 문단과 함께'보다 확실함)
+ */
+function keepTogether(children: (Paragraph | Table)[]): Table {
+  const none = { top: NONE, bottom: NONE, left: NONE, right: NONE };
+  return new Table({
+    width: { size: PAGE_WIDTH, type: WidthType.DXA },
+    columnWidths: [PAGE_WIDTH],
+    borders: { ...none, insideHorizontal: NONE, insideVertical: NONE },
+    rows: [
+      new TableRow({
+        cantSplit: true,
+        children: [new TableCell({ children: [...children, new Paragraph({ spacing: { line: 240 }, children: [] })], borders: none, margins: { top: 0, bottom: 0, left: 0, right: 0 } })],
+      }),
+    ],
+  });
+}
+
+/** 차시 번호가 칸에서 어색하게 끊기지 않게 긴 것은 '/' 앞에서 줄을 바꾼다 (예시안: 8~10 / /29) */
+const lessonLabel = (s: string) => (s.length > 6 ? s.replace("/", "\n/") : s);
+
 const box = (checked: boolean, label: string) => `${checked ? "■" : "□"} ${label}`;
 const kindOf = (doc: DesignDoc) => (doc.basic.type === "subject" ? "과목" : "활동");
 const schoolOf = (doc: DesignDoc) => doc.application.schoolName.trim() || "○○초등학교";
@@ -282,22 +304,22 @@ function standardsBlock(doc: DesignDoc): (Paragraph | Table)[] {
   const codes = codeMap(doc);
   if (doc.basic.type === "subject") {
     const dotted = line(4, BorderStyle.DOTTED);
-    return doc.areas.flatMap((a, i) => [
+    return doc.areas.map((a, i) => keepTogether([
       para(`(${i + 1}) ${a.name}`, { size: 12, align: AlignmentType.LEFT, before: 6, after: 4, keepNext: true }),
       table(
-        [[cell(doc.standards.filter((s) => s.areaIndex === i).map((s) => para(`${codes.get(s.id) ?? ""} ${s.text}`, { font: HCR, size: 10, left: 74, first: -74, line: 1.3, keepNext: true })), { margins: 40 })]],
+        [[cell(doc.standards.filter((s) => s.areaIndex === i).map((s) => para(`${codes.get(s.id) ?? ""} ${s.text}`, { font: HCR, size: 10, left: 74, first: -74, line: 1.3, keepNext: true })), { margins: 40, borders: { left: dotted, right: dotted } })]],
         [PAGE_WIDTH],
         { top: dotted, bottom: dotted, outer: false },
       ),
-    ]);
+    ]));
   }
   return [
     table(
       doc.standards.map((s) => [
-        cell([para(codes.get(s.id) ?? "", { font: HCR, size: 9.5, align: AlignmentType.CENTER })], { fill: LIGHT }),
+        cell([para(codes.get(s.id) ?? "", { font: HCR, size: 9, align: AlignmentType.CENTER, line: 1.1 })], { fill: LIGHT }),
         cell([para(s.text, { font: HCR, size: 10, line: 1.25 })]),
       ]),
-      [1180, PAGE_WIDTH - 1180],
+      [1700, PAGE_WIDTH - 1700],
     ),
   ];
 }
@@ -340,7 +362,7 @@ function unitPlanTable(doc: DesignDoc): Table | Paragraph {
         row.push(cell(standardParas(doc, u.standardIds), { rows: u.lessons.length }));
       }
       row.push(
-        cell([para(labels[ui][li], { size: 10, align: AlignmentType.CENTER })]),
+        cell(lines(lessonLabel(labels[ui][li]), { size: 9.5, align: AlignmentType.CENTER, line: 1.1 })),
         cell([para(l.topic, { size: 9.5, align: AlignmentType.CENTER, line: 1.15 })]),
         cell(content, { align: VerticalAlignTable.TOP }),
         cell(lines(l.note, { size: 9, align: AlignmentType.CENTER, line: 1.15 })),
@@ -389,8 +411,8 @@ function curriculumDoc(doc: DesignDoc): (Paragraph | Table)[] {
   } else {
     out.push(...h1(`${n++}. 필요성 및 목표`), ...rationale, para(doc.intro.overallGoal, { first: 9, before: 6 }), ...goals.map((g) => para(`·${g}`)), spacer());
   }
-  out.push(...h1(`${n++}. 내용 체계`), ideasTable(doc), para("", { size: 4, line: 1, after: 4, keepNext: true }), contentTable(doc), spacer());
-  out.push(...h1(`${n++}. 성취기준`), ...standardsBlock(doc), spacer());
+  out.push(...h1(`${n++}. 내용 체계`), keepTogether([ideasTable(doc), para("", { size: 4, line: 1, after: 4 }), contentTable(doc)]), spacer());
+  out.push(...h1(`${n++}. 성취기준`), ...(doc.basic.type === "subject" ? standardsBlock(doc) : [keepTogether(standardsBlock(doc))]), spacer());
   if (subject) {
     // 쪽 수를 줄이려고 억지 쪽 나눔은 하지 않는다 (표 머리줄은 쪽마다 반복)
     const t = doc.teaching;
