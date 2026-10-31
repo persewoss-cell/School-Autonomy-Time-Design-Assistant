@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { emptyDesign, type DesignDoc } from "@/domain/types";
+import { api } from "@/lib/api";
 import type { StepKey } from "@/validation/types";
 import { checklistResults, validateDesign } from "@/validation/design";
 import { mergeTyping, type TypingState } from "@/domain/history";
@@ -176,10 +177,17 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
       /* 무시 */
     }
   };
-  // 되돌리기·다시 실행: 이 설계를 연 뒤의 고침을 최근 100번까지 기억 (단계를 넘어도 유지).
-  // 글은 한 어절(띄어쓰기까지)씩, 고르기·추가·삭제는 한 번씩 되돌린다 (src/domain/history.ts). 진행 위치(progress)는 되돌리지 않는다.
-  const past = useRef<DesignDoc[]>([]);
-  const future = useRef<DesignDoc[]>([]);
+  // 되돌리기·다시 실행: 이 설계를 연 뒤의 모든 행동(고침·고르기·단계 이동)을 최근 100번까지 기억.
+  // 글은 한 어절(띄어쓰기까지)씩, 고르기·추가·삭제·다음/이전은 한 번씩 되돌린다 (src/domain/history.ts).
+  // 계속 되돌리면 처음 화면(유형 고르기)까지 돌아간다 (사용자 결정, 2026-10-31).
+  type Snap = { doc: DesignDoc; stepKey: StepKey; maxIndex: number };
+  const past = useRef<Snap[]>([]);
+  const future = useRef<Snap[]>([]);
+  const stepRef = useRef(stepKey);
+  const maxRef = useRef(maxIndex);
+  stepRef.current = stepKey;
+  maxRef.current = maxIndex;
+  const snap = (): Snap => ({ doc: docRef.current, stepKey: stepRef.current, maxIndex: maxRef.current });
   const typing = useRef<TypingState | null>(null);
   const [undoKey, setUndoKey] = useState(0);
   /** 바뀌기 전 문서를 기록 (이어 치는 같은 어절이면 직전 기록에 합침) */
@@ -187,17 +195,21 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
     const r = next ? mergeTyping(docRef.current, next, typing.current, Date.now()) : { merge: false, state: null };
     typing.current = r.state;
     if (!r.merge || past.current.length === 0) {
-      past.current.push(docRef.current);
+      past.current.push(snap());
       if (past.current.length > 100) past.current.shift();
     }
     future.current = [];
   };
-  const travel = (from: React.RefObject<DesignDoc[]>, to: React.RefObject<DesignDoc[]>) => {
+  const travel = (from: React.RefObject<Snap[]>, to: React.RefObject<Snap[]>) => {
     const target = from.current.pop();
     if (!target) return;
-    to.current.push(docRef.current);
+    to.current.push(snap());
     typing.current = null;
-    commit({ ...target, progress: docRef.current.progress });
+    stepRef.current = target.stepKey;
+    maxRef.current = target.maxIndex;
+    setStepKey(target.stepKey);
+    setMaxIndex(target.maxIndex);
+    commit({ ...target.doc, progress: { stepKey: target.stepKey, maxIndex: target.maxIndex } });
     setUndoKey((k) => k + 1); // 단계 화면을 새로 그려 되돌린 내용이 입력칸에 보이게
   };
   const undo = () => travel(past, future);
@@ -243,6 +255,15 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
     const list = stepsFor(docRef.current);
     const to = Math.min(Math.max(i, 0), list.length - 1);
     const nextMax = Math.max(maxIndex, to);
+    if (list[to].key !== stepRef.current) {
+      // 단계 이동도 되돌리기 한 번
+      typing.current = null;
+      past.current.push(snap());
+      if (past.current.length > 100) past.current.shift();
+      future.current = [];
+    }
+    stepRef.current = list[to].key;
+    maxRef.current = nextMax;
     setStepKey(list[to].key);
     setMaxIndex(nextMax);
     setRestoredNote("");
@@ -252,10 +273,29 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const goTo = (key: StepKey) => goIndex(stepsFor(docRef.current).findIndex((s) => s.key === key));
-  const reset = () => {
+  /** 삭제하기: 저장된 설계면 설계 현황에서도 지우고, 아직 저장 전이면 쓰던 내용을 지우고 처음부터 */
+  const remove = async () => {
+    if (designId) {
+      if (!confirm(`「${docRef.current.basic.name || "이름 없는 설계"}」 설계를 삭제할까요? 설계 현황에서도 지워지고 되돌릴 수 없어요.`)) return;
+      try {
+        await api(`/api/designs/${designId}`, { method: "DELETE" });
+      } catch (e) {
+        return alert(e instanceof Error ? e.message : "삭제하지 못했어요.");
+      }
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {
+        /* 무시 */
+      }
+      window.location.href = "/designs";
+      return;
+    }
     if (!confirm("작성 중인 내용을 모두 지우고 처음부터 시작할까요?")) return;
-    remember();
+    past.current.push(snap());
+    future.current = [];
     commit(emptyDesign());
+    stepRef.current = "type";
+    maxRef.current = 0;
     setStepKey("type");
     setMaxIndex(0);
   };
@@ -337,20 +377,18 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
             type="button"
             onClick={() => void downloadFromBar()}
             title={docReady.ok ? "문서(.docx) 내려받기" : docReady.reason}
-            className={`flex items-center gap-1 rounded-lg border px-3 py-1 font-semibold ${docReady.ok ? "border-brand-500 text-brand-700 hover:bg-brand-50" : "border-gray-200 bg-gray-50 text-gray-400"}`}
+            className={`flex items-center gap-1 rounded-lg border px-3 py-1 font-semibold ${docReady.ok ? "border-sky-600 bg-sky-600 text-white hover:bg-sky-700" : "border-sky-200 bg-sky-50 text-sky-400"}`}
           >
             문서 <DownloadIcon />
           </button>
           {save && (
-            <button type="button" onClick={save} className="rounded-lg border border-brand-500 px-3 py-1 font-semibold text-brand-700 hover:bg-brand-50">
+            <button type="button" onClick={save} className="rounded-lg border border-brand-600 bg-brand-600 px-3 py-1 font-semibold text-white hover:bg-brand-700">
               💾 저장
             </button>
           )}
-          {isNew && !designId && (
-            <button type="button" onClick={reset} className="text-gray-400 hover:text-red-600">
-              처음부터 다시
-            </button>
-          )}
+          <button type="button" onClick={() => void remove()} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1 font-semibold text-red-600 hover:bg-red-100">
+            삭제하기
+          </button>
         </div>
       </div>
       <div className="-mt-4 space-y-2">
