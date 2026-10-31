@@ -279,3 +279,22 @@ describe("관리자: 학교 일괄 등록", () => {
     expect((await login(repo, "여수서초등학교", "password12")).id).toBe(u!.id);
   });
 });
+
+describe("타학교 완성 설계안", () => {
+  it("다른 학교의 완성(오류 0 + 체크리스트 모두 ○) 설계만 보이고, 미완성은 볼 수 없다", async () => {
+    const { listSharedDesigns, getSharedDesign } = await import("./services");
+    const { checklistFor } = await import("@/domain/checklist");
+    const { repo, admin, t } = await setup();
+    const done = sampleSubject();
+    done.checklist = Object.fromEntries(checklistFor("subject").map((c) => [c.id, true]));
+    const a = await saveDesign(repo, t, done);
+    const b = await saveDesign(repo, t, { ...sampleSubject(), basic: { ...sampleSubject().basic, name: "미완성 과목" } });
+    const mine = await saveDesign(repo, admin, done);
+    const list = await listSharedDesigns(repo, admin);
+    expect(list.map((d) => d.id)).toEqual([a.record.id]);
+    expect(list[0].school).toBe("광양마동초등학교");
+    expect((await listSharedDesigns(repo, t)).map((d) => d.id)).toEqual([mine.record.id]);
+    expect((await getSharedDesign(repo, admin, a.record.id)).school).toBe("광양마동초등학교");
+    await expect(getSharedDesign(repo, admin, b.record.id)).rejects.toThrow("완성된 설계만");
+  });
+});

@@ -1,5 +1,6 @@
 import { LoginGateLink } from "@/components/LoginGate";
 import { ExamplesButton } from "@/components/Examples";
+import { SharedDesignsButton } from "@/components/SharedDesigns";
 
 const steps = [
   ["기본 정보", "학년·학기를 고르면 시수가 자동으로 채워져요"],
@@ -19,18 +20,15 @@ export default function Home() {
         <p className="mt-3 text-gray-600">
           내 AI에 붙여 넣을 프롬프트를 만들고, AI 답을 지침대로 점검해 한글 문서로 완성해요.
         </p>
-        <LoginGateLink
-          href="/designs/new"
-          className="mt-6 inline-block rounded-lg bg-brand-600 px-5 py-3 font-semibold text-white hover:bg-brand-700"
-        >
-          새 설계 시작하기
-        </LoginGateLink>
-        <LoginGateLink
-          href="/hours"
-          className="ml-2 mt-6 inline-block rounded-lg border border-brand-500 px-5 py-3 font-semibold text-brand-700 hover:bg-brand-50"
-        >
-          시수 편성 점검하기
-        </LoginGateLink>
+        <div className="mt-6 flex flex-wrap gap-2">
+          <LoginGateLink href="/designs/new" className="rounded-lg bg-brand-600 px-5 py-3 font-semibold text-white hover:bg-brand-700">
+            새 설계 시작하기
+          </LoginGateLink>
+          <LoginGateLink href="/hours" className="rounded-lg bg-amber-500 px-5 py-3 font-semibold text-white hover:bg-amber-600">
+            시수 편성 점검하기
+          </LoginGateLink>
+          <SharedDesignsButton className="rounded-lg bg-sky-600 px-5 py-3 font-semibold text-white hover:bg-sky-700" />
+        </div>
         <ExamplesButton />
       </section>
 

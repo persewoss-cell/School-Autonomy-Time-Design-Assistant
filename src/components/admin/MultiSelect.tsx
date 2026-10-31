@@ -73,3 +73,55 @@ export function MultiSelect({
     </div>
   );
 }
+
+/** 하나만 고르는 드롭다운. MultiSelect와 같은 모양 (빈 값 = '전체') */
+export function SingleSelect({
+  allLabel,
+  options,
+  value,
+  onChange,
+}: {
+  allLabel: string;
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+  const pick = (v: string) => {
+    onChange(v);
+    setOpen(false);
+  };
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`flex min-w-32 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm ${value ? "border-brand-500 bg-brand-50 font-semibold text-brand-700" : "border-gray-300 bg-white text-gray-700"}`}
+      >
+        <span className="max-w-44 truncate">{options.find((o) => o.value === value)?.label ?? allLabel}</span>
+        <span className="text-xs text-gray-400">▾</span>
+      </button>
+      {open && (
+        <div className="absolute z-30 mt-1 min-w-40 rounded-lg border border-gray-200 bg-white p-1 shadow-lg">
+          {[{ value: "", label: allLabel }, ...options].map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => pick(o.value)}
+              className={`block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-gray-50 ${o.value === value ? "font-semibold text-brand-700" : ""}`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

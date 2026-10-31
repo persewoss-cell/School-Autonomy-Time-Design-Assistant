@@ -25,9 +25,11 @@ export function AuthNav() {
         </>
       )}
       {me?.user && (
-        <span className="flex items-center gap-2">
-          <Link href="/account/password" className="text-gray-400 hover:text-brand-700" title="비밀번호 바꾸기">{me.user.schoolName}</Link>
+        <span className="flex items-center gap-3">
+          <Link href="/account/password" className="text-gray-400 hover:text-brand-700">비밀번호 변경</Link>
           <button type="button" onClick={logout} className="text-gray-400 hover:text-red-600">로그아웃</button>
+          {/* 로그인한 학교 (누르는 버튼은 아님) */}
+          <span className="rounded-full border border-brand-100 bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">{me.user.schoolName}</span>
         </span>
       )}
       {me && !me.enabled && <Link href="/status" className={link}>설정 확인</Link>}

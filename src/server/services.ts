@@ -485,3 +485,44 @@ export async function createUsersByAdmin(repo: Repo, admin: User, rows: BulkRow[
   if (made) await adminLog(repo, admin, `학교 등록: ${made}개 (${out.filter((x) => x.ok).map((x) => x.schoolName).slice(0, 5).join(", ")}${made > 5 ? " 외" : ""})`);
   return out;
 }
+
+// ───────────── 타학교 완성 설계안 (로그인한 학교끼리 나눔) ─────────────
+export interface SharedDesign {
+  id: string;
+  school: string;
+  type: "subject" | "activity";
+  grade: number;
+  semester: number;
+  name: string;
+  schoolYear: string;
+  updatedAt: Date;
+}
+
+/** 완성된 설계인지: 오류 0개 + 체크리스트 모두 ○ (시수 점검은 그 학교 일이라 보지 않음) */
+async function isComplete(repo: Repo, d: DesignSummary): Promise<boolean> {
+  if (d.errorCount !== 0) return false;
+  if (typeof d.checklistLeft === "number") return d.checklistLeft === 0;
+  const full = await repo.designs.get(d.id); // 예전 저장본
+  return !!full && checklistResults(full.doc).every((c) => c.ok);
+}
+
+/** 다른 학교가 완성한 설계 목록 */
+export async function listSharedDesigns(repo: Repo, user: User): Promise<SharedDesign[]> {
+  const [all, users] = await Promise.all([repo.designs.listAll(), repo.users.list()]);
+  const school = new Map(users.map((u) => [u.id, u.schoolName]));
+  const others = all.filter((d) => d.ownerId !== user.id && school.has(d.ownerId));
+  const done = await Promise.all(others.map((d) => isComplete(repo, d)));
+  return others
+    .filter((_, i) => done[i])
+    .map((d) => ({ id: d.id, school: school.get(d.ownerId)!, type: d.type, grade: d.grade, semester: d.semester, name: d.name, schoolYear: d.schoolYear, updatedAt: d.updatedAt }));
+}
+
+/** 다른 학교 완성 설계 하나 (보기·내려받기·가져오기용) */
+export async function getSharedDesign(repo: Repo, user: User, id: string): Promise<{ doc: DesignRecord["doc"]; school: string }> {
+  const d = await repo.designs.get(id);
+  if (!d) throw new ServiceError(404, "설계를 찾을 수 없습니다.");
+  const { doc: _doc, ...summary } = d;
+  if (d.ownerId !== user.id && !(await isComplete(repo, summary))) throw new ServiceError(403, "완성된 설계만 볼 수 있어요.");
+  const owner = await repo.users.findById(d.ownerId);
+  return { doc: d.doc, school: owner?.schoolName ?? d.schoolName };
+}

@@ -28,7 +28,7 @@ export function allocationFor(doc: DesignDoc, id: string, checks: Checks, design
 }
 
 /** .docx를 만들어 내려받기 */
-export async function saveDesignDocx(doc: DesignDoc, attachment: AllocationAttachment | PendingAllocation) {
+export async function saveDesignDocx(doc: DesignDoc, attachment?: AllocationAttachment | PendingAllocation) {
   const blob = await Packer.toBlob(buildDesignDocx(doc, attachment));
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

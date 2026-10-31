@@ -272,12 +272,12 @@ export function FinalStep({
 }
 
 /** 간단한 문서 미리보기 (교육과정 문서 본문) */
-export function DocPreview({ doc }: { doc: DesignDoc }) {
+export function DocPreview({ doc, title = "④ 미리보기" }: { doc: DesignDoc; title?: string }) {
   const codes = codeMap(doc);
   const subject = doc.basic.type === "subject";
   return (
     <Card className="space-y-4 text-sm">
-      <h2 className="font-bold">④ 미리보기</h2>
+      <h2 className="font-bold">{title}</h2>
       <div className="space-y-4 rounded-xl border border-gray-200 p-5">
         <p className="text-center text-lg font-bold">「{doc.basic.name}」</p>
         <section>

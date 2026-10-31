@@ -13,7 +13,7 @@ import { fmtDate, StatusBadge, type DesignRow } from "../account/MyDesigns";
 import { useMe } from "../useMe";
 import { Modal } from "../Modal";
 import { enterSchool } from "../ActingBanner";
-import { MultiSelect } from "./MultiSelect";
+import { MultiSelect, SingleSelect } from "./MultiSelect";
 import { SortTh, useSort } from "./sort";
 import { BulkUsers } from "./BulkUsers";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -247,6 +247,11 @@ function UsersTable({
   );
 }
 
+const TYPE_OPTIONS = [
+  { value: "activity", label: "활동" },
+  { value: "subject", label: "과목" },
+];
+
 type AdminDesignRow = DesignRow & { owner: string; ownerId: string; hoursComplete: boolean; schoolYear?: string };
 
 /** 관리자: 전체 설계 — 학교·유형·학년 고르기, 제목 세모로 정렬, 상세보기(그 학교로 들어가 보기), 삭제 */
@@ -298,24 +303,20 @@ export function AdminDesigns() {
       <div className="flex flex-wrap items-center gap-2">
         <input className={`${inputClass} max-w-56`} placeholder="설계 이름·학교 검색" value={q} onChange={(e) => setQ(e.target.value)} />
         <MultiSelect allLabel="전체 학교" options={schoolOptions} selected={schools} onChange={setSchools} />
-        <select className={`${inputClass} max-w-32`} value={type} onChange={(e) => setType(e.target.value)}>
-          <option value="">전체 유형</option>
-          <option value="activity">활동</option>
-          <option value="subject">과목</option>
-        </select>
+        <SingleSelect allLabel="전체 유형" options={TYPE_OPTIONS} value={type} onChange={setType} />
         <MultiSelect allLabel="전체 학년" options={[3, 4, 5, 6].map((g) => ({ value: String(g), label: `${g}학년` }))} selected={grades} onChange={setGrades} />
-        <select
-          className={`${inputClass} max-w-32`}
+        <SingleSelect
+          allLabel="전체 상태"
+          options={[
+            { value: "complete", label: "완성" },
+            { value: "progress", label: "설계 중" },
+          ]}
           value={status}
-          onChange={(e) => {
-            setStatus(e.target.value);
-            router.replace(e.target.value ? `/admin/designs?status=${e.target.value}` : "/admin/designs");
+          onChange={(v) => {
+            setStatus(v);
+            router.replace(v ? `/admin/designs?status=${v}` : "/admin/designs");
           }}
-        >
-          <option value="">전체 상태</option>
-          <option value="complete">완성</option>
-          <option value="progress">설계 중</option>
-        </select>
+        />
         <span className="text-sm text-gray-500">{rows.length}건</span>
       </div>
       <Card className="overflow-x-auto">
