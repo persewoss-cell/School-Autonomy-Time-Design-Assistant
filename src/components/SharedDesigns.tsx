@@ -6,13 +6,14 @@ import { useEffect, useMemo, useState } from "react";
 import type { DesignDoc } from "@/domain/types";
 import { api } from "@/lib/api";
 import { Modal } from "./Modal";
-import { DownloadIcon, OpenNewIcon } from "./icons";
+import { DownloadIcon } from "./icons";
 import { TypeTag, inputClass } from "./ui";
 import { loadMe } from "./useMe";
 import { MultiSelect, SingleSelect } from "./admin/MultiSelect";
 import { SortTh, useSort } from "./admin/sort";
 import { saveDesignDocx } from "./wizard/downloadDesign";
 import { ExamplesButton } from "./Examples";
+import { SharedDesignView } from "./SharedDesignView";
 
 interface Shared {
   id: string;
@@ -126,7 +127,9 @@ function SharedTable({ rows }: { rows: Shared[] }) {
   const [years, setYears] = useState<string[]>([]);
   const [busy, setBusy] = useState("");
   /** 보기·내려받기 전 양식 안내 */
-  const [notice, setNotice] = useState<{ row: Shared; action: "view" | "download" } | null>(null);
+  const [notice, setNotice] = useState<Shared | null>(null);
+  /** 요약보기 팝업 */
+  const [preview, setPreview] = useState<Shared | null>(null);
   const [cloned, setCloned] = useState<{ name: string; id: string } | null>(null);
   const shown = useMemo(
     () =>
@@ -150,10 +153,11 @@ function SharedTable({ rows }: { rows: Shared[] }) {
   const yearOptions = [...new Set(rows.map((d) => d.schoolYear))].sort().reverse().map((v) => ({ value: v, label: `${v}학년도` }));
   const proceed = () => {
     if (!notice) return;
-    const { row, action } = notice;
+    const row = notice;
     setNotice(null);
-    if (action === "view") window.open(`/shared/${row.id}`, "_blank", "noopener,noreferrer");
-    else void download(row);
+    // 내려받으면서 새 창에서도 문서를 띄움 (누른 순간 열어야 팝업 차단에 안 걸림)
+    window.open(`/shared/${row.id}`, "_blank", "noopener,noreferrer");
+    void download(row);
   };
   const fetchDoc = async (id: string) => (await api<{ doc: DesignDoc; school: string }>(`/api/shared/designs/${id}`)).doc;
 
@@ -219,7 +223,7 @@ function SharedTable({ rows }: { rows: Shared[] }) {
               <SortTh label="학년-학기" k="grade" sort={sort} />
               <SortTh label="명칭" k="name" sort={sort} />
               <th className="p-2 text-center">복제</th>
-              <th className="p-2 text-center">보기</th>
+              <th className="p-2 text-center">요약보기</th>
               <th className="p-2 text-center">내려받기</th>
             </tr>
           </thead>
@@ -249,12 +253,12 @@ function SharedTable({ rows }: { rows: Shared[] }) {
                   </button>
                 </td>
                 <td className="p-2 text-center">
-                  <button type="button" onClick={() => setNotice({ row: d, action: "view" })} title="새 창에서 문서 보기" className="inline-flex rounded-lg p-1.5 text-gray-600 hover:bg-gray-100">
-                    <OpenNewIcon />
+                  <button type="button" onClick={() => setPreview(d)} className="rounded-full border border-gray-300 px-2.5 py-0.5 text-xs text-gray-600 hover:bg-gray-50">
+                    요약보기
                   </button>
                 </td>
                 <td className="p-2 text-center">
-                  <button type="button" disabled={!!busy} onClick={() => setNotice({ row: d, action: "download" })} title="문서(.docx) 내려받기" className="inline-flex rounded-lg p-1.5 text-brand-700 hover:bg-brand-50 disabled:opacity-50">
+                  <button type="button" disabled={!!busy} onClick={() => setNotice(d)} title="문서(.docx) 내려받기 (새 창에서도 열림)" className="inline-flex rounded-lg p-1.5 text-brand-700 hover:bg-brand-50 disabled:opacity-50">
                     {busy === d.id ? "…" : <DownloadIcon />}
                   </button>
                 </td>
@@ -281,7 +285,7 @@ function SharedTable({ rows }: { rows: Shared[] }) {
                 취소
               </button>
               <button type="button" onClick={proceed} className="rounded-lg bg-brand-600 px-4 py-2 font-semibold text-white hover:bg-brand-700">
-                {notice.action === "view" ? "확인하고 보기" : "확인하고 내려받기"}
+                확인하고 내려받기
               </button>
             </>
           }
@@ -291,6 +295,21 @@ function SharedTable({ rows }: { rows: Shared[] }) {
           </p>
           <p className="text-sm text-gray-600">양식 예시는 광양중동초등학교 예시안을 참고하세요.</p>
           <ExamplesButton />
+        </Modal>
+      )}
+      {preview && (
+        <Modal
+          xl
+          tone="brand"
+          title={`요약보기 — ${preview.name}`}
+          onClose={() => setPreview(null)}
+          actions={
+            <button type="button" onClick={() => setPreview(null)} className="rounded-lg border border-gray-300 px-4 py-2 font-semibold text-gray-700 hover:bg-gray-50">
+              닫기
+            </button>
+          }
+        >
+          <SharedDesignView id={preview.id} />
         </Modal>
       )}
       {cloned && (
