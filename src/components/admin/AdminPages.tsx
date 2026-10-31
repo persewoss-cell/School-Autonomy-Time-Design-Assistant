@@ -254,25 +254,25 @@ function UsersTable({
       )}
       <BulkUsers onDone={reload} />
       <Card className="overflow-x-auto">
-        <table className={`${DESIGN_TABLE} [&_td]:px-2.5 [&_th]:px-2.5`}>
+        <table className={`${DESIGN_TABLE} [&_td]:px-4 [&_th]:px-4`}>
           <thead className={DESIGN_THEAD}>
             <tr>
-              <SortTh label="지역" k="region" sort={sort} dark className={NARROW} />
+              <SortTh label="지역" k="region" sort={sort} dark className="text-center" />
               <SortTh label="학교명" k="school" sort={sort} dark className="text-center" />
-              <SortTh label="상태" k="status" sort={sort} dark className={NARROW} />
-              <SortTh label="권한" k="role" sort={sort} dark className={NARROW} />
-              <SortTh label="설계" k="designs" sort={sort} dark className={NARROW} />
-              <SortTh label="가입일" k="created" sort={sort} dark className={NARROW} />
-              <SortTh label="최근 로그인" k="login" sort={sort} dark className={NARROW} />
-              <th className={`p-2 ${NARROW}`}>관리</th>
+              <SortTh label="상태" k="status" sort={sort} dark className="text-center" />
+              <SortTh label="권한" k="role" sort={sort} dark className="text-center" />
+              <SortTh label="설계" k="designs" sort={sort} dark className="text-center" />
+              <SortTh label="가입일" k="created" sort={sort} dark className="text-center" />
+              <SortTh label="최근 로그인" k="login" sort={sort} dark className="text-center" />
+              <th className={`p-2 text-center`}>관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-center">
             {sort.sorted.map((u) => (
               <tr key={u.id} className={DESIGN_ROW}>
                 <td className="p-2">{u.region || "-"}</td>
-                <td className="w-full max-w-0 p-2 text-left">
-                  <span className="block truncate" title={u.schoolName}>
+                <td className="p-2 text-left">
+                  <span className="block" title={u.schoolName}>
                     <b>{u.schoolName}</b>
                     {u.mustChangePassword && <span className="ml-1 text-xs text-amber-600">(임시 비밀번호)</span>}
                   </span>
@@ -611,12 +611,12 @@ export function AdminLogs() {
         )}
       </div>
       <Card className="overflow-x-auto">
-        <table className={`${DESIGN_TABLE} [&_td]:px-2.5 [&_th]:px-2.5`}>
+        <table className={`${DESIGN_TABLE} [&_td]:px-4 [&_th]:px-4`}>
           <thead className={DESIGN_THEAD}>
             <tr>
-              <SortTh label="시각" k="time" sort={sort} dark className={NARROW} />
-              <SortTh label="종류" k="kind" sort={sort} dark className={NARROW} />
-              <SortTh label="학교" k="school" sort={sort} dark className={NARROW} />
+              <SortTh label="시각" k="time" sort={sort} dark className="text-center" />
+              <SortTh label="종류" k="kind" sort={sort} dark className="text-center" />
+              <SortTh label="학교" k="school" sort={sort} dark className="text-center" />
               <SortTh label="내용" k="detail" sort={sort} dark className="text-center" />
             </tr>
           </thead>
@@ -626,9 +626,9 @@ export function AdminLogs() {
                 <td className="p-2 text-xs text-gray-500">{fmtDate(l.createdAt)}</td>
                 <td className="p-2">{KIND_LABEL[l.kind] ?? l.kind}</td>
                 <td className="p-2 text-gray-600">{l.school ?? "-"}</td>
-                <td className="w-full max-w-0 p-2 text-left text-gray-600">
+                <td className="p-2 text-left text-gray-600">
                   <span className="flex items-center gap-2">
-                    <span className="truncate" title={l.detail}>
+                    <span title={l.detail}>
                       {l.detail}
                     </span>
                     {l.designId && <Link href={`/admin/designs/${l.designId}`} className="shrink-0 text-xs text-brand-600">설계 보기</Link>}

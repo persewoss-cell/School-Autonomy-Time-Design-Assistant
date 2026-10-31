@@ -10,7 +10,7 @@ import { DownloadIcon, OpenNewIcon } from "./icons";
 import { TypeTag, inputClass } from "./ui";
 import { loadMe } from "./useMe";
 import { MultiSelect, SingleSelect } from "./admin/MultiSelect";
-import { byYearThenSaved, DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, NARROW, SortTh, useSort } from "./admin/sort";
+import { byYearThenSaved, DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, SortTh, useSort } from "./admin/sort";
 import { saveDesignDocx } from "./wizard/downloadDesign";
 import { ExamplesButton } from "./Examples";
 import { SharedDesignView } from "./SharedDesignView";
@@ -216,18 +216,18 @@ function SharedTable({ rows }: { rows: Shared[] }) {
         <span className="text-sm text-gray-500">{shown.length}건</span>
       </div>
       <div className="overflow-x-auto">
-        <table className={`${DESIGN_TABLE} [&_td]:px-2.5 [&_th]:px-2.5`}>
+        <table className={`${DESIGN_TABLE} [&_td]:px-4 [&_th]:px-4`}>
           <thead className={DESIGN_THEAD}>
             <tr>
-              <SortTh label="학년도" k="year" sort={sort} dark className={NARROW} />
-              <SortTh label="학교" k="school" sort={sort} dark className={NARROW} />
-              <SortTh label="유형" k="type" sort={sort} dark className={NARROW} />
-              <SortTh label="학년" k="grade" sort={sort} dark className={NARROW} />
-              <SortTh label="학기" k="semester" sort={sort} dark className={NARROW} />
+              <SortTh label="학년도" k="year" sort={sort} dark className="text-center" />
+              <SortTh label="학교" k="school" sort={sort} dark className="text-center" />
+              <SortTh label="유형" k="type" sort={sort} dark className="text-center" />
+              <SortTh label="학년" k="grade" sort={sort} dark className="text-center" />
+              <SortTh label="학기" k="semester" sort={sort} dark className="text-center" />
               <SortTh label="과목(활동)명" k="name" sort={sort} dark className="text-center" />
-              <th className={`p-2 ${NARROW}`}>복제</th>
-              <th className={`p-2 ${NARROW}`}>요약보기</th>
-              <th className={`p-2 ${NARROW}`}>내려받기</th>
+              <th className={`p-2 text-center`}>복제</th>
+              <th className={`p-2 text-center`}>요약보기</th>
+              <th className={`p-2 text-center`}>내려받기</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-center">
@@ -243,8 +243,8 @@ function SharedTable({ rows }: { rows: Shared[] }) {
                 </td>
                 <td className="p-2">{d.grade}학년</td>
                 <td className="p-2">{d.semester}학기</td>
-                <td className="w-full max-w-0 p-2 text-left">
-                  <span className="block truncate" title={d.name}>
+                <td className="p-2 text-left">
+                  <span className="block" title={d.name}>
                     {d.name}
                   </span>
                 </td>

@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { REGION_VALUES } from "@/domain/regions";
 import { inputClass } from "../ui";
 import { Modal } from "../Modal";
-import { DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, NARROW } from "./sort";
+import { DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD } from "./sort";
 
 interface Row {
   region: string;
@@ -173,12 +173,12 @@ export function BulkUsers({ onDone }: { onDone: () => void }) {
         {results.some((r) => !r.ok) && <span className="text-red-600"> · {results.filter((r) => !r.ok).length}개 안 됨</span>}
       </p>
       <div className="max-h-64 overflow-auto rounded-lg border border-gray-200">
-        <table className={`${DESIGN_TABLE} [&_td]:px-2.5 [&_th]:px-2.5`}>
+        <table className={`${DESIGN_TABLE} [&_td]:px-4 [&_th]:px-4`}>
           <thead className={`sticky top-0 ${DESIGN_THEAD}`}>
             <tr>
-              {mode === "bulk" && <th className={`p-2 ${NARROW}`}>#</th>}
-              <th className={`p-2 ${NARROW}`}>학교명</th>
-              <th className={`p-2 ${NARROW}`}>결과</th>
+              {mode === "bulk" && <th className={`p-2 text-center`}>#</th>}
+              <th className={`p-2 text-center`}>학교명</th>
+              <th className={`p-2 text-center`}>결과</th>
               <th className="p-2 text-center">내용</th>
             </tr>
           </thead>
@@ -190,8 +190,8 @@ export function BulkUsers({ onDone }: { onDone: () => void }) {
                 <td className="p-2">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${r.ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>{r.ok ? "등록" : "안 됨"}</span>
                 </td>
-                <td className={`w-full max-w-0 p-2 text-left ${r.ok ? "text-gray-600" : "text-red-700"}`}>
-                  <span className="block truncate" title={r.message}>
+                <td className={`p-2 text-left ${r.ok ? "text-gray-600" : "text-red-700"}`}>
+                  <span className="block" title={r.message}>
                     {r.message}
                   </span>
                 </td>
@@ -315,12 +315,12 @@ export function BulkUsers({ onDone }: { onDone: () => void }) {
                 </span>
               </div>
               <div className="max-h-64 overflow-auto rounded-lg border border-gray-200">
-                <table className={`${DESIGN_TABLE} [&_td]:px-2.5 [&_th]:px-2.5`}>
+                <table className={`${DESIGN_TABLE} [&_td]:px-4 [&_th]:px-4`}>
                   <thead className={`sticky top-0 ${DESIGN_THEAD}`}>
                     <tr>
-                      <th className={`p-2 ${NARROW}`}>#</th>
+                      <th className={`p-2 text-center`}>#</th>
                       {HEADERS.map((h) => (
-                        <th key={h} className={`p-2 ${h === "학교명" ? "text-center" : NARROW}`}>
+                        <th key={h} className="p-2 text-center">
                           {h}
                         </th>
                       ))}
@@ -331,8 +331,8 @@ export function BulkUsers({ onDone }: { onDone: () => void }) {
                       <tr key={i} className={DESIGN_ROW}>
                         <td className="p-2 text-gray-400">{i + 1}</td>
                         <td className="p-2">{r.region}</td>
-                        <td className="w-full max-w-0 p-2 text-left">
-                          <span className="block truncate">{r.schoolName}</span>
+                        <td className="p-2 text-left">
+                          <span className="block">{r.schoolName}</span>
                         </td>
                         <td className="p-2 text-gray-400">{"•".repeat(Math.min(12, r.password.length))}</td>
                       </tr>

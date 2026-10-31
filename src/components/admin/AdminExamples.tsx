@@ -6,7 +6,7 @@ import { fileSize, type ExampleRow } from "../Examples";
 import { DownloadIcon } from "../icons";
 import { Card, Field, TypeTag, inputClass } from "../ui";
 import { useLoad } from "./AdminPages";
-import { byYearThenSaved, DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, NARROW, SortTh, useSort } from "./sort";
+import { byYearThenSaved, DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, SortTh, useSort } from "./sort";
 import { fmtDate } from "../account/MyDesigns";
 
 const nextYear = () => String(new Date().getFullYear() + (new Date().getMonth() >= 2 ? 1 : 0));
@@ -108,17 +108,17 @@ export function AdminExamples() {
       </Card>
       {error && <p className="text-red-700">{error}</p>}
       <Card className="overflow-x-auto">
-        <table className={`${DESIGN_TABLE} [&_td]:px-2.5 [&_th]:px-2.5`}>
+        <table className={`${DESIGN_TABLE} [&_td]:px-4 [&_th]:px-4`}>
           <thead className={DESIGN_THEAD}>
             <tr>
-              <SortTh label="학년도" k="year" sort={sort} dark className={NARROW} />
-              <SortTh label="유형" k="type" sort={sort} dark className={NARROW} />
-              <SortTh label="학년" k="grade" sort={sort} dark className={NARROW} />
-              <SortTh label="학기" k="semester" sort={sort} dark className={NARROW} />
+              <SortTh label="학년도" k="year" sort={sort} dark className="text-center" />
+              <SortTh label="유형" k="type" sort={sort} dark className="text-center" />
+              <SortTh label="학년" k="grade" sort={sort} dark className="text-center" />
+              <SortTh label="학기" k="semester" sort={sort} dark className="text-center" />
               <SortTh label="과목(활동)명" k="name" sort={sort} dark className="text-center" />
-              <SortTh label="올린 날" k="uploaded" sort={sort} dark className={NARROW} />
-              <th className={`p-2 ${NARROW}`}>파일</th>
-              <th className={`p-2 ${NARROW}`}>삭제</th>
+              <SortTh label="올린 날" k="uploaded" sort={sort} dark className="text-center" />
+              <th className={`p-2 text-center`}>파일</th>
+              <th className={`p-2 text-center`}>삭제</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-center">
@@ -130,8 +130,8 @@ export function AdminExamples() {
                 </td>
                 <td className="p-2">{r.grade}학년</td>
                 <td className="p-2">{r.semester}학기</td>
-                <td className="w-full max-w-0 p-2 text-left font-semibold">
-                  <span className="block truncate" title={r.name}>
+                <td className="p-2 text-left font-semibold">
+                  <span className="block" title={r.name}>
                     {r.name}
                   </span>
                 </td>
