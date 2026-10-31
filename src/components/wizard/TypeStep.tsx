@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { DesignType } from "@/domain/types";
-import { Card, NavButtons } from "../ui";
+import { Card, NavButtons, TypeTag } from "../ui";
 
 const OPTIONS: { type: DesignType; title: string; points: string[] }[] = [
   {
@@ -42,7 +42,9 @@ export function TypeStep({ value, onNext }: { value: DesignType; onNext: (t: Des
               type === o.type ? "border-brand-500 bg-brand-50" : "border-gray-200 hover:border-brand-100"
             }`}
           >
-            <p className="text-lg font-bold">학교자율시간 {o.title}</p>
+            <p className="flex items-center gap-2 text-lg font-bold">
+              학교자율시간 <TypeTag type={o.type} className="text-base" />
+            </p>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-600">
               {o.points.map((p) => (
                 <li key={p}>{p}</li>

@@ -8,7 +8,7 @@ import { buildDesignDocx, docxFileName } from "@/export/docx";
 import { validateDesign } from "@/validation/design";
 import { api } from "@/lib/api";
 import { DocPreview } from "../wizard/FinalSteps";
-import { Card, IssueList, inputClass } from "../ui";
+import { Card, IssueList, inputClass, TypeTag } from "../ui";
 import { fmtDate, StatusBadge, type DesignRow } from "../account/MyDesigns";
 import { useMe } from "../useMe";
 
@@ -247,7 +247,7 @@ export function AdminDesigns() {
             {rows.map((d) => (
               <tr key={d.id}>
                 <td className="p-2"><Link href={`/admin/designs/${d.id}`} className="font-semibold text-brand-700 hover:underline">{d.name || "(이름 없음)"}</Link></td>
-                <td className="p-2">{d.type === "subject" ? "과목" : "활동"} · {d.grade}-{d.semester}</td>
+                <td className="p-2"><TypeTag type={d.type} /> {d.grade}-{d.semester}</td>
                 <td className="p-2">{d.schoolName}</td>
                 <td className="p-2 text-gray-600">{d.owner}</td>
                 <td className="p-2"><StatusBadge errors={d.errorCount} warnings={d.warningCount} type={d.type} progress={d.progress} /></td>
@@ -281,7 +281,7 @@ export function AdminDesignView({ id }: { id: string }) {
     <div className="space-y-4">
       <Card className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-xs text-gray-500">{doc.basic.type === "subject" ? "과목" : "활동"} · {doc.basic.grade}학년 {doc.basic.semester}학기 · {doc.basic.hours}시간 · {doc.application.schoolName}</p>
+          <p className="flex items-center gap-1 text-xs text-gray-500"><TypeTag type={doc.basic.type} /> {doc.basic.grade}학년 {doc.basic.semester}학기 · {doc.basic.hours}시간 · {doc.application.schoolName}</p>
           <p className="text-xl font-bold">{doc.basic.name}</p>
         </div>
         <button type="button" onClick={download} className="rounded-lg bg-brand-600 px-4 py-2 font-semibold text-white hover:bg-brand-700">📄 문서 내려받기</button>

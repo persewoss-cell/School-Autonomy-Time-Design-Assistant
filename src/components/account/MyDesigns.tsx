@@ -14,7 +14,7 @@ import { stepsFor } from "../wizard/Wizard";
 import { sameSemesterOthers, semesterHours } from "@/validation/hours";
 import { bandStatus, checkKey, isViewGrade, schoolYearOf, type Checks, type HourCheck } from "@/domain/hoursView";
 import type { Grade } from "@/domain/types";
-import { Card } from "../ui";
+import { Card, TypeTag } from "../ui";
 import { useMe } from "../useMe";
 
 export interface DesignRow {
@@ -337,15 +337,6 @@ export function MyDesigns() {
         </Modal>
       )}
     </div>
-  );
-}
-
-/** 과목·활동 구분 표시 (연한 배경색) */
-function TypeTag({ type }: { type: DesignRow["type"] }) {
-  return type === "subject" ? (
-    <span className="rounded bg-violet-100 px-1.5 py-0.5 text-xs font-semibold text-violet-700">과목</span>
-  ) : (
-    <span className="rounded bg-sky-100 px-1.5 py-0.5 text-xs font-semibold text-sky-700">활동</span>
   );
 }
 

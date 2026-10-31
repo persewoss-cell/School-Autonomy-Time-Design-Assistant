@@ -18,7 +18,7 @@ import { findSameName, sameNameMessage } from "@/validation/names";
 
 /** 에듀넷 티-클리어 '교육감 승인 과목' 목록 (교사 로그인해야 보임) */
 const APPROVED_SUBJECTS_URL = "https://www.edunet.net/sprApprSbjct/list/11";
-import { Card, Field, IssueList, NavButtons, inputClass } from "../ui";
+import { Card, Field, IssueList, NavButtons, TypeTag, inputClass } from "../ui";
 import { useSavedDesigns } from "./useSavedDesigns";
 
 export function BasicStep({
@@ -83,7 +83,9 @@ export function BasicStep({
 
   return (
     <Card className="space-y-5">
-      <h1 className="text-xl font-bold">기본 정보 ({kind})</h1>
+      <h1 className="flex items-center gap-2 text-xl font-bold">
+        기본 정보 <TypeTag type={b.type} className="text-sm" />
+      </h1>
 
       <div className="space-y-1">
         <label htmlFor="design-name" className="text-sm font-semibold">

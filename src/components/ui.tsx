@@ -268,3 +268,12 @@ export function Chips({
 }
 
 export const toggle = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
+
+/** 과목·활동 구분 표시 (연한 배경색: 과목 보라, 활동 하늘) — 설계 현황·설계 화면·관리자 화면에서 같이 쓴다 */
+export function TypeTag({ type, className = "" }: { type: "subject" | "activity"; className?: string }) {
+  return type === "subject" ? (
+    <span className={`rounded bg-violet-100 px-1.5 py-0.5 text-xs font-semibold text-violet-700 ${className}`}>과목</span>
+  ) : (
+    <span className={`rounded bg-sky-100 px-1.5 py-0.5 text-xs font-semibold text-sky-700 ${className}`}>활동</span>
+  );
+}
