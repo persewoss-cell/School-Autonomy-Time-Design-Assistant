@@ -317,6 +317,7 @@ export function AdminDesigns() {
     school: (d) => d.owner,
     type: (d) => d.type,
     grade: (d) => d.grade * 10 + d.semester,
+    semester: (d) => d.semester * 10 + d.grade,
     name: (d) => d.name,
     status: (d) => (d.errorCount === 0 ? 0 : 1),
     updated: (d) => d.updatedAt,
@@ -362,7 +363,8 @@ export function AdminDesigns() {
               <SortTh label="학년도" k="year" sort={sort} dark className={NARROW} />
               <SortTh label="학교" k="school" sort={sort} dark className={NARROW} />
               <SortTh label="유형" k="type" sort={sort} dark className={NARROW} />
-              <SortTh label="학년-학기" k="grade" sort={sort} dark className={NARROW} />
+              <SortTh label="학년" k="grade" sort={sort} dark className={NARROW} />
+              <SortTh label="학기" k="semester" sort={sort} dark className={NARROW} />
               <SortTh label="과목(활동)명" k="name" sort={sort} dark className="text-center" />
               <SortTh label="상태" k="status" sort={sort} dark className={NARROW} />
               <SortTh label="마지막 저장" k="updated" sort={sort} dark className={NARROW} />
@@ -379,9 +381,8 @@ export function AdminDesigns() {
                 <td className="p-2">
                   <TypeTag type={d.type} />
                 </td>
-                <td className="p-2">
-                  {d.grade}-{d.semester}
-                </td>
+                <td className="p-2">{d.grade}학년</td>
+                <td className="p-2">{d.semester}학기</td>
                 <td className="w-full max-w-0 p-2 text-left">
                   <span className="block truncate" title={d.name}>
                     {d.name || "(이름 없음)"}

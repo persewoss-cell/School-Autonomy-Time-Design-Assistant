@@ -335,6 +335,7 @@ function DesignTable({
       year: yearOf,
       type: (r) => r.type,
       grade: (r) => r.grade * 10 + r.semester,
+    semester: (r) => r.semester * 10 + r.grade,
       hours: (r) => r.hours ?? 0,
       name: (r) => r.name,
       fill: (r) => semesterFill(r, all).left,
@@ -352,7 +353,8 @@ function DesignTable({
           <tr>
             <SortTh label="학년도" k="year" sort={sort} dark className={NARROW} />
             <SortTh label="유형" k="type" sort={sort} dark className={NARROW} />
-            <SortTh label="학년-학기" k="grade" sort={sort} dark className={NARROW} />
+            <SortTh label="학년" k="grade" sort={sort} dark className={NARROW} />
+            <SortTh label="학기" k="semester" sort={sort} dark className={NARROW} />
             <SortTh label="차시" k="hours" sort={sort} dark className={NARROW} />
             <SortTh label="과목(활동)명" k="name" sort={sort} dark className="text-center" />
             <SortTh label="학기 편성" k="fill" sort={sort} dark className={NARROW} />
@@ -370,9 +372,8 @@ function DesignTable({
               <td className="p-2">
                 <TypeTag type={r.type} />
               </td>
-              <td className="p-2">
-                {r.grade}-{r.semester}
-              </td>
+              <td className="p-2">{r.grade}학년</td>
+              <td className="p-2">{r.semester}학기</td>
               <td className="p-2">{typeof r.hours === "number" ? `${r.hours}차시` : "-"}</td>
               <td className="w-full max-w-0 text-left font-semibold">
                 <button type="button" onClick={() => onOpen(r)} title={`${r.name} — 눌러서 설계 열기`} className="block max-w-full truncate text-left text-brand-800 hover:text-brand-600 hover:underline">
