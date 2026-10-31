@@ -180,7 +180,11 @@ export function MyDesigns() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">설계 현황</h1>
-        <Link href="/designs/new" className="rounded-lg bg-brand-600 px-4 py-2 font-semibold text-white hover:bg-brand-700">+ 새 설계</Link>
+        <span className="flex gap-2">
+          <Link href="/designs/new" className="rounded-lg bg-brand-600 px-4 py-2 font-semibold text-white hover:bg-brand-700">+ 새 설계</Link>
+          {/* 타학교 완성 설계안에서 복제해 가져오기 */}
+          <Link href="/shared" className="rounded-lg bg-sky-600 px-4 py-2 font-semibold text-white hover:bg-sky-700">가져오기</Link>
+        </span>
       </div>
       {error && <p className="text-red-700">{error}</p>}
       {rows === null ? (

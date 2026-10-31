@@ -20,7 +20,7 @@ export interface ExampleRow {
 export const fileSize = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1024))}KB`);
 
 /** 첫 화면: '학교자율시간 예시안 보기' 버튼 → 예시안 목록 팝업 (로그인 없이 누구나 내려받기) */
-export function ExamplesButton() {
+export function ExamplesButton({ className = "mt-3 block" }: { className?: string }) {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<ExampleRow[] | null>(null);
   const [error, setError] = useState("");
@@ -32,7 +32,7 @@ export function ExamplesButton() {
   };
   return (
     <>
-      <button type="button" onClick={show} className="mt-3 block text-sm font-semibold text-brand-700 underline hover:text-brand-600">
+      <button type="button" onClick={show} className={`${className} text-sm font-semibold text-brand-700 underline hover:text-brand-600`}>
         학교자율시간 예시안 보기 (광양중동초등학교)
       </button>
       {open && (

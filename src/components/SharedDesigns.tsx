@@ -88,7 +88,15 @@ export function SharedDesignsPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold">타학교 완성 설계안</h1>
-        <p className="mt-1 text-sm text-gray-600">학교들이 완성한 설계예요. 보기·내려받기를 하거나, 복제해 우리 학교 설계로 가져와 고쳐 쓸 수 있어요.</p>
+        <div className="mt-1 space-y-0.5 text-sm text-gray-600">
+          <p>학교들이 완성한 설계예요. 보기·내려받기를 하거나, 복제해 우리 학교 설계로 가져와 고쳐 쓸 수 있어요.</p>
+          <p>
+            이 문서는 앱이 만든 <b>docx 양식</b>이에요. 제출할 때는 내용을 <b>한글(hwp) 양식에 복사해 붙여</b> 양식을 맞춰 주세요.
+          </p>
+          <p>
+            양식 예시는 광양중동초등학교 예시안을 참고하세요. <ExamplesButton className="inline" />
+          </p>
+        </div>
       </div>
       <div className="rounded-2xl bg-white p-4 shadow-sm">
         {login ? (
