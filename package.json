@@ -12,6 +12,7 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "docx": "^9.15.0",
+    "docx-preview": "0.3.7",
     "exceljs": "^4.4.0",
     "jose": "^6.2.14",
     "mongodb": "^7.7.0",

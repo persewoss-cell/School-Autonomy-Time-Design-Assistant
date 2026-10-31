@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { DesignDoc } from "@/domain/types";
 import { api } from "@/lib/api";
 import { Modal } from "./Modal";
-import { DownloadIcon } from "./icons";
+import { DownloadIcon, OpenNewIcon } from "./icons";
 import { TypeTag, inputClass } from "./ui";
 import { loadMe } from "./useMe";
 import { MultiSelect, SingleSelect } from "./admin/MultiSelect";
@@ -155,8 +155,8 @@ function SharedTable({ rows }: { rows: Shared[] }) {
     if (!notice) return;
     const row = notice;
     setNotice(null);
-    // 내려받으면서 새 창에서도 문서를 띄움 (누른 순간 열어야 팝업 차단에 안 걸림)
-    window.open(`/shared/${row.id}`, "_blank", "noopener,noreferrer");
+    // 내려받으면서 그 .docx를 새 창에서도 띄움 (누른 순간 열어야 팝업 차단에 안 걸림)
+    window.open(`/shared/${row.id}/docx`, "_blank", "noopener,noreferrer");
     void download(row);
   };
   const fetchDoc = async (id: string) => (await api<{ doc: DesignDoc; school: string }>(`/api/shared/designs/${id}`)).doc;
@@ -253,12 +253,12 @@ function SharedTable({ rows }: { rows: Shared[] }) {
                   </button>
                 </td>
                 <td className="p-2 text-center">
-                  <button type="button" onClick={() => setPreview(d)} className="rounded-full border border-gray-300 px-2.5 py-0.5 text-xs text-gray-600 hover:bg-gray-50">
-                    요약보기
+                  <button type="button" onClick={() => setPreview(d)} title="요약보기" className="inline-flex rounded-lg p-1.5 text-gray-600 hover:bg-gray-100">
+                    <OpenNewIcon />
                   </button>
                 </td>
                 <td className="p-2 text-center">
-                  <button type="button" disabled={!!busy} onClick={() => setNotice(d)} title="문서(.docx) 내려받기 (새 창에서도 열림)" className="inline-flex rounded-lg p-1.5 text-brand-700 hover:bg-brand-50 disabled:opacity-50">
+                  <button type="button" disabled={!!busy} onClick={() => setNotice(d)} title="문서(.docx) 내려받기 (받은 문서를 새 창에서도 열어요)" className="inline-flex rounded-lg p-1.5 text-brand-700 hover:bg-brand-50 disabled:opacity-50">
                     {busy === d.id ? "…" : <DownloadIcon />}
                   </button>
                 </td>
