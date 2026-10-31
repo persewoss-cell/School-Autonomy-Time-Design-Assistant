@@ -2,7 +2,7 @@
 
 import { Packer } from "docx";
 import type { DesignDoc } from "@/domain/types";
-import { bandStatus, checkKey, isViewGrade, viewYears, type Checks, type DesignBrief } from "@/domain/hoursView";
+import { bandStatus, viewYears, type Checks, type DesignBrief } from "@/domain/hoursView";
 import { buildDesignDocx, docxFileName, type AllocationAttachment, type PendingAllocation } from "@/export/docx";
 
 /** 내려받기 전에 보여 주는 안내 (최종 점검 화면·설계 현황 같이 씀) */
@@ -19,7 +19,7 @@ export function allocationFor(doc: DesignDoc, id: string, checks: Checks, design
   const year = Number(doc.application.startYear) || 2027;
   const briefs = [...designs.filter((d) => d.id !== id), briefOf(doc, id)];
   const status = bandStatus(doc.basic.grade, year, checks, briefs);
-  const own = isViewGrade(doc.basic.grade) ? checks[checkKey(year, doc.basic.grade)] : undefined;
+  const own = status.okCheck;
   const attachment: AllocationAttachment | PendingAllocation =
     status.complete && own
       ? { input: own.input, years: viewYears(own.grade, own.schoolYear), grade: own.grade, schoolYear: own.schoolYear }

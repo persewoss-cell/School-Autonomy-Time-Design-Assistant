@@ -218,6 +218,8 @@ export function restoreHalf(check: HourCheck, half: 0 | 1, source: HourCheck, so
 export function missingHalves(check: HourCheck, designs: DesignBrief[]): { half: 0 | 1; grade: number; year: number; fromYear: number | null }[] {
   return viewHalves(check.grade, check.schoolYear).flatMap((h, i) => {
     if (designs.some((d) => d.grade === h.grade && yearOfDesign(d) === h.year)) return [];
+    // 이미 직접 입력했으면 알리지 않는다
+    if (check.input.courses.some((c) => Math.floor(c.semester / 2) === i)) return [];
     const years = designs.filter((d) => d.grade === h.grade).map(yearOfDesign).filter((y) => y > 0);
     return [{ half: i as 0 | 1, grade: h.grade, year: h.year, fromYear: years.length ? Math.max(...years) : null }];
   });
@@ -263,27 +265,41 @@ export function checkOk(check: HourCheck | undefined, designs: DesignBrief[]): b
 export interface BandStatus {
   band: BandKey;
   schoolYear: number;
+  /** 이 학년·학년도가 들어 있는 화면이 저장되고 이상없음 */
   complete: boolean;
-  /** 화면별 상태 */
-  views: { grade: ViewGrade; saved: boolean; ok: boolean }[];
-  /** 그 학년도 설계가 하나도 없는 학년 (시수 점검에서 직접 입력하거나 가져와야 함) */
-  gradesWithoutDesign: number[];
+  /** 이 학년·학년도를 담는 화면 2개 (같은 학년·학기를 담음: 예 2027학년도 5학년 화면 = 2028학년도 6학년 화면). 첫 번째가 기본 화면 */
+  views: { grade: ViewGrade; year: number; saved: boolean; ok: boolean }[];
+  /** 이상없음인 화면 (편성표 붙임에 씀) */
+  okCheck?: HourCheck;
+  /** 그 화면의 두 학년(학년도) */
+  halves: { grade: number; year: number }[];
+  /** 설계가 하나도 없는 절반 (시수 점검에서 직접 입력하거나 가져와야 함) */
+  halvesWithoutDesign: { grade: number; year: number }[];
 }
 
-/** 학년도의 학년군 시수 점검 완료 여부: 그 학년도 두 학년 화면이 모두 저장되고 이상없음 */
+/**
+ * 설계(학년·학년도)의 시수 점검 완료 여부.
+ * 그 설계가 들어가는 화면이 저장되고 이상없음이면 완료. 같은 학년·학기를 담는 짝 화면
+ * (3·5학년 화면 Y = 4·6학년 화면 Y+1)도 같은 것으로 본다. 앞 학년 학생들의 다른 화면과는 상관없다.
+ */
 export function bandStatus(grade: number, schoolYear: number, checks: Checks, designs: DesignBrief[]): BandStatus {
   const band = bandOfGrade(grade);
-  const grades = bandInfo(band).grades as readonly number[];
-  const views = grades.map((g) => {
-    const vg = g as ViewGrade;
-    const c = checks[checkKey(schoolYear, vg)];
-    return { grade: vg, saved: !!c, ok: checkOk(c, designs) };
+  const g = grade as ViewGrade;
+  const first = (bandInfo(band).grades as readonly number[])[0] === grade;
+  const twin = { grade: pairGrade(g), year: first ? schoolYear + 1 : schoolYear - 1 };
+  const views = [{ grade: g, year: schoolYear }, twin].map((v) => {
+    const c = checks[checkKey(v.year, v.grade)];
+    return { ...v, saved: !!c, ok: checkOk(c, designs) };
   });
+  const ok = views.find((v) => v.ok);
+  const halves = viewHalves(g, schoolYear);
   return {
     band,
     schoolYear,
-    complete: views.every((v) => v.ok),
+    complete: !!ok,
     views,
-    gradesWithoutDesign: grades.filter((g) => !designs.some((d) => d.grade === g && yearOfDesign(d) === schoolYear)),
+    okCheck: ok ? checks[checkKey(ok.year, ok.grade)] : undefined,
+    halves,
+    halvesWithoutDesign: halves.filter((h) => !designs.some((d) => d.grade === h.grade && yearOfDesign(d) === h.year)),
   };
 }

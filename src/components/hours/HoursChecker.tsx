@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   VIEW_GRADES,
-  bandStatus,
+  viewHalves,
   carryWarnings,
   checkKey,
   checkOk,
@@ -13,7 +13,6 @@ import {
   initialCheck,
   isViewGrade,
   missingHalves,
-  pairGrade,
   restoreHalf,
   schoolYearOf,
   semesterLabelWithYear,
@@ -139,9 +138,9 @@ export function HoursChecker() {
   const errorCount = r.issues.length;
   const diff = designDiff(check, designs);
   const all: Checks = { ...checks, [key]: check };
-  const status = bandStatus(grade, year, all, designs);
-  const pair = pairGrade(grade);
-  const pairCheck = all[checkKey(year, pair)];
+  // 이 화면이 이상없음이면 화면에 든 두 학년(학년도) 설계가 모두 시수 점검 완료
+  const viewOk = checkOk(check, designs);
+  const halvesLabel = viewHalves(grade, year).map((h) => `${h.grade}학년(${h.year})`).join("·");
   const warnings = carryWarnings(check, checks);
   const missing = missingHalves(check, designs).filter((m) => !skipped.includes(`${key}-${m.half}`));
 
@@ -186,7 +185,7 @@ export function HoursChecker() {
           <li>학년도와 학년을 고릅니다.</li>
           <li>그 학년도 설계가 자동으로 들어가요. 같은 학년·학년도를 앞서 점검했다면 그 시수를 그대로 이어받아요.</li>
           <li>바꿀 계획이 있으면 추가·삭제·수정하세요. 교과별 편성 시수는 아래 편성표 칸에 넣습니다.</li>
-          <li>학년군의 두 학년이 모두 이상없음이면 그 학년도 시수 점검 완료!</li>
+          <li>이 화면이 이상없음이면 화면에 든 두 학년 설계의 시수 점검 완료!</li>
         </ol>
         <p className="text-xs text-gray-400">기준: 학교자율시간 시수 편성 점검표(엑셀) 계산식 · 증감 범위는 지침대로 교과(군) 단위</p>
       </Card>
@@ -216,13 +215,13 @@ export function HoursChecker() {
       </div>
 
       {/* 학년도 완료 상태 + 완료까지 할 일 (한 상자) */}
-      <div className={`space-y-2 rounded-xl p-4 text-sm ${status.complete && missing.length === 0 ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-900"}`}>
+      <div className={`space-y-2 rounded-xl p-4 text-sm ${viewOk && missing.length === 0 ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-900"}`}>
         <p className="font-semibold">
-          {status.complete
-            ? `✓ ${year}학년도 ${info.label} 시수 점검 완료 — 설계 현황에 '시수점검 완료'로 표시돼요.`
-            : `${year}학년도 ${info.label} 시수 점검 완료까지 할 일 (두 학년 화면 ${info.grades.join("·")}학년이 모두 이상없음이어야 해요)`}
+          {viewOk
+            ? `✓ ${halvesLabel} 시수 점검 완료 — 이 두 학년의 설계는 설계 현황에 '시수점검 완료'로 표시돼요.`
+            : `${halvesLabel} 시수 점검 완료까지 할 일 (이 화면이 이상없음이면 완료)`}
         </p>
-        {(!status.complete || missing.length > 0) && (
+        {(!viewOk || missing.length > 0) && (
           <ul className="space-y-1.5">
             {missing.map((m) => (
               <li key={`m${m.half}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/70 px-3 py-2">
@@ -255,25 +254,9 @@ export function HoursChecker() {
                 </span>
               </li>
             ))}
-            {!checkOk(check, designs) && (
+            {!viewOk && (
               <li className="rounded-lg bg-white/70 px-3 py-2">
                 <b>{grade}학년 화면(지금 화면) 점검 필요</b> — 아래 ③ 점검 결과의 오류를 고쳐 주세요.
-              </li>
-            )}
-            {!checkOk(pairCheck, designs) && (
-              <li className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/70 px-3 py-2">
-                <span>
-                  <b>
-                    {pair}학년 화면 {pairCheck ? "점검 필요" : "아직 안 함"}
-                  </b>
-                </span>
-                <button
-                  type="button"
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-1 font-semibold text-gray-700 hover:bg-gray-50"
-                  onClick={() => void go(pair, year)}
-                >
-                  {pair}학년 화면으로 →
-                </button>
               </li>
             )}
           </ul>

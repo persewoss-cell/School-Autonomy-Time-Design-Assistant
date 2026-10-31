@@ -215,27 +215,18 @@ export function FinalStep({
               <p className="font-semibold">⚠ 시수 점검을 마쳐야 문서가 완성됩니다.</p>
               <p>지금 내려받으면 붙임(편성표) 자리에 &lsquo;시수 점검을 마쳐야 표시됩니다&rsquo;라는 빨간 안내가 들어가요.</p>
               <p>
-                {hours.views.map((v) => `${v.grade}학년 화면: ${v.ok ? "이상없음" : v.saved ? "점검 필요" : "아직 안 함"}`).join(" · ")}
-                {" "}— 학년군의 두 학년 화면이 모두 이상없음이어야 해요.
+                {year}학년도 {doc.basic.grade}학년 시수 점검 화면({hours.halves.map((h) => `${h.grade}학년(${h.year})`).join("·")})이{" "}
+                {hours.views[0].saved ? "아직 이상없음이 아니에요." : "아직 저장되지 않았어요."}
               </p>
-              {hours.gradesWithoutDesign.length > 0 && (
+              {hours.halvesWithoutDesign.length > 0 && (
                 <p>
-                  {hours.gradesWithoutDesign.join("·")}학년은 설계 현황에 설계가 없어 시수 점검에 자동으로 들어가지 않아요. 시수 점검 화면에서 {hours.gradesWithoutDesign.join("·")}학년 학교자율시간을 직접 입력해 주세요.
+                  {hours.halvesWithoutDesign.map((h) => `${h.grade}학년(${h.year}학년도)`).join("·")}은 설계가 없어 시수 점검 화면에서 학교자율시간을 직접 입력해야 해요.
                 </p>
               )}
               <div className="flex flex-wrap gap-2">
-                {hours.views
-                  .filter((v) => !v.ok)
-                  .map((v) => (
-                    <button
-                      key={v.grade}
-                      type="button"
-                      onClick={() => void goHours(v.grade)}
-                      className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-700"
-                    >
-                      ⚠ {v.grade}학년 시수 점검하기
-                    </button>
-                  ))}
+                <button type="button" onClick={() => void goHours(doc.basic.grade)} className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-700">
+                  ⚠ {doc.basic.grade}학년 시수 점검하기
+                </button>
               </div>
             </>
           )}

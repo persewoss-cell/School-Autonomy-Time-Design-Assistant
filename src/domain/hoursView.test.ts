@@ -63,10 +63,18 @@ describe("학년별 시수 점검 화면", () => {
     expect(synced.input.courses.find((x) => x.designId === "d4")?.hours).toBe(19);
     expect(synced.input.courses.some((x) => x.name === "직접 추가")).toBe(true);
   });
-  it("학년군의 두 화면이 모두 이상없음이어야 완료", () => {
+  it("설계가 들어간 화면이 이상없음이면 완료 (짝 화면도 같은 것으로, 앞 학년 학생들 화면과는 상관없음)", () => {
     expect(checkAllocation(okCheck(3).input).issues).toEqual([]);
     const checks = { [checkKey(2027, 3)]: okCheck(3) };
-    expect(bandStatus(3, 2027, checks, designs).complete).toBe(false);
+    // 2027학년도 3학년 화면 = 3학년(2027)·4학년(2028) → 3학년 2027 설계 완료, 4학년 2028 설계도 완료(짝 화면)
+    expect(bandStatus(3, 2027, checks, designs).complete).toBe(true);
+    expect(bandStatus(4, 2028, checks, designs).complete).toBe(true);
+    expect(bandStatus(3, 2027, checks, designs).halves).toEqual([
+      { grade: 3, year: 2027 },
+      { grade: 4, year: 2028 },
+    ]);
+    // 4학년 2027 설계는 3학년(2026)·4학년(2027) 화면 → 아직 안 함
+    expect(bandStatus(4, 2027, checks, designs).complete).toBe(false);
     checks[checkKey(2027, 4)] = okCheck(4);
     expect(bandStatus(4, 2027, checks, designs).complete).toBe(true);
     // 다른 학년도는 따로 점검
@@ -77,9 +85,9 @@ describe("학년별 시수 점검 화면", () => {
   });
   it("한 학년만 앱으로 설계해도, 다른 학년을 직접 입력해 맞추면 완료", () => {
     const only3 = designs.filter((d) => d.grade === 3);
-    expect(bandStatus(3, 2027, {}, only3).gradesWithoutDesign).toEqual([4]);
-    const checks = { [checkKey(2027, 3)]: okCheck(3, only3), [checkKey(2027, 4)]: okCheck(4, only3) };
-    expect(bandStatus(3, 2027, checks, only3).complete).toBe(true);
+    expect(bandStatus(3, 2027, {}, only3).halvesWithoutDesign).toEqual([{ grade: 4, year: 2028 }]);
+    // 4학년(2028)은 직접 입력해 3학년 화면만 이상없음 → 완료 (2027학년도 4학년 화면은 상관없음)
+    expect(bandStatus(3, 2027, { [checkKey(2027, 3)]: okCheck(3, only3) }, only3).complete).toBe(true);
   });
 });
 
@@ -110,6 +118,8 @@ describe("학년도별 시수 점검", () => {
       { half: 1, grade: 4, year: 2029, fromYear: 2027 },
     ]);
     const imported = importDesigns(v, 0, 2027, designs);
+    // 가져오거나 직접 입력한 절반은 더 알리지 않음
+    expect(missingHalves(imported, designs).map((m) => m.half)).toEqual([1]);
     expect(imported.input.courses).toEqual([{ name: "디지털탐험대3 (2027 설계)", subjectKey: "과학", semester: 0, hours: 29 }]);
   });
 });
