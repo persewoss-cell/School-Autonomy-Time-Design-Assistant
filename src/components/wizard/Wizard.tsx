@@ -318,7 +318,12 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
         <p className="flex items-center gap-1.5 text-sm text-gray-500">
           {doc.basic.name ? <b className="text-gray-800">{doc.basic.name}</b> : "새 설계"}
           <TypeTag type={doc.basic.type} />
-          {doc.basic.grade}학년 {doc.basic.semester}학기
+          {/* 학년·학기는 기본 정보를 마친 뒤에 표시 (처음엔 기본값이라 헷갈림) */}
+          {maxIndex >= 2 && (
+            <>
+              {doc.basic.grade}학년 {doc.basic.semester}학기
+            </>
+          )}
         </p>
         <div className="flex items-center gap-2 text-sm">
           <span className={`mr-1 text-xs ${saved.state === "error" ? "text-red-600" : "text-gray-400"}`}>{savedLabel}</span>
@@ -374,8 +379,8 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
                   title={state === "error" ? `${s.label}: 고칠 오류가 있어요` : state === "todo" ? `${s.label}: 아직 작성하지 않았어요` : s.label}
                   className={`flex h-full w-full flex-col items-center justify-center rounded-md px-0.5 py-1.5 text-center leading-tight disabled:cursor-not-allowed ${color} ${current ? "font-bold shadow-sm" : "font-medium"}`}
                 >
-                  <span className="text-[10px] opacity-75">{i + 1}{state === "error" ? " ⚠" : ""}</span>
-                  <span className="w-full truncate text-[12px] tracking-tighter md:text-[11px] lg:text-[12px]">{s.label}</span>
+                  <span className="text-[12px] font-semibold opacity-80">{i + 1}{state === "error" ? " ⚠" : ""}</span>
+                  <span className="w-full truncate text-[12px] tracking-tighter md:text-[11px] lg:text-[12px] xl:text-[13px]">{s.label}</span>
                 </button>
               </li>
             );
@@ -389,6 +394,7 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
       {stepKey === "type" && (
         <TypeStep
           value={doc.basic.type}
+          onChange={(type) => setDoc((d) => void (d.basic.type = type))}
           onNext={(type) => {
             setDoc((d) => void (d.basic.type = type));
             goIndex(1);

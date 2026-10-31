@@ -27,8 +27,13 @@ const OPTIONS: { type: DesignType; title: string; points: string[] }[] = [
   },
 ];
 
-export function TypeStep({ value, onNext }: { value: DesignType; onNext: (t: DesignType) => void }) {
+/** 고르는 순간 문서에 반영해 위 단계 목록(과목·활동마다 다름)이 바로 바뀐다 */
+export function TypeStep({ value, onChange, onNext }: { value: DesignType; onChange: (t: DesignType) => void; onNext: (t: DesignType) => void }) {
   const [type, setType] = useState<DesignType>(value);
+  const pick = (t: DesignType) => {
+    setType(t);
+    if (t !== value) onChange(t);
+  };
   return (
     <Card className="space-y-4">
       <h1 className="text-xl font-bold">무엇을 설계할까요?</h1>
@@ -37,7 +42,7 @@ export function TypeStep({ value, onNext }: { value: DesignType; onNext: (t: Des
           <button
             key={o.type}
             type="button"
-            onClick={() => setType(o.type)}
+            onClick={() => pick(o.type)}
             className={`rounded-xl border-2 p-5 text-left transition ${
               type === o.type ? "border-brand-500 bg-brand-50" : "border-gray-200 hover:border-brand-100"
             }`}
