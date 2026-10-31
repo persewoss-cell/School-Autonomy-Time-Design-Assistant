@@ -1,14 +1,13 @@
 import "server-only";
 import { ObjectId, type Db, type WithId, type Document } from "mongodb";
 import { nameKey } from "@/validation/names";
-import type { DesignRecord, DesignSummary, ExampleFile, HourCheckRecord, LogEntry, Repo, User } from "./repo";
+import { MAX_VERSIONS, type DesignRecord, type DesignSummary, type ExampleFile, type HourCheckRecord, type LogEntry, type Repo, type User } from "./repo";
 
 /**
  * MongoDB 저장소. 컬렉션: users, designs, designVersions, hourChecks, activityLogs
  * (설계 제안서 docs/PLAN.md의 데이터 구조)
  */
 
-const MAX_VERSIONS = 20;
 
 function toUser(d: WithId<Document> | null): User | null {
   if (!d) return null;
@@ -140,6 +139,10 @@ export function mongoRepo(db: Db): Repo {
       list: async (limit, skip = 0) =>
         (await logs.find().sort({ createdAt: -1 }).skip(skip).limit(limit).toArray()).map(({ _id, ...rest }) => ({ ...(rest as Omit<LogEntry, "id">), id: _id.toString() })),
       count: async () => logs.countDocuments(),
+    },
+    storageBytes: async () => {
+      const s = await db.command({ dbStats: 1 });
+      return Number(s.dataSize ?? 0) + Number(s.indexSize ?? 0);
     },
     examples: {
       list: async () => (await exampleFiles.find({}, { projection: { data: 0 } }).sort({ uploadedAt: -1 }).toArray()).map(toExample),

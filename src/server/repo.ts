@@ -133,6 +133,8 @@ export interface Repo {
     list(limit: number, skip?: number): Promise<LogEntry[]>;
     count(): Promise<number>;
   };
+  /** DB 사용량(바이트): 데이터 + 인덱스 */
+  storageBytes(): Promise<number>;
   examples: {
     list(): Promise<ExampleFile[]>;
     getFile(id: string): Promise<{ meta: ExampleFile; data: Buffer } | null>;
@@ -140,6 +142,15 @@ export interface Repo {
     delete(id: string): Promise<void>;
   };
 }
+
+/**
+ * 설계마다 남기는 이전 판 사본 수. 저장 실수에 대비한 최소한만 남긴다.
+ * (무료 DB 512MB에서 오래 쓰려고 20 → 3, 사용자 결정 2026-10-31)
+ */
+export const MAX_VERSIONS = 3;
+
+/** 무료 DB(MongoDB Atlas M0) 저장 한도 */
+export const DB_LIMIT_BYTES = 512 * 1024 * 1024;
 
 /** 메모리 저장소 (테스트용) */
 export function memoryRepo(): Repo {
@@ -198,6 +209,8 @@ export function memoryRepo(): Repo {
       },
       saveVersion: async (designId, doc) => {
         versions.push({ designId, doc: structuredClone(doc), savedAt: new Date() });
+        const mine = versions.filter((v) => v.designId === designId);
+        for (const v of mine.slice(0, Math.max(0, mine.length - MAX_VERSIONS))) versions.splice(versions.indexOf(v), 1);
       },
       deleteByOwner: async (ownerId) => {
         const before = designs.length;
@@ -223,6 +236,8 @@ export function memoryRepo(): Repo {
       list: async (limit, skip = 0) => [...logs].reverse().slice(skip, skip + limit),
       count: async () => logs.length,
     },
+    storageBytes: async () =>
+      JSON.stringify({ users, designs, versions, logs, hourChecks }).length + examples.reduce((t, e) => t + e.data.length, 0),
     examples: {
       list: async () => examples.map((e) => ({ ...e.meta })).sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime()),
       getFile: async (eid) => examples.find((e) => e.meta.id === eid) ?? null,

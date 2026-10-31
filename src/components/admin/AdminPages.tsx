@@ -64,6 +64,29 @@ function Breakdown({ title, data }: { title: string; data: Record<string, number
 interface Stats {
   users: { total: number; pending: number; resetRequests: number; byRegion: Record<string, number> };
   designs: { total: number; complete: number; inProgress: number; byType: Record<string, number>; byGrade: Record<string, number>; bySchool: Record<string, number> };
+  storage: { used: number; limit: number } | null;
+}
+
+const mb = (b: number) => (b / 1024 / 1024).toFixed(b < 10 * 1024 * 1024 ? 1 : 0);
+
+/** DB 사용량 막대: 70% 넘으면 주황, 90% 넘으면 빨강 */
+function StorageBar({ used, limit }: { used: number; limit: number }) {
+  const pct = Math.min(100, (used / limit) * 100);
+  const color = pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-brand-500";
+  return (
+    <Card className="space-y-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-bold">DB 사용량 (무료 한도)</h2>
+        <p className="text-sm text-gray-600">
+          <b>{mb(used)}MB</b> / {mb(limit)}MB ({pct < 1 ? pct.toFixed(1) : Math.round(pct)}%)
+        </p>
+      </div>
+      <div className="h-3 w-full overflow-hidden rounded-full bg-gray-100">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.max(pct, 0.5)}%` }} />
+      </div>
+      {pct >= 70 && <p className="text-sm font-semibold text-amber-700">무료 한도에 가까워요. 지난 학년도 설계를 정리하거나 DB 요금제를 올릴 때가 됐어요.</p>}
+    </Card>
+  );
 }
 
 export function AdminDashboard() {
@@ -86,6 +109,7 @@ export function AdminDashboard() {
         <StatLink href="/admin/designs?status=complete" label="설계 완성" value={data.designs.complete} sub="오류 0개" />
         <StatLink href="/admin/designs?status=progress" label="설계 중" value={data.designs.inProgress} sub="오류가 남은 설계" />
       </div>
+      {data.storage && <StorageBar used={data.storage.used} limit={data.storage.limit} />}
       <div className="grid gap-3 md:grid-cols-2">
         <Breakdown title="유형별 설계" data={data.designs.byType} />
         <Breakdown title="학년별 설계" data={data.designs.byGrade} />

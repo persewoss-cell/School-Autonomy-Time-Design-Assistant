@@ -5,7 +5,7 @@ import { REGION_VALUES } from "@/domain/regions";
 import { checklistResults, validateDesign, withoutDismissed } from "@/validation/design";
 import { checkBasicHours, sameSemesterOthers, type SemesterOthers } from "@/validation/hours";
 import { bandStatus, checkKey, isViewGrade, type Checks, type HourCheck } from "@/domain/hoursView";
-import type { DesignRecord, DesignSummary, Repo, User } from "./repo";
+import { DB_LIMIT_BYTES, type DesignRecord, type DesignSummary, type Repo, type User } from "./repo";
 
 /** 서비스 계층: 로그인·저장·권한 규칙. 저장소(repo)만 바꾸면 테스트할 수 있다. */
 
@@ -365,7 +365,7 @@ export async function updateUserByAdmin(
 
 /** 관리자 대시보드 통계 */
 export async function adminStats(repo: Repo) {
-  const [users, designs] = await Promise.all([repo.users.list(), repo.designs.listAll()]);
+  const [users, designs, used] = await Promise.all([repo.users.list(), repo.designs.listAll(), repo.storageBytes().catch(() => null)]);
   const count = <T,>(xs: T[], key: (x: T) => string) =>
     xs.reduce<Record<string, number>>((acc, x) => {
       const k = key(x);
@@ -388,6 +388,8 @@ export async function adminStats(repo: Repo) {
       byGrade: count(designs, (d) => `${d.grade}학년`),
       bySchool: count(designs, (d) => d.schoolName || "(학교 미입력)"),
     },
+    /** DB 사용량 (무료 한도 대비). 읽지 못하면 null */
+    storage: used === null ? null : { used, limit: DB_LIMIT_BYTES },
   };
 }
 

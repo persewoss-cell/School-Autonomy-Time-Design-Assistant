@@ -298,3 +298,20 @@ describe("타학교 완성 설계안", () => {
     await expect(getSharedDesign(repo, admin, b.record.id)).rejects.toThrow("완성된 설계만");
   });
 });
+
+describe("DB 용량", () => {
+  it("설계마다 이전 판 사본은 3개까지만 남고, 대시보드에 사용량이 나온다", async () => {
+    const { MAX_VERSIONS } = await import("./repo");
+    const { repo, admin } = await setup();
+    const saved = await saveDesign(repo, admin, sampleSubject());
+    for (let i = 0; i < 6; i++) await saveDesign(repo, admin, sampleSubject(), saved.record.id);
+    const before = await repo.storageBytes();
+    for (let i = 0; i < 6; i++) await saveDesign(repo, admin, sampleSubject(), saved.record.id);
+    expect(MAX_VERSIONS).toBe(3);
+    // 사본이 더 쌓이지 않으므로 (기록 몇 줄 말고는) 크기가 거의 그대로
+    expect((await repo.storageBytes()) - before).toBeLessThan(5000);
+    const stats = await adminStats(repo);
+    expect(stats.storage?.limit).toBe(512 * 1024 * 1024);
+    expect(stats.storage!.used).toBeGreaterThan(0);
+  });
+});
