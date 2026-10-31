@@ -355,15 +355,15 @@ export function AdminDesigns() {
         <span className="text-sm text-gray-500">{rows.length}건</span>
       </div>
       <Card className="overflow-x-auto">
-        {/* 명칭 말고는 내용 폭만큼만(w-px), 남는 폭은 모두 명칭. 제목과 내용은 모두 가운데 정렬 */}
+        {/* 과목(활동)명 말고는 내용 폭만큼만(w-px), 남는 폭은 모두 과목(활동)명. 제목은 모두 가운데, 내용은 과목(활동)명만 왼쪽 */}
         <table className="w-full min-w-[980px] text-sm whitespace-nowrap">
-          <thead className="text-xs text-gray-500">
+          <thead className="border-b border-gray-300 text-xs text-gray-500">
             <tr>
               <SortTh label="학년도" k="year" sort={sort} className={NARROW} />
               <SortTh label="학교" k="school" sort={sort} className={NARROW} />
               <SortTh label="유형" k="type" sort={sort} className={NARROW} />
               <SortTh label="학년-학기" k="grade" sort={sort} className={NARROW} />
-              <SortTh label="명칭" k="name" sort={sort} className="text-center" />
+              <SortTh label="과목(활동)명" k="name" sort={sort} className="text-center" />
               <SortTh label="상태" k="status" sort={sort} className={NARROW} />
               <SortTh label="마지막 저장" k="updated" sort={sort} className={NARROW} />
               <th className={`p-2 ${NARROW}`}>요약보기</th>
@@ -371,7 +371,7 @@ export function AdminDesigns() {
               <th className={`p-2 ${NARROW}`}>삭제</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 text-center">
+          <tbody className="divide-y divide-gray-200 text-center">
             {sort.sorted.map((d) => (
               <tr key={d.id}>
                 <td className="p-2">{yearOf(d) || "-"}</td>
@@ -382,7 +382,7 @@ export function AdminDesigns() {
                 <td className="p-2">
                   {d.grade}-{d.semester}
                 </td>
-                <td className="w-full max-w-0 p-2 text-center">
+                <td className="w-full max-w-0 p-2 text-left">
                   <span className="block truncate" title={d.name}>
                     {d.name || "(이름 없음)"}
                   </span>

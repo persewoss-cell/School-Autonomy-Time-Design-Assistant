@@ -346,15 +346,15 @@ function DesignTable({
   if (rows.length === 0) return <Card><p className="text-gray-600">조건에 맞는 설계가 없어요.</p></Card>;
   return (
     <Card className="overflow-x-auto">
-      {/* 명칭 말고는 내용 폭만큼만(w-px), 남는 폭은 모두 명칭. 제목과 내용은 모두 가운데 정렬 */}
+      {/* 과목(활동)명 말고는 내용 폭만큼만(w-px), 남는 폭은 모두 과목(활동)명. 제목은 모두 가운데, 내용은 과목(활동)명만 왼쪽 */}
       <table className="w-full text-sm whitespace-nowrap [&_td]:px-1.5 [&_td]:py-2 [&_th]:px-1.5">
-        <thead className="text-xs text-gray-500">
+        <thead className="border-b border-gray-300 text-xs text-gray-500">
           <tr>
             <SortTh label="학년도" k="year" sort={sort} className={NARROW} />
             <SortTh label="유형" k="type" sort={sort} className={NARROW} />
             <SortTh label="학년-학기" k="grade" sort={sort} className={NARROW} />
             <SortTh label="차시" k="hours" sort={sort} className={NARROW} />
-            <SortTh label="명칭" k="name" sort={sort} className="text-center" />
+            <SortTh label="과목(활동)명" k="name" sort={sort} className="text-center" />
             <SortTh label="학기 편성" k="fill" sort={sort} className={NARROW} />
             <SortTh label="상태" k="status" sort={sort} className={NARROW} />
             <SortTh label="마지막 저장" k="updated" sort={sort} className={NARROW} />
@@ -363,7 +363,7 @@ function DesignTable({
             <th className={`p-2 ${NARROW}`}>삭제</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100 text-center">
+        <tbody className="divide-y divide-gray-200 text-center">
           {sort.sorted.map((r) => (
             <tr key={r.id} className="hover:bg-gray-50">
               <td className="p-2">{yearOf(r)}</td>
@@ -374,8 +374,8 @@ function DesignTable({
                 {r.grade}-{r.semester}
               </td>
               <td className="p-2">{typeof r.hours === "number" ? `${r.hours}차시` : "-"}</td>
-              <td className="w-full max-w-0 text-center font-semibold">
-                <button type="button" onClick={() => onOpen(r)} title={`${r.name} — 눌러서 설계 열기`} className="inline-block max-w-full truncate align-middle text-brand-800 hover:text-brand-600 hover:underline">
+              <td className="w-full max-w-0 text-left font-semibold">
+                <button type="button" onClick={() => onOpen(r)} title={`${r.name} — 눌러서 설계 열기`} className="block max-w-full truncate text-left text-brand-800 hover:text-brand-600 hover:underline">
                   {r.name || "(이름 없음)"}
                 </button>
               </td>
