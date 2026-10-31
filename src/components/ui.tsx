@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import type { Issue } from "@/validation/types";
+import { issueKey, withoutDismissed } from "@/validation/design";
 
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <section className={`rounded-2xl bg-white p-6 shadow-sm ${className}`}>{children}</section>;
@@ -80,8 +81,11 @@ export function StepHeader({ title, tips, children }: { title: string; tips?: st
 }
 
 /** 검증 결과 목록: 어느 항목이 / 왜 / 어떻게 고치는지 */
+/** 설계 화면이 내려 주는 '무시하기' (확인 필요 점검만). 없으면 무시하기 버튼을 보이지 않는다 */
+export const DismissContext = createContext<{ dismissed: string[]; dismiss: (key: string) => void } | null>(null);
+
 export function IssueList({
-  issues,
+  issues: all,
   onGo,
   stepLabel,
 }: {
@@ -89,6 +93,8 @@ export function IssueList({
   onGo?: (i: Issue) => void;
   stepLabel?: (i: Issue) => string;
 }) {
+  const dm = useContext(DismissContext);
+  const issues = withoutDismissed(all, dm?.dismissed);
   if (issues.length === 0) {
     return (
       <p className="rounded-lg bg-green-50 p-3 text-sm text-green-700">✓ 지침 위반 사항이 없습니다.</p>
@@ -108,11 +114,23 @@ export function IssueList({
               {i.level === "error" ? "오류" : "확인 필요"} · {stepLabel ? `${stepLabel(i)} · ` : ""}
               {i.field}
             </p>
-            {onGo && i.step && (
-              <button type="button" onClick={() => onGo(i)} className="shrink-0 text-xs font-semibold text-brand-700 underline">
-                고치러 가기
-              </button>
-            )}
+            <span className="flex shrink-0 gap-3">
+              {dm && i.level === "warning" && (
+                <button
+                  type="button"
+                  title="권장 사항이라 그대로 두어도 돼요. 이 설계에서는 더 이상 보이지 않아요."
+                  onClick={() => dm.dismiss(issueKey(i))}
+                  className="text-xs font-semibold text-gray-500 underline hover:text-gray-700"
+                >
+                  무시하기
+                </button>
+              )}
+              {onGo && i.step && (
+                <button type="button" onClick={() => onGo(i)} className="text-xs font-semibold text-brand-700 underline">
+                  고치러 가기
+                </button>
+              )}
+            </span>
           </div>
           <p className="text-gray-700">{i.message}</p>
           <p className="text-gray-500">→ {i.fix}</p>
@@ -123,7 +141,9 @@ export function IssueList({
 }
 
 /** 점검 결과 카드 (단계 아래에 붙임) */
-export function StepIssues({ issues }: { issues: Issue[] }) {
+export function StepIssues({ issues: all }: { issues: Issue[] }) {
+  const dm = useContext(DismissContext);
+  const issues = withoutDismissed(all, dm?.dismissed);
   const errors = issues.filter((i) => i.level === "error").length;
   return (
     <Card className="space-y-3">

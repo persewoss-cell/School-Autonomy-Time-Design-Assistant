@@ -7,7 +7,7 @@ import { checklistResults, validateDesign } from "@/validation/design";
 import { mergeTyping, type TypingState } from "@/domain/history";
 import { useHourChecks } from "../hours/useHourChecks";
 import { DownloadIcon } from "../icons";
-import { TypeTag } from "../ui";
+import { DismissContext, TypeTag } from "../ui";
 import { allocationFor, FORM_NOTICE, saveDesignDocx } from "./downloadDesign";
 import { TypeStep } from "./TypeStep";
 import { BasicStep } from "./BasicStep";
@@ -303,7 +303,13 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
     onParseFail,
   };
 
+  const dismissCtx = {
+    dismissed: doc.dismissed ?? [],
+    dismiss: (key: string) => setDoc((d) => void (d.dismissed = [...(d.dismissed ?? []), key])),
+  };
+
   return (
+    <DismissContext.Provider value={dismissCtx}>
     <div className="space-y-6">
       {/* 스크롤해도 설계 이름·저장 줄은 위에 고정 */}
       <div className="sticky top-[53px] z-20 -mx-4 flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-[#f7f8f6]/95 px-4 py-2 backdrop-blur">
@@ -439,5 +445,6 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
       )}
       </div>
     </div>
+    </DismissContext.Provider>
   );
 }

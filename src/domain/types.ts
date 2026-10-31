@@ -205,6 +205,8 @@ export interface DesignDoc {
   standardCounts?: (number | null)[];
   /** 단원 지도계획을 AI에게 묻기 전에 교사가 정하는 것 */
   planRequest?: PlanRequest;
+  /** '무시하기'를 누른 확인 필요(권장) 점검 (issueKey). 내용이 바뀌어 문장이 달라지면 다시 나타남 */
+  dismissed?: string[];
   /** 어디까지 작성했는지 (다시 열면 이 단계부터) */
   progress?: { stepKey: string; maxIndex: number };
 }

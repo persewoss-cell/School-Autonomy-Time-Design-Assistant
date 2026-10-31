@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { basicInfoSchema, type DesignDoc, type Grade } from "@/domain/types";
 import { REGION_VALUES } from "@/domain/regions";
-import { checklistResults, validateDesign } from "@/validation/design";
+import { checklistResults, validateDesign, withoutDismissed } from "@/validation/design";
 import { checkBasicHours, sameSemesterOthers, type SemesterOthers } from "@/validation/hours";
 import type { DesignRecord, DesignSummary, Repo, User } from "./repo";
 
@@ -158,6 +158,7 @@ function recordFields(doc: DesignDoc, fallbackSchool: string, others: SemesterOt
     errorCount: issues.filter((i) => i.level === "error").length,
     warningCount: issues.filter((i) => i.level === "warning").length,
     hoursWarnings: issues.filter((i) => i.level === "warning" && i.field === "운영 시수").length,
+    dismissed: doc.dismissed ?? [],
     checklistLeft: checklistResults(doc, ctx).filter((c) => !c.ok).length,
     progress: doc.progress ?? null,
   };
@@ -208,7 +209,7 @@ function withLiveHoursWarnings(list: DesignSummary[]): DesignSummary[] {
   return list.map((d) => {
     if (typeof d.hours !== "number") return d;
     const basic = { grade: d.grade as Grade, hours: d.hours, type: d.type };
-    const warn = (others: SemesterOthers) => checkBasicHours(basic, others).filter((i) => i.level === "warning").length;
+    const warn = (others: SemesterOthers) => withoutDismissed(checkBasicHours(basic, others), d.dismissed).filter((i) => i.level === "warning").length;
     const stored = d.hoursWarnings ?? warn([]); // 예전 저장본은 같은 학기 설계를 모르고 셌음
     const live = warn(sameSemesterOthers(d, list));
     return { ...d, warningCount: Math.max(0, d.warningCount - stored + live), hoursWarnings: live };

@@ -475,8 +475,19 @@ export function checkChecklist(doc: Pick<DesignDoc, "basic" | "checklist">): Iss
   ];
 }
 
+/** 점검 한 건을 알아보는 열쇠 ('무시하기' 기억용). 문장에 숫자가 들어 있어 내용이 바뀌면 열쇠도 바뀐다 */
+export const issueKey = (i: Pick<Issue, "field" | "message">) => `${i.field}|${i.message}`;
+
+/** '무시하기'한 확인 필요(권장) 점검을 뺀다. 오류는 무시할 수 없다 */
+export const withoutDismissed = (issues: Issue[], dismissed: string[] = []) =>
+  dismissed.length ? issues.filter((i) => i.level === "error" || !dismissed.includes(issueKey(i))) : issues;
+
 /** 설계 문서 전체 점검 */
 export function validateDesign(doc: DesignDoc, ctx: DesignContext = {}): Issue[] {
+  return withoutDismissed(allIssues(doc, ctx), doc.dismissed);
+}
+
+function allIssues(doc: DesignDoc, ctx: DesignContext): Issue[] {
   return [
     ...tag("basic", checkBasicHours(doc.basic, ctx.semesterOthers)),
     ...(doc.basic.name.trim() ? [] : tag("basic", [{ level: "error" as const, field: `${DESIGN_TYPES[doc.basic.type]}명`, message: "이름이 비어 있습니다.", fix: "이름을 적어 주세요." }])),

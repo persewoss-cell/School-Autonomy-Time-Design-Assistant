@@ -180,3 +180,22 @@ describe("단원 지도계획·평가 계획", () => {
     expect(errors(checkAssessments(doc)).some((i) => i.message.includes("단원 지도계획에 들어 있지 않습니다"))).toBe(true);
   });
 });
+
+describe("확인 필요 점검 무시하기", () => {
+  it("무시한 권장 점검은 빠지고, 내용이 바뀌어 문장이 달라지면 다시 나온다. 오류는 무시할 수 없다", async () => {
+    const { sampleSubject } = await import("@/domain/sample");
+    const { issueKey, validateDesign } = await import("./design");
+    const doc = sampleSubject();
+    doc.areas = doc.areas.slice(0, 1);
+    doc.standards = doc.standards.filter((s) => s.areaIndex === 0);
+    const w = validateDesign(doc).find((i) => i.field === "영역 수")!;
+    expect(w.level).toBe("warning");
+    doc.dismissed = [issueKey(w)];
+    expect(validateDesign(doc).some((i) => i.field === "영역 수")).toBe(false);
+    doc.areas = [...doc.areas, ...Array.from({ length: 3 }, () => ({ ...doc.areas[0], name: "새 영역" }))];
+    expect(validateDesign(doc).some((i) => i.field === "영역 수")).toBe(true);
+    const err = validateDesign(doc).find((i) => i.level === "error")!;
+    doc.dismissed.push(issueKey(err));
+    expect(validateDesign(doc).some((i) => issueKey(i) === issueKey(err))).toBe(true);
+  });
+});

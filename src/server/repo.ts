@@ -48,6 +48,8 @@ export interface DesignRecord {
   warningCount: number;
   /** warningCount 중 '운영 시수' 경고 수 (목록을 볼 때 같은 학기 설계에 맞춰 다시 계산하려고. 예전 저장본에는 없음) */
   hoursWarnings?: number;
+  /** 무시한 확인 필요 점검 (doc.dismissed 복사본, 목록에서 다시 셀 때 씀) */
+  dismissed?: string[];
   /** 아직 ○가 아닌 체크리스트 항목 수 (0이면 문서를 내려받을 수 있음. 예전 저장본에는 없을 수 있음) */
   checklistLeft?: number;
   /** 어디까지 작성했는지 (doc.progress 복사본, 목록 표시용) */
