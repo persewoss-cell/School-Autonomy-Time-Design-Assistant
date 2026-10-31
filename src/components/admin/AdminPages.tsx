@@ -14,7 +14,7 @@ import { useMe } from "../useMe";
 import { Modal } from "../Modal";
 import { enterSchool } from "../ActingBanner";
 import { MultiSelect, SingleSelect } from "./MultiSelect";
-import { byYearThenSaved, NARROW, SortTh, useSort } from "./sort";
+import { byYearThenSaved, DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, NARROW, SortTh, useSort } from "./sort";
 import { OpenNewIcon } from "../icons";
 import { BulkUsers } from "./BulkUsers";
 import { SeedButton } from "./SeedButton";
@@ -356,24 +356,24 @@ export function AdminDesigns() {
       </div>
       <Card className="overflow-x-auto">
         {/* 과목(활동)명 말고는 내용 폭만큼만(w-px), 남는 폭은 모두 과목(활동)명. 제목은 모두 가운데, 내용은 과목(활동)명만 왼쪽 */}
-        <table className="w-full min-w-[980px] text-sm whitespace-nowrap [&_td]:px-2.5 [&_th]:px-2.5 [&_td+td]:border-l [&_td]:border-gray-200 [&_th+th]:border-l [&_th]:border-gray-200">
-          <thead className="border-b border-gray-300 text-xs text-gray-500">
+        <table className={`${DESIGN_TABLE} min-w-[980px] [&_td]:px-2.5 [&_th]:px-2.5`}>
+          <thead className={DESIGN_THEAD}>
             <tr>
-              <SortTh label="학년도" k="year" sort={sort} className={NARROW} />
-              <SortTh label="학교" k="school" sort={sort} className={NARROW} />
-              <SortTh label="유형" k="type" sort={sort} className={NARROW} />
-              <SortTh label="학년-학기" k="grade" sort={sort} className={NARROW} />
-              <SortTh label="과목(활동)명" k="name" sort={sort} className="text-center" />
-              <SortTh label="상태" k="status" sort={sort} className={NARROW} />
-              <SortTh label="마지막 저장" k="updated" sort={sort} className={NARROW} />
+              <SortTh label="학년도" k="year" sort={sort} dark className={NARROW} />
+              <SortTh label="학교" k="school" sort={sort} dark className={NARROW} />
+              <SortTh label="유형" k="type" sort={sort} dark className={NARROW} />
+              <SortTh label="학년-학기" k="grade" sort={sort} dark className={NARROW} />
+              <SortTh label="과목(활동)명" k="name" sort={sort} dark className="text-center" />
+              <SortTh label="상태" k="status" sort={sort} dark className={NARROW} />
+              <SortTh label="마지막 저장" k="updated" sort={sort} dark className={NARROW} />
               <th className={`p-2 ${NARROW}`}>요약보기</th>
               <th className={`p-2 ${NARROW}`}>상세보기</th>
               <th className={`p-2 ${NARROW}`}>삭제</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 text-center">
+          <tbody className="divide-y divide-gray-100 text-center">
             {sort.sorted.map((d) => (
-              <tr key={d.id}>
+              <tr key={d.id} className={DESIGN_ROW}>
                 <td className="p-2">{yearOf(d) || "-"}</td>
                 <td className="p-2 font-semibold">{d.owner}</td>
                 <td className="p-2">

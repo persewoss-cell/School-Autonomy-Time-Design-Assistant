@@ -29,13 +29,29 @@ export function useSort<T>(rows: T[], getters: Record<string, (r: T) => string |
 }
 
 /** 정렬 세모가 붙은 제목 칸 */
-export function SortTh({ label, k, sort, className = "" }: { label: string; k: string; sort: { toggle: (k: string) => void; dirOf: (k: string) => SortDir }; className?: string }) {
+export function SortTh({
+  label,
+  k,
+  sort,
+  className = "",
+  dark,
+}: {
+  label: string;
+  k: string;
+  sort: { toggle: (k: string) => void; dirOf: (k: string) => SortDir };
+  className?: string;
+  /** 진한 제목 줄(흰 글자)용 세모 색 */
+  dark?: boolean;
+}) {
   const dir = sort.dirOf(k);
+  const arrow = dark
+    ? dir === "asc" ? "text-sky-300" : dir === "desc" ? "text-rose-300" : "text-white"
+    : dir === "asc" ? "text-blue-600" : dir === "desc" ? "text-red-600" : "text-gray-900";
   return (
     <th className={`p-2 ${className}`}>
-      <button type="button" onClick={() => sort.toggle(k)} className="inline-flex items-center gap-1 whitespace-nowrap hover:text-gray-800" title="눌러서 정렬">
+      <button type="button" onClick={() => sort.toggle(k)} className={`inline-flex items-center gap-1 whitespace-nowrap ${dark ? "hover:text-gray-200" : "hover:text-gray-800"}`} title="눌러서 정렬">
         {label}
-        <span className={`text-[10px] ${dir === "asc" ? "text-blue-600" : dir === "desc" ? "text-red-600" : "text-gray-900"}`}>{dir === "desc" ? "▲" : "▼"}</span>
+        <span className={`text-[10px] ${arrow}`}>{dir === "desc" ? "▲" : "▼"}</span>
       </button>
     </th>
   );
@@ -47,3 +63,8 @@ export const byYearThenSaved = (a: { schoolYear?: string; updatedAt: string }, b
 
 /** 명칭이 아닌 칸: 내용 폭만큼만 차지하고 가운데 정렬 (남는 폭은 명칭이 씀) */
 export const NARROW = "w-px text-center";
+
+/** 설계 표 공통: 진한 회색 제목 줄(흰 글자), 칸 사이 세로선, 한 줄 건너 연한 배경 */
+export const DESIGN_TABLE = "w-full text-sm whitespace-nowrap [&_td+td]:border-l [&_td]:border-gray-200 [&_th+th]:border-l [&_th]:border-gray-500";
+export const DESIGN_THEAD = "bg-gray-700 text-xs text-white";
+export const DESIGN_ROW = "even:bg-gray-100/70 hover:bg-brand-50";

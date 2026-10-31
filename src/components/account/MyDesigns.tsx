@@ -16,7 +16,7 @@ import { bandStatus, checkKey, isViewGrade, schoolYearOf, type Checks, type Hour
 import type { Grade } from "@/domain/types";
 import { Card, TypeTag } from "../ui";
 import { MultiSelect, SingleSelect } from "../admin/MultiSelect";
-import { byYearThenSaved, NARROW, SortTh, useSort } from "../admin/sort";
+import { byYearThenSaved, DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, NARROW, SortTh, useSort } from "../admin/sort";
 import { useMe } from "../useMe";
 
 export interface DesignRow {
@@ -347,25 +347,25 @@ function DesignTable({
   return (
     <Card className="overflow-x-auto">
       {/* 과목(활동)명 말고는 내용 폭만큼만(w-px), 남는 폭은 모두 과목(활동)명. 제목은 모두 가운데, 내용은 과목(활동)명만 왼쪽 */}
-      <table className="w-full text-sm whitespace-nowrap [&_td]:px-2 [&_td]:py-2 [&_th]:px-2 [&_td+td]:border-l [&_td]:border-gray-200 [&_th+th]:border-l [&_th]:border-gray-200">
-        <thead className="border-b border-gray-300 text-xs text-gray-500">
+      <table className={`${DESIGN_TABLE} [&_td]:px-2 [&_td]:py-2 [&_th]:px-2`}>
+        <thead className={DESIGN_THEAD}>
           <tr>
-            <SortTh label="학년도" k="year" sort={sort} className={NARROW} />
-            <SortTh label="유형" k="type" sort={sort} className={NARROW} />
-            <SortTh label="학년-학기" k="grade" sort={sort} className={NARROW} />
-            <SortTh label="차시" k="hours" sort={sort} className={NARROW} />
-            <SortTh label="과목(활동)명" k="name" sort={sort} className="text-center" />
-            <SortTh label="학기 편성" k="fill" sort={sort} className={NARROW} />
-            <SortTh label="상태" k="status" sort={sort} className={NARROW} />
-            <SortTh label="마지막 저장" k="updated" sort={sort} className={NARROW} />
+            <SortTh label="학년도" k="year" sort={sort} dark className={NARROW} />
+            <SortTh label="유형" k="type" sort={sort} dark className={NARROW} />
+            <SortTh label="학년-학기" k="grade" sort={sort} dark className={NARROW} />
+            <SortTh label="차시" k="hours" sort={sort} dark className={NARROW} />
+            <SortTh label="과목(활동)명" k="name" sort={sort} dark className="text-center" />
+            <SortTh label="학기 편성" k="fill" sort={sort} dark className={NARROW} />
+            <SortTh label="상태" k="status" sort={sort} dark className={NARROW} />
+            <SortTh label="마지막 저장" k="updated" sort={sort} dark className={NARROW} />
             <th className={`p-2 ${NARROW}`}>문서</th>
             <th className={`p-2 ${NARROW}`}>복제</th>
             <th className={`p-2 ${NARROW}`}>삭제</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-200 text-center">
+        <tbody className="divide-y divide-gray-100 text-center">
           {sort.sorted.map((r) => (
-            <tr key={r.id} className="hover:bg-gray-50">
+            <tr key={r.id} className={DESIGN_ROW}>
               <td className="p-2">{yearOf(r)}</td>
               <td className="p-2">
                 <TypeTag type={r.type} />
