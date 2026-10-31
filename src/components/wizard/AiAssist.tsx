@@ -129,7 +129,7 @@ export function AiAssist<T>({
           <textarea
             rows={6}
             className={`${inputClass} font-mono text-xs`}
-            placeholder={"AI의 답을 여기에 그대로 붙여 넣으세요. (```json 으로 시작하는 부분이 들어 있어야 해요)"}
+            placeholder={"AI 답을 통째로 복사해 붙여 넣으세요."}
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
           />

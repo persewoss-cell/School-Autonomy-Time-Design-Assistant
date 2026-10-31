@@ -183,7 +183,7 @@ export function HoursChecker() {
 
       <Card className="space-y-2">
         <ol className="list-decimal space-y-0.5 pl-5 text-sm text-gray-600">
-          <li>학년도와 학년을 고릅니다. 예: 2027학년도 &lsquo;3학년&rsquo; = 3학년(2027)·4학년(2028), &lsquo;4학년&rsquo; = 3학년(2026)·4학년(2027)</li>
+          <li>학년도와 학년을 고릅니다.</li>
           <li>그 학년도 설계가 자동으로 들어가요. 같은 학년·학년도를 앞서 점검했다면 그 시수를 그대로 이어받아요.</li>
           <li>바꿀 계획이 있으면 추가·삭제·수정하세요. 교과별 편성 시수는 아래 편성표 칸에 넣습니다.</li>
           <li>학년군의 두 학년이 모두 이상없음이면 그 학년도 시수 점검 완료!</li>
