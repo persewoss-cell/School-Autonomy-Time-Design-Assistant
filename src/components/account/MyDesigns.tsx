@@ -351,15 +351,15 @@ function DesignTable({
       <table className={`${DESIGN_TABLE} [&_td]:px-2 [&_td]:py-2 [&_th]:px-2`}>
         <thead className={DESIGN_THEAD}>
           <tr>
-            <SortTh label="학년도" k="year" sort={sort} dark className={NARROW} />
-            <SortTh label="유형" k="type" sort={sort} dark className={NARROW} />
-            <SortTh label="학년" k="grade" sort={sort} dark className={NARROW} />
-            <SortTh label="학기" k="semester" sort={sort} dark className={NARROW} />
-            <SortTh label="차시" k="hours" sort={sort} dark className={NARROW} />
-            <SortTh label="과목(활동)명" k="name" sort={sort} dark className="text-center" />
-            <SortTh label="학기 편성" k="fill" sort={sort} dark className={NARROW} />
-            <SortTh label="상태" k="status" sort={sort} dark className={NARROW} />
-            <SortTh label="마지막 저장" k="updated" sort={sort} dark className={NARROW} />
+            <SortTh label="학년도" k="year" sort={sort} className={NARROW} />
+            <SortTh label="유형" k="type" sort={sort} className={NARROW} />
+            <SortTh label="학년" k="grade" sort={sort} className={NARROW} />
+            <SortTh label="학기" k="semester" sort={sort} className={NARROW} />
+            <SortTh label="차시" k="hours" sort={sort} className={NARROW} />
+            <SortTh label="과목(활동)명" k="name" sort={sort} className="text-center" />
+            <SortTh label="학기 편성" k="fill" sort={sort} className={NARROW} />
+            <SortTh label="상태" k="status" sort={sort} className={NARROW} />
+            <SortTh label="마지막 저장" k="updated" sort={sort} className={NARROW} />
             <th className={`p-2 ${NARROW}`}>문서</th>
             <th className={`p-2 ${NARROW}`}>복제</th>
             <th className={`p-2 ${NARROW}`}>삭제</th>
