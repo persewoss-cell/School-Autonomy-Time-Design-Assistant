@@ -25,6 +25,8 @@ export class ApiError extends Error {
 export interface Me {
   enabled: boolean;
   user: { id: string; region: string; schoolName: string; role: "teacher" | "admin"; status: string; mustChangePassword: boolean } | null;
+  /** 관리자가 이 학교로 들어가 보는 중 */
+  acting?: { adminSchool: string } | null;
 }
 
 /** 이용 기록 보내기 (실패해도 무시) */

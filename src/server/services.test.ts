@@ -16,6 +16,9 @@ import {
   uploadExample,
   deleteExample,
   listExamples,
+  deleteUserByAdmin,
+  deleteDesignByAdmin,
+  listAllDesignsForAdmin,
 } from "./services";
 import { createSessionToken, readSessionToken } from "./session";
 
@@ -175,14 +178,12 @@ describe("설계 저장·권한", () => {
 });
 
 describe("관리자 통계", () => {
-  it("사용자·설계·기록을 센다", async () => {
+  it("가입 학교·설계 완성·설계 중을 센다", async () => {
     const { repo, t } = await setup();
     await saveDesign(repo, t, sampleSubject());
-    await repo.logs.add({ kind: "parse_fail", detail: "standards: JSON 형식이 깨져 있습니다." });
     const s = await adminStats(repo);
     expect(s.users).toMatchObject({ total: 2, pending: 1, resetRequests: 0, byRegion: { 광양시: 2 } });
-    expect(s.designs).toMatchObject({ total: 1, complete: 1, byType: { 과목: 1 } });
-    expect(s.week.parseFailByStep).toEqual({ standards: 1 });
+    expect(s.designs).toMatchObject({ total: 1, complete: 1, inProgress: 0, byType: { 과목: 1 } });
   });
 });
 
@@ -217,5 +218,26 @@ describe("예시안 파일", () => {
     expect((await repo.examples.getFile(e.id))?.data.toString()).toBe("abc");
     await deleteExample(repo, admin, e.id);
     expect(await listExamples(repo)).toEqual([]);
+  });
+});
+
+describe("관리자: 계정·설계 삭제, 전체 설계 목록", () => {
+  it("계정을 지우면 그 학교 설계·시수 점검도 함께 지워지고, 자기 자신은 못 지운다", async () => {
+    const { repo, admin, t } = await setup();
+    await saveDesign(repo, t, sampleSubject());
+    await repo.hourChecks.upsert({ ownerId: t.id, grade: 3, schoolYear: 2027, data: {}, updatedAt: new Date() });
+    await expect(deleteUserByAdmin(repo, admin, admin.id)).rejects.toThrow("자기 자신");
+    expect(await deleteUserByAdmin(repo, admin, t.id)).toEqual({ designs: 1 });
+    expect(await repo.users.findById(t.id)).toBeNull();
+    expect(await repo.designs.listByOwner(t.id)).toEqual([]);
+    expect(await repo.hourChecks.listByOwner(t.id)).toEqual([]);
+  });
+  it("전체 설계에 학교명과 시수 점검 완료 여부가 붙고, 관리자는 아무 설계나 지울 수 있다", async () => {
+    const { repo, admin, t } = await setup();
+    const { record } = await saveDesign(repo, t, sampleSubject());
+    const list = await listAllDesignsForAdmin(repo);
+    expect(list[0]).toMatchObject({ owner: "광양마동초등학교", hoursComplete: false });
+    await deleteDesignByAdmin(repo, admin, record.id);
+    expect(await listAllDesignsForAdmin(repo)).toEqual([]);
   });
 });

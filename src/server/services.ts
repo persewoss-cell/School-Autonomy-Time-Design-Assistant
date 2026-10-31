@@ -4,6 +4,7 @@ import { basicInfoSchema, type DesignDoc, type Grade } from "@/domain/types";
 import { REGION_VALUES } from "@/domain/regions";
 import { checklistResults, validateDesign, withoutDismissed } from "@/validation/design";
 import { checkBasicHours, sameSemesterOthers, type SemesterOthers } from "@/validation/hours";
+import { bandStatus, checkKey, isViewGrade, type Checks, type HourCheck } from "@/domain/hoursView";
 import type { DesignRecord, DesignSummary, Repo, User } from "./repo";
 
 /** 서비스 계층: 로그인·저장·권한 규칙. 저장소(repo)만 바꾸면 테스트할 수 있다. */
@@ -192,6 +193,7 @@ export async function saveDesign(repo: Repo, user: User, rawDoc: unknown, id?: s
   }
   await repo.designs.saveVersion(record.id, doc);
   await repo.logs.add({ kind: "save", userId: user.id, school: user.schoolName, designId: record.id, detail: fields.name });
+  if (user.actingAdmin) await adminLog(repo, user, `관리자 수정: ${user.schoolName} 「${fields.name}」`, record.id);
 
   const duplicate =
     fields.name
@@ -282,6 +284,59 @@ export async function deleteDesign(repo: Repo, user: User, id: string): Promise<
   if (d.ownerId !== user.id) throw new ServiceError(403, "내 설계만 삭제할 수 있습니다.");
   await repo.designs.delete(id);
   await repo.logs.add({ kind: "delete", userId: user.id, school: user.schoolName, designId: id, detail: d.name });
+  if (user.actingAdmin) await adminLog(repo, user, `관리자 삭제: ${user.schoolName} 「${d.name}」`, id);
+}
+
+/** 관리자 작업 기록 (학교로 들어가 고친 것 포함) */
+async function adminLog(repo: Repo, user: User, detail: string, designId?: string) {
+  const admin = user.actingAdmin ?? { id: user.id, schoolName: user.schoolName };
+  await repo.logs.add({ kind: "admin", userId: admin.id, school: admin.schoolName, designId, detail });
+}
+
+/** 관리자: 아무 학교의 설계 삭제 */
+export async function deleteDesignByAdmin(repo: Repo, admin: User, id: string): Promise<void> {
+  const d = await repo.designs.get(id);
+  if (!d) throw new ServiceError(404, "설계를 찾을 수 없습니다.");
+  await repo.designs.delete(id);
+  await adminLog(repo, admin, `관리자 삭제: ${d.schoolName} 「${d.name}」`, id);
+}
+
+/** 관리자: 학교 계정 삭제 (그 학교의 설계·시수 점검도 함께, 이용 기록은 남김). 자기 자신은 못 지움 */
+export async function deleteUserByAdmin(repo: Repo, admin: User, targetId: string): Promise<{ designs: number }> {
+  if (targetId === admin.id) throw new ServiceError(400, "자기 자신의 계정은 지울 수 없습니다.");
+  const target = await repo.users.findById(targetId);
+  if (!target) throw new ServiceError(404, "학교를 찾을 수 없습니다.");
+  const designs = await repo.designs.deleteByOwner(targetId);
+  await repo.hourChecks.deleteByOwner(targetId);
+  await repo.users.delete(targetId);
+  await adminLog(repo, admin, `계정 삭제: ${target.schoolName} (설계 ${designs}개 함께 삭제)`);
+  return { designs };
+}
+
+/** 관리자 전체 설계 목록: 학교명과 그 학년도 학년군의 시수 점검 완료 여부를 붙인다 */
+export async function listAllDesignsForAdmin(repo: Repo) {
+  const [designs, users] = await Promise.all([repo.designs.listAll(), repo.users.list()]);
+  const owner = new Map(users.map((u) => [u.id, u]));
+  const byOwner = new Map<string, DesignSummary[]>();
+  for (const d of designs) byOwner.set(d.ownerId, [...(byOwner.get(d.ownerId) ?? []), d]);
+  const out = [];
+  for (const [ownerId, list] of byOwner) {
+    const checks: Checks = {};
+    for (const c of await repo.hourChecks.listByOwner(ownerId)) {
+      const data = c.data as HourCheck | undefined;
+      if (data?.schoolYear && isViewGrade(c.grade)) checks[checkKey(data.schoolYear, c.grade)] = data;
+    }
+    for (const d of withLiveHoursWarnings(list)) {
+      const u = owner.get(ownerId);
+      out.push({
+        ...d,
+        owner: u ? u.schoolName : "(삭제된 학교)",
+        ownerRegion: u?.region ?? "",
+        hoursComplete: bandStatus(d.grade, Number(d.schoolYear) || 2027, checks, list).complete,
+      });
+    }
+  }
+  return out.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 }
 
 /** 관리자: 사용자 상태·권한 바꾸기 (자기 자신은 못 바꿈) */
@@ -303,39 +358,28 @@ export async function updateUserByAdmin(
 
 /** 관리자 대시보드 통계 */
 export async function adminStats(repo: Repo) {
-  const [users, designs, logs] = await Promise.all([repo.users.list(), repo.designs.listAll(), repo.logs.list(500)]);
-  const resetRequests = users.filter((u) => u.resetRequest).length;
+  const [users, designs] = await Promise.all([repo.users.list(), repo.designs.listAll()]);
   const count = <T,>(xs: T[], key: (x: T) => string) =>
     xs.reduce<Record<string, number>>((acc, x) => {
       const k = key(x);
       acc[k] = (acc[k] ?? 0) + 1;
       return acc;
     }, {});
-  const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
-  const recent = logs.filter((l) => l.createdAt.getTime() > weekAgo);
-  const saves = recent.filter((l) => l.kind === "save").length;
-  const parseFails = recent.filter((l) => l.kind === "parse_fail");
+  const complete = designs.filter((d) => d.errorCount === 0).length;
   return {
     users: {
       total: users.length,
       pending: users.filter((u) => u.status === "pending").length,
-      resetRequests,
-      byStatus: count(users, (u) => u.status),
+      resetRequests: users.filter((u) => u.resetRequest).length,
       byRegion: count(users, (u) => u.region || "(지역 없음)"),
     },
     designs: {
       total: designs.length,
+      complete,
+      inProgress: designs.length - complete,
       byType: count(designs, (d) => (d.type === "subject" ? "과목" : "활동")),
       byGrade: count(designs, (d) => `${d.grade}학년`),
-      complete: designs.filter((d) => d.errorCount === 0).length,
       bySchool: count(designs, (d) => d.schoolName || "(학교 미입력)"),
-    },
-    week: {
-      saves,
-      downloads: recent.filter((l) => l.kind === "download").length,
-      logins: recent.filter((l) => l.kind === "login").length,
-      parseFails: parseFails.length,
-      parseFailByStep: count(parseFails, (l) => (l.detail ?? "").split(":")[0] || "기타"),
     },
   };
 }

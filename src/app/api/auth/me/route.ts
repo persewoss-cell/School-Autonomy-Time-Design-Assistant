@@ -8,5 +8,5 @@ export const dynamic = "force-dynamic";
 export const GET = handle(async () => {
   if (!isAccountEnabled()) return json({ enabled: false, user: null });
   const user = await currentUser(await getRepo());
-  return json({ enabled: true, user: user ? publicUser(user) : null });
+  return json({ enabled: true, user: user ? publicUser(user) : null, acting: user?.actingAdmin ? { adminSchool: user.actingAdmin.schoolName } : null });
 });

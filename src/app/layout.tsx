@@ -1,3 +1,4 @@
+import { ActingBanner } from "@/components/ActingBanner";
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
@@ -18,6 +19,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-screen font-sans">
+        {/* 관리자가 학교 화면을 보는 중일 때만 보임 (고정 머리글 높이가 바뀌지 않게 머리글 밖에) */}
+        <ActingBanner />
         <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3">
             <Link href="/" className="text-lg font-bold text-brand-700">

@@ -22,12 +22,29 @@ export async function getRepo(): Promise<Repo> {
   return mongoRepo(await getDb());
 }
 
-export async function currentUser(repo: Repo): Promise<User | null> {
+/** 관리자가 '그 학교로 들어가 보기'를 할 때 쓰는 쿠키 (들어간 학교 id, 서명함) */
+export const ACT_COOKIE = "sat_act";
+
+/** 로그인한 본인 (관리자가 학교로 들어가 있어도 관리자 본인) */
+async function sessionUser(repo: Repo): Promise<User | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const id = await readSessionToken(token, env.authSecret);
   if (!id) return null;
   const user = await repo.users.findById(id);
   return user && user.status === "active" ? user : null;
+}
+
+/**
+ * 지금 화면의 주인. 관리자가 어느 학교로 들어가 보는 중이면 그 학교 (actingAdmin에 관리자 표시).
+ * 설계·시수 점검·설계 현황 API가 이것을 써서, 관리자는 그 학교가 보는 모습 그대로 보고 고칠 수 있다.
+ */
+export async function currentUser(repo: Repo): Promise<User | null> {
+  const real = await sessionUser(repo);
+  if (real?.role !== "admin") return real;
+  const targetId = await readSessionToken((await cookies()).get(ACT_COOKIE)?.value, env.authSecret);
+  if (!targetId || targetId === real.id) return real;
+  const target = await repo.users.findById(targetId);
+  return target ? { ...target, actingAdmin: { id: real.id, schoolName: real.schoolName } } : real;
 }
 
 export async function requireUser(repo: Repo): Promise<User> {
@@ -37,9 +54,23 @@ export async function requireUser(repo: Repo): Promise<User> {
 }
 
 export async function requireAdmin(repo: Repo): Promise<User> {
-  const u = await requireUser(repo);
+  const u = await sessionUser(repo);
+  if (!u) throw new ServiceError(401, "로그인이 필요합니다.");
   if (u.role !== "admin") throw new ServiceError(403, "관리자만 볼 수 있습니다.");
   return u;
+}
+
+/** 관리자: 학교로 들어가 보기 시작(학교 id) / 끝내기(null) */
+export async function setActing(targetId: string | null) {
+  const jar = await cookies();
+  if (!targetId) return void jar.delete(ACT_COOKIE);
+  jar.set(ACT_COOKIE, await createSessionToken(targetId, env.authSecret), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 8 * 3600,
+  });
 }
 
 export async function setSession(userId: string) {
@@ -53,7 +84,9 @@ export async function setSession(userId: string) {
 }
 
 export async function clearSession() {
-  (await cookies()).delete(SESSION_COOKIE);
+  const jar = await cookies();
+  jar.delete(SESSION_COOKIE);
+  jar.delete(ACT_COOKIE);
 }
 
 /** 라우트 처리기를 감싸 ServiceError를 알기 쉬운 JSON 오류로 바꾼다 */

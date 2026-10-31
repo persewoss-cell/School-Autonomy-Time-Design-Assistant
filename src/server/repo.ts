@@ -27,6 +27,8 @@ export interface User {
   resetRequest: { requestedAt: Date; contact: string } | null;
   createdAt: Date;
   lastLoginAt: Date | null;
+  /** (저장 안 함) 관리자가 이 학교로 들어가 보는 중이면 그 관리자 */
+  actingAdmin?: { id: string; schoolName: string };
 }
 
 export interface DesignRecord {
