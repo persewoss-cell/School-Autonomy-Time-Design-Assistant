@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Packer } from "docx";
 import { TEACHER_PLANS, TEXTBOOK_TYPES, type DesignDoc } from "@/domain/types";
 import { applicationTexts } from "@/domain/summary";
 import { codeMap } from "@/domain/codes";
-import { buildDesignDocx, docxFileName } from "@/export/docx";
-import { bandStatus, checkKey, isViewGrade, viewYears, type DesignBrief } from "@/domain/hoursView";
+import { allocationFor, FORM_NOTICE, saveDesignDocx } from "./downloadDesign";
 import { useHourChecks } from "../hours/useHourChecks";
 import { checkApplication, checklistResults, validateDesign } from "@/validation/design";
 import type { Issue, StepKey } from "@/validation/types";
@@ -131,11 +129,7 @@ export function FinalStep({
   const unchecked = checklist.filter((c) => !c.ok);
   // 시수 점검: 학년군의 두 학년 화면이 모두 이상없음이어야 편성표가 붙는다. 안 했어도 문서는 내려받되 붙임 자리에 빨간 안내 (사용자 결정, 2026-10-30)
   const hc = useHourChecks();
-  const current: DesignBrief = { id: designId ?? "current", name: doc.basic.name, grade: doc.basic.grade, semester: doc.basic.semester, hours: doc.basic.hours, subjectGroup: doc.basic.subjectGroup, schoolYear: doc.application.startYear };
-  const year = Number(doc.application.startYear) || 2027;
-  const briefs = [...hc.designs.filter((d) => d.id !== current.id), current];
-  const hours = bandStatus(doc.basic.grade, year, hc.checks, briefs);
-  const ownView = isViewGrade(doc.basic.grade) ? hc.checks[checkKey(year, doc.basic.grade)] : undefined;
+  const { status: hours, year } = allocationFor(doc, designId ?? "current", hc.checks, hc.designs);
   // 로그인하지 않은 체험: 문서를 내려받을 수 없다 (사용자 결정, 2026-10-30)
   const guest = !!hc.me?.enabled && !hc.loggedIn;
   const blocked = unchecked.length > 0 || guest;
@@ -144,29 +138,13 @@ export function FinalStep({
     window.location.href = `/hours?grade=${grade}&year=${year}`;
   };
 
-  const FORM_NOTICE = "내려받는 문서는 교육청에서 제공하는 양식과 다를 수 있습니다.\n한글(HWP)에서 열어 양식을 다듬어 쓰세요.";
   const download = async () => {
     if (blocked) return;
     if (!confirm(`${FORM_NOTICE}\n\n확인을 누르면 내려받습니다.`)) return;
     if (errors.length > 0 && !confirm(`아직 오류가 ${errors.length}개 있습니다. 그래도 문서를 내려받을까요?`)) return;
     setBusy(true);
     try {
-      const blob = await Packer.toBlob(
-        buildDesignDocx(
-          doc,
-          hours.complete && ownView
-            ? { input: ownView.input, years: viewYears(ownView.grade, ownView.schoolYear), grade: ownView.grade, schoolYear: ownView.schoolYear }
-            : { pending: true, grade: doc.basic.grade },
-        ),
-      );
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = docxFileName(doc);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      await saveDesignDocx(doc, allocationFor(doc, designId ?? "current", hc.checks, hc.designs).attachment);
       onDownloaded?.();
     } finally {
       setBusy(false);

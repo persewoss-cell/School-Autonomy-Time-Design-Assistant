@@ -20,8 +20,8 @@ export function AuthNav() {
       {me?.user?.role === "admin" && <Link href="/admin" className={`${link} font-semibold text-brand-700`}>관리자</Link>}
       {me?.enabled && !me.user && (
         <>
-          <Link href="/login" className={link}>로그인</Link>
-          <Link href="/signup" className="rounded-lg bg-brand-600 px-3 py-1 text-white hover:bg-brand-700">회원가입</Link>
+          <Link href="/signup" className={link}>회원가입</Link>
+          <Link href="/login" className="rounded-lg bg-brand-600 px-3 py-1 text-white hover:bg-brand-700">로그인</Link>
         </>
       )}
       {me?.user && (

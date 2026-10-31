@@ -46,6 +46,8 @@ export interface DesignRecord {
   schoolYear: string;
   errorCount: number;
   warningCount: number;
+  /** 아직 ○가 아닌 체크리스트 항목 수 (0이면 문서를 내려받을 수 있음. 예전 저장본에는 없을 수 있음) */
+  checklistLeft?: number;
   /** 어디까지 작성했는지 (doc.progress 복사본, 목록 표시용) */
   progress: { stepKey: string; maxIndex: number } | null;
   createdAt: Date;

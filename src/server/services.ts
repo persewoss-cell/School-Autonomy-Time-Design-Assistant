@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { basicInfoSchema, type DesignDoc } from "@/domain/types";
 import { REGION_VALUES } from "@/domain/regions";
-import { validateDesign } from "@/validation/design";
+import { checklistResults, validateDesign } from "@/validation/design";
 import type { DesignRecord, DesignSummary, Repo, User } from "./repo";
 
 /** 서비스 계층: 로그인·저장·권한 규칙. 저장소(repo)만 바꾸면 테스트할 수 있다. */
@@ -155,6 +155,7 @@ function recordFields(doc: DesignDoc, fallbackSchool: string) {
     schoolYear: doc.application.startYear.trim() || "2027",
     errorCount: issues.filter((i) => i.level === "error").length,
     warningCount: issues.filter((i) => i.level === "warning").length,
+    checklistLeft: checklistResults(doc).filter((c) => !c.ok).length,
     progress: doc.progress ?? null,
   };
 }
