@@ -216,7 +216,7 @@ function SharedTable({ rows }: { rows: Shared[] }) {
         <span className="text-sm text-gray-500">{shown.length}건</span>
       </div>
       <div className="overflow-x-auto">
-        <table className={`${DESIGN_TABLE} [&_td]:px-4 [&_th]:px-4`}>
+        <table className={`${DESIGN_TABLE} [&_td]:px-2 [&_th]:px-2`}>
           <thead className={DESIGN_THEAD}>
             <tr>
               <SortTh label="학년도" k="year" sort={sort} dark className="text-center" />
@@ -224,7 +224,7 @@ function SharedTable({ rows }: { rows: Shared[] }) {
               <SortTh label="유형" k="type" sort={sort} dark className="text-center" />
               <SortTh label="학년" k="grade" sort={sort} dark className="text-center" />
               <SortTh label="학기" k="semester" sort={sort} dark className="text-center" />
-              <SortTh label="과목(활동)명" k="name" sort={sort} dark className="text-center" />
+              <SortTh label="과목(활동)명" k="name" sort={sort} dark className="w-full text-center" />
               <th className={`p-2 text-center`}>복제</th>
               <th className={`p-2 text-center`}>요약보기</th>
               <th className={`p-2 text-center`}>내려받기</th>
@@ -243,7 +243,7 @@ function SharedTable({ rows }: { rows: Shared[] }) {
                 </td>
                 <td className="p-2">{d.grade}학년</td>
                 <td className="p-2">{d.semester}학기</td>
-                <td className="p-2 text-left">
+                <td className="w-full p-2 text-left">
                   <span className="block" title={d.name}>
                     {d.name}
                   </span>
