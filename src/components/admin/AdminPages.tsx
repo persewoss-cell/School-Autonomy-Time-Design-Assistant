@@ -16,6 +16,7 @@ import { enterSchool } from "../ActingBanner";
 import { MultiSelect, SingleSelect } from "./MultiSelect";
 import { SortTh, useSort } from "./sort";
 import { BulkUsers } from "./BulkUsers";
+import { SeedButton } from "./SeedButton";
 import { useSearchParams, useRouter } from "next/navigation";
 import type { Issue } from "@/validation/types";
 
@@ -76,6 +77,9 @@ export function AdminDashboard() {
           비밀번호 재설정 신청이 {data.users.resetRequests}건 있어요 → 사용학교 화면에서 임시 비밀번호 발급하기
         </Link>
       )}
+      <div className="flex justify-end">
+        <SeedButton />
+      </div>
       {/* 누르면 해당 목록으로 이동 */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatLink href="/admin/users" label="가입 학교" value={data.users.total} sub={data.users.pending ? `승인 대기 ${data.users.pending}` : "승인 대기 없음"} alert={data.users.pending > 0} />
