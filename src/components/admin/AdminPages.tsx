@@ -135,6 +135,37 @@ interface UserRow {
 }
 const STATUS_LABEL = { pending: "승인 대기", active: "사용 중", blocked: "중지" } as const;
 
+/** 날짜만: 26. 10. 31. */
+const fmtDay = (s: string) => new Date(s).toLocaleDateString("ko-KR", { year: "2-digit", month: "numeric", day: "numeric" });
+
+/** 사용학교 기본 순서: 승인 대기 먼저, 그 안에서 최근 가입순 (사용자 결정, 2026-10-31) */
+const pendingFirst = (a: UserRow, b: UserRow) => Number(b.status === "pending") - Number(a.status === "pending") || b.createdAt.localeCompare(a.createdAt);
+
+/**
+ * 상태 버튼: 누를 때마다 사용 중 → 중지 → 승인 대기 → 사용 중 (사용자 결정, 2026-10-31).
+ * 버튼 글자는 누르면 바뀌는 상태.
+ */
+const NEXT_STATUS = { active: "blocked", blocked: "pending", pending: "active" } as const;
+const NEXT_LABEL = { active: "중지", blocked: "승인 대기로", pending: "사용 승인" } as const;
+const NEXT_STYLE = {
+  active: "border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200",
+  blocked: "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100",
+  pending: "border-green-200 bg-green-50 text-green-700 hover:bg-green-100",
+} as const;
+function StatusCycleButton({ u, onChange }: { u: UserRow; onChange: (s: UserRow["status"]) => void }) {
+  const next = NEXT_STATUS[u.status];
+  return (
+    <button
+      type="button"
+      title={`누르면 '${STATUS_LABEL[next]}'(으)로 바뀌어요`}
+      className={`rounded-full border px-2.5 py-0.5 ${NEXT_STYLE[u.status]}`}
+      onClick={() => (next !== "blocked" || confirm(`${u.schoolName} 계정을 중지할까요? 중지하면 로그인할 수 없어요.`)) && onChange(next)}
+    >
+      {NEXT_LABEL[u.status]}
+    </button>
+  );
+}
+
 export function AdminUsers() {
   const me = useMe();
   const { data, error, reload } = useLoad<{ users: UserRow[] }>("/api/admin/users");
@@ -185,7 +216,8 @@ function UsersTable({
     role: (u) => u.role,
     designs: (u) => u.designCount,
     created: (u) => u.createdAt,
-  });
+    login: (u) => u.lastLoginAt ?? "",
+  }, pendingFirst);
   const removeUser = async (u: UserRow) => {
     if (!confirm(`「${u.schoolName}」 계정을 삭제할까요?\n이 학교의 설계 ${u.designCount}개와 시수 점검도 함께 지워지고, 되돌릴 수 없어요.`)) return;
     if (prompt(`정말 삭제하려면 학교명(${u.schoolName})을 그대로 입력하세요.`)?.trim() !== u.schoolName) return alert("학교명이 달라 삭제하지 않았어요.");
@@ -222,25 +254,28 @@ function UsersTable({
       )}
       <BulkUsers onDone={reload} />
       <Card className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-sm">
-          <thead className="text-left text-xs text-gray-500">
+        <table className={`${DESIGN_TABLE} [&_td]:px-2.5 [&_th]:px-2.5`}>
+          <thead className={DESIGN_THEAD}>
             <tr>
-              <SortTh label="지역" k="region" sort={sort} />
-              <SortTh label="학교명" k="school" sort={sort} />
-              <SortTh label="상태" k="status" sort={sort} />
-              <SortTh label="권한" k="role" sort={sort} />
-              <SortTh label="설계" k="designs" sort={sort} />
-              <SortTh label="가입 / 최근 로그인" k="created" sort={sort} />
-              <th className="p-2">관리</th>
+              <SortTh label="지역" k="region" sort={sort} dark className={NARROW} />
+              <SortTh label="학교명" k="school" sort={sort} dark className="text-center" />
+              <SortTh label="상태" k="status" sort={sort} dark className={NARROW} />
+              <SortTh label="권한" k="role" sort={sort} dark className={NARROW} />
+              <SortTh label="설계" k="designs" sort={sort} dark className={NARROW} />
+              <SortTh label="가입일" k="created" sort={sort} dark className={NARROW} />
+              <SortTh label="최근 로그인" k="login" sort={sort} dark className={NARROW} />
+              <th className={`p-2 ${NARROW}`}>관리</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 text-center">
             {sort.sorted.map((u) => (
-              <tr key={u.id}>
+              <tr key={u.id} className={DESIGN_ROW}>
                 <td className="p-2">{u.region || "-"}</td>
-                <td className="p-2">
-                  <b>{u.schoolName}</b>
-                  {u.mustChangePassword && <span className="ml-1 text-xs text-amber-600">(임시 비밀번호)</span>}
+                <td className="w-full max-w-0 p-2 text-left">
+                  <span className="block truncate" title={u.schoolName}>
+                    <b>{u.schoolName}</b>
+                    {u.mustChangePassword && <span className="ml-1 text-xs text-amber-600">(임시 비밀번호)</span>}
+                  </span>
                 </td>
                 <td className="p-2">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${u.status === "active" ? "bg-green-100 text-green-700" : u.status === "pending" ? "bg-amber-100 text-amber-700" : "bg-gray-200 text-gray-600"}`}>
@@ -249,22 +284,31 @@ function UsersTable({
                 </td>
                 <td className="p-2">{u.role === "admin" ? "관리자" : "학교"}</td>
                 <td className="p-2">{u.designCount}</td>
-                <td className="p-2 text-xs text-gray-500">{fmtDate(u.createdAt)}<br />{fmtDate(u.lastLoginAt)}</td>
-                <td className="space-x-2 p-2 text-xs">
+                {/* 가입일은 날짜만, 마우스를 올리면 시간까지 */}
+                <td className="p-2 text-xs text-gray-500" title={fmtDate(u.createdAt)}>
+                  {fmtDay(u.createdAt)}
+                </td>
+                <td className="p-2 text-xs text-gray-500">{fmtDate(u.lastLoginAt)}</td>
+                <td className="p-2 text-xs">
                   {u.id === meId ? (
                     <span className="text-gray-400">(나)</span>
                   ) : (
-                    <>
-                      {u.status !== "active" && <button type="button" className="font-semibold text-brand-600" onClick={() => update(u, { status: "active" })}>가입 승인</button>}
-                      {u.status === "active" && <button type="button" className="text-gray-500 hover:text-red-600" onClick={() => confirm(`${u.schoolName} 계정을 중지할까요?`) && update(u, { status: "blocked" })}>중지</button>}
-                      <button type="button" className="text-gray-500 hover:text-brand-600" onClick={() => issueTemp(u)}>임시 비밀번호</button>
-                      <button type="button" className="text-gray-500 hover:text-brand-600" onClick={() => confirm("권한을 바꿀까요?") && update(u, { role: u.role === "admin" ? "teacher" : "admin" })}>
-                        {u.role === "admin" ? "일반으로" : "관리자로"}
+                    <span className="flex items-center justify-center gap-1 font-semibold">
+                      <StatusCycleButton u={u} onChange={(status) => update(u, { status })} />
+                      <button type="button" className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-sky-700 hover:bg-sky-100" onClick={() => issueTemp(u)}>
+                        임시 비밀번호
                       </button>
-                      <button type="button" className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-semibold text-red-600 hover:bg-red-100" onClick={() => void removeUser(u)}>
+                      <button
+                        type="button"
+                        className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-0.5 text-violet-700 hover:bg-violet-100"
+                        onClick={() => confirm(u.role === "admin" ? `${u.schoolName}의 관리자 권한을 해제할까요?` : `${u.schoolName}을(를) 관리자로 지정할까요?`) && update(u, { role: u.role === "admin" ? "teacher" : "admin" })}
+                      >
+                        {u.role === "admin" ? "관리자 해제" : "관리자 지정"}
+                      </button>
+                      <button type="button" className="rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-red-600 hover:bg-red-100" onClick={() => void removeUser(u)}>
                         계정 삭제
                       </button>
-                    </>
+                    </span>
                   )}
                 </td>
               </tr>
@@ -541,7 +585,11 @@ export function AdminLogs() {
   }, [load]);
   const all = logs ?? [];
   const filtered = all.filter((l) => !kind || l.kind === kind);
-  const sort = useSort(filtered, { time: (l) => l.createdAt, kind: (l) => KIND_LABEL[l.kind] ?? l.kind, school: (l) => l.school ?? "", detail: (l) => l.detail ?? "" });
+  const sort = useSort(
+    filtered,
+    { time: (l) => l.createdAt, kind: (l) => KIND_LABEL[l.kind] ?? l.kind, school: (l) => l.school ?? "", detail: (l) => l.detail ?? "" },
+    (a, b) => b.createdAt.localeCompare(a.createdAt), // 기본: 최근 것부터
+  );
   if (error) return <p className="text-red-700">{error}</p>;
   if (!logs) return <p className="text-gray-500">불러오는 중…</p>;
   return (
@@ -563,24 +611,28 @@ export function AdminLogs() {
         )}
       </div>
       <Card className="overflow-x-auto">
-        <table className="w-full min-w-[640px] text-sm">
-          <thead className="text-left text-xs text-gray-500">
+        <table className={`${DESIGN_TABLE} [&_td]:px-2.5 [&_th]:px-2.5`}>
+          <thead className={DESIGN_THEAD}>
             <tr>
-              <SortTh label="시각" k="time" sort={sort} />
-              <SortTh label="종류" k="kind" sort={sort} />
-              <SortTh label="학교" k="school" sort={sort} />
-              <SortTh label="내용" k="detail" sort={sort} />
+              <SortTh label="시각" k="time" sort={sort} dark className={NARROW} />
+              <SortTh label="종류" k="kind" sort={sort} dark className={NARROW} />
+              <SortTh label="학교" k="school" sort={sort} dark className={NARROW} />
+              <SortTh label="내용" k="detail" sort={sort} dark className="text-center" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 text-center">
             {sort.sorted.map((l) => (
-              <tr key={l.id}>
+              <tr key={l.id} className={DESIGN_ROW}>
                 <td className="p-2 text-xs text-gray-500">{fmtDate(l.createdAt)}</td>
                 <td className="p-2">{KIND_LABEL[l.kind] ?? l.kind}</td>
                 <td className="p-2 text-gray-600">{l.school ?? "-"}</td>
-                <td className="p-2 text-gray-600">
-                  {l.detail}
-                  {l.designId && <Link href={`/admin/designs/${l.designId}`} className="ml-2 text-xs text-brand-600">설계 보기</Link>}
+                <td className="w-full max-w-0 p-2 text-left text-gray-600">
+                  <span className="flex items-center gap-2">
+                    <span className="truncate" title={l.detail}>
+                      {l.detail}
+                    </span>
+                    {l.designId && <Link href={`/admin/designs/${l.designId}`} className="shrink-0 text-xs text-brand-600">설계 보기</Link>}
+                  </span>
                 </td>
               </tr>
             ))}

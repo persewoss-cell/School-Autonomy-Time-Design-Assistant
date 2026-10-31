@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { REGION_VALUES } from "@/domain/regions";
 import { inputClass } from "../ui";
 import { Modal } from "../Modal";
+import { DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, NARROW } from "./sort";
 
 interface Row {
   region: string;
@@ -171,14 +172,34 @@ export function BulkUsers({ onDone }: { onDone: () => void }) {
         등록 결과: <span className="text-green-700">{results.filter((r) => r.ok).length}개 등록</span>
         {results.some((r) => !r.ok) && <span className="text-red-600"> · {results.filter((r) => !r.ok).length}개 안 됨</span>}
       </p>
-      <ul className="max-h-64 space-y-1 overflow-auto text-sm">
-        {results.map((r) => (
-          <li key={r.row} className={`rounded px-2 py-1 ${r.ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-700"}`}>
-            {mode === "bulk" ? `${r.row}. ` : ""}
-            {r.schoolName || "(학교명 없음)"} — {r.message}
-          </li>
-        ))}
-      </ul>
+      <div className="max-h-64 overflow-auto rounded-lg border border-gray-200">
+        <table className={`${DESIGN_TABLE} [&_td]:px-2.5 [&_th]:px-2.5`}>
+          <thead className={`sticky top-0 ${DESIGN_THEAD}`}>
+            <tr>
+              {mode === "bulk" && <th className={`p-2 ${NARROW}`}>#</th>}
+              <th className={`p-2 ${NARROW}`}>학교명</th>
+              <th className={`p-2 ${NARROW}`}>결과</th>
+              <th className="p-2 text-center">내용</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 text-center">
+            {results.map((r) => (
+              <tr key={r.row} className={DESIGN_ROW}>
+                {mode === "bulk" && <td className="p-2 text-gray-400">{r.row}</td>}
+                <td className="p-2 font-semibold">{r.schoolName || "(학교명 없음)"}</td>
+                <td className="p-2">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${r.ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>{r.ok ? "등록" : "안 됨"}</span>
+                </td>
+                <td className={`w-full max-w-0 p-2 text-left ${r.ok ? "text-gray-600" : "text-red-700"}`}>
+                  <span className="block truncate" title={r.message}>
+                    {r.message}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
   const closeBtn = (
@@ -294,23 +315,25 @@ export function BulkUsers({ onDone }: { onDone: () => void }) {
                 </span>
               </div>
               <div className="max-h-64 overflow-auto rounded-lg border border-gray-200">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-gray-50 text-left text-xs text-gray-500">
+                <table className={`${DESIGN_TABLE} [&_td]:px-2.5 [&_th]:px-2.5`}>
+                  <thead className={`sticky top-0 ${DESIGN_THEAD}`}>
                     <tr>
-                      <th className="p-2">#</th>
+                      <th className={`p-2 ${NARROW}`}>#</th>
                       {HEADERS.map((h) => (
-                        <th key={h} className="p-2">
+                        <th key={h} className={`p-2 ${h === "학교명" ? "text-center" : NARROW}`}>
                           {h}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-gray-100 text-center">
                     {rows.map((r, i) => (
-                      <tr key={i}>
+                      <tr key={i} className={DESIGN_ROW}>
                         <td className="p-2 text-gray-400">{i + 1}</td>
                         <td className="p-2">{r.region}</td>
-                        <td className="p-2">{r.schoolName}</td>
+                        <td className="w-full max-w-0 p-2 text-left">
+                          <span className="block truncate">{r.schoolName}</span>
+                        </td>
                         <td className="p-2 text-gray-400">{"•".repeat(Math.min(12, r.password.length))}</td>
                       </tr>
                     ))}

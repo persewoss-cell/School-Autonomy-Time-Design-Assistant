@@ -10,7 +10,7 @@ import { DownloadIcon, OpenNewIcon } from "./icons";
 import { TypeTag, inputClass } from "./ui";
 import { loadMe } from "./useMe";
 import { MultiSelect, SingleSelect } from "./admin/MultiSelect";
-import { SortTh, useSort } from "./admin/sort";
+import { byYearThenSaved, DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, NARROW, SortTh, useSort } from "./admin/sort";
 import { saveDesignDocx } from "./wizard/downloadDesign";
 import { ExamplesButton } from "./Examples";
 import { SharedDesignView } from "./SharedDesignView";
@@ -25,6 +25,7 @@ interface Shared {
   schoolYear: string;
   /** 본교 설계 */
   mine: boolean;
+  updatedAt: string;
 }
 
 const nextSchoolYear = () => {
@@ -148,8 +149,9 @@ function SharedTable({ rows }: { rows: Shared[] }) {
     school: (d) => d.school,
     type: (d) => d.type,
     grade: (d) => d.grade * 10 + d.semester,
+    semester: (d) => d.semester * 10 + d.grade,
     name: (d) => d.name,
-  });
+  }, byYearThenSaved);
   const yearOptions = [...new Set(rows.map((d) => d.schoolYear))].sort().reverse().map((v) => ({ value: v, label: `${v}학년도` }));
   const proceed = () => {
     if (!notice) return;
@@ -214,23 +216,24 @@ function SharedTable({ rows }: { rows: Shared[] }) {
         <span className="text-sm text-gray-500">{shown.length}건</span>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-sm">
-          <thead className="sticky top-0 bg-white text-left text-xs text-gray-500">
+        <table className={`${DESIGN_TABLE} [&_td]:px-2.5 [&_th]:px-2.5`}>
+          <thead className={DESIGN_THEAD}>
             <tr>
-              <SortTh label="학년도" k="year" sort={sort} />
-              <SortTh label="학교" k="school" sort={sort} />
-              <SortTh label="유형" k="type" sort={sort} />
-              <SortTh label="학년-학기" k="grade" sort={sort} />
-              <SortTh label="명칭" k="name" sort={sort} />
-              <th className="p-2 text-center">복제</th>
-              <th className="p-2 text-center">요약보기</th>
-              <th className="p-2 text-center">내려받기</th>
+              <SortTh label="학년도" k="year" sort={sort} dark className={NARROW} />
+              <SortTh label="학교" k="school" sort={sort} dark className={NARROW} />
+              <SortTh label="유형" k="type" sort={sort} dark className={NARROW} />
+              <SortTh label="학년" k="grade" sort={sort} dark className={NARROW} />
+              <SortTh label="학기" k="semester" sort={sort} dark className={NARROW} />
+              <SortTh label="과목(활동)명" k="name" sort={sort} dark className="text-center" />
+              <th className={`p-2 ${NARROW}`}>복제</th>
+              <th className={`p-2 ${NARROW}`}>요약보기</th>
+              <th className={`p-2 ${NARROW}`}>내려받기</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 text-center">
             {sort.sorted.map((d) => (
-              <tr key={d.id}>
-                <td className="p-2 whitespace-nowrap">{d.schoolYear}</td>
+              <tr key={d.id} className={DESIGN_ROW}>
+                <td className="p-2">{d.schoolYear}</td>
                 <td className="p-2 font-semibold">
                   {d.school}
                   {d.mine && <span className="ml-1 rounded-full bg-brand-600 px-2 py-0.5 text-xs font-semibold text-white">본교</span>}
@@ -238,11 +241,14 @@ function SharedTable({ rows }: { rows: Shared[] }) {
                 <td className="p-2">
                   <TypeTag type={d.type} />
                 </td>
-                <td className="p-2 whitespace-nowrap">
-                  {d.grade}-{d.semester}
+                <td className="p-2">{d.grade}학년</td>
+                <td className="p-2">{d.semester}학기</td>
+                <td className="w-full max-w-0 p-2 text-left">
+                  <span className="block truncate" title={d.name}>
+                    {d.name}
+                  </span>
                 </td>
-                <td className="p-2">{d.name}</td>
-                <td className="p-2 text-center">
+                <td className="p-2">
                   <button
                     type="button"
                     disabled={!!busy}
@@ -252,12 +258,12 @@ function SharedTable({ rows }: { rows: Shared[] }) {
                     복제
                   </button>
                 </td>
-                <td className="p-2 text-center">
+                <td className="p-2">
                   <button type="button" onClick={() => setPreview(d)} title="요약보기" className="inline-flex rounded-lg p-1.5 text-gray-600 hover:bg-gray-100">
                     <OpenNewIcon />
                   </button>
                 </td>
-                <td className="p-2 text-center">
+                <td className="p-2">
                   <button type="button" disabled={!!busy} onClick={() => setNotice(d)} title="문서(.docx) 내려받기 (받은 문서를 새 창에서도 열어요)" className="inline-flex rounded-lg p-1.5 text-brand-700 hover:bg-brand-50 disabled:opacity-50">
                     {busy === d.id ? "…" : <DownloadIcon />}
                   </button>
@@ -266,7 +272,7 @@ function SharedTable({ rows }: { rows: Shared[] }) {
             ))}
             {shown.length === 0 && (
               <tr>
-                <td colSpan={8} className="p-4 text-center text-gray-500">
+                <td colSpan={9} className="p-4 text-center text-gray-500">
                   {rows.length === 0 ? "아직 완성된 설계가 없어요." : "조건에 맞는 설계가 없어요."}
                 </td>
               </tr>

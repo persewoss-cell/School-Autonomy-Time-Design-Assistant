@@ -6,7 +6,8 @@ import { fileSize, type ExampleRow } from "../Examples";
 import { DownloadIcon } from "../icons";
 import { Card, Field, TypeTag, inputClass } from "../ui";
 import { useLoad } from "./AdminPages";
-import { SortTh, useSort } from "./sort";
+import { byYearThenSaved, DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, NARROW, SortTh, useSort } from "./sort";
+import { fmtDate } from "../account/MyDesigns";
 
 const nextYear = () => String(new Date().getFullYear() + (new Date().getMonth() >= 2 ? 1 : 0));
 
@@ -22,9 +23,10 @@ export function AdminExamples() {
     year: (r) => r.schoolYear,
     type: (r) => r.type,
     grade: (r) => r.grade * 10 + r.semester,
+    semester: (r) => r.semester * 10 + r.grade,
     name: (r) => r.name,
     uploaded: (r) => r.uploadedAt,
-  });
+  }, (a, b) => byYearThenSaved({ schoolYear: a.schoolYear, updatedAt: a.uploadedAt }, { schoolYear: b.schoolYear, updatedAt: b.uploadedAt }));
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm({ ...form, [k]: e.target.value });
 
   const upload = async (e: React.FormEvent) => {
@@ -106,33 +108,37 @@ export function AdminExamples() {
       </Card>
       {error && <p className="text-red-700">{error}</p>}
       <Card className="overflow-x-auto">
-        <table className="w-full min-w-[640px] text-sm">
-          <thead className="text-left text-xs text-gray-500">
+        <table className={`${DESIGN_TABLE} [&_td]:px-2.5 [&_th]:px-2.5`}>
+          <thead className={DESIGN_THEAD}>
             <tr>
-              <SortTh label="학년도" k="year" sort={sort} />
-              <SortTh label="활동/과목" k="type" sort={sort} />
-              <SortTh label="학년·학기" k="grade" sort={sort} />
-              <SortTh label="이름" k="name" sort={sort} />
-              <SortTh label="올린 날" k="uploaded" sort={sort} />
-              <th className="p-2">파일</th>
-              <th className="p-2">삭제</th>
+              <SortTh label="학년도" k="year" sort={sort} dark className={NARROW} />
+              <SortTh label="유형" k="type" sort={sort} dark className={NARROW} />
+              <SortTh label="학년" k="grade" sort={sort} dark className={NARROW} />
+              <SortTh label="학기" k="semester" sort={sort} dark className={NARROW} />
+              <SortTh label="과목(활동)명" k="name" sort={sort} dark className="text-center" />
+              <SortTh label="올린 날" k="uploaded" sort={sort} dark className={NARROW} />
+              <th className={`p-2 ${NARROW}`}>파일</th>
+              <th className={`p-2 ${NARROW}`}>삭제</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 text-center">
             {sort.sorted.map((r) => (
-              <tr key={r.id}>
+              <tr key={r.id} className={DESIGN_ROW}>
                 <td className="p-2">{r.schoolYear}</td>
                 <td className="p-2">
                   <TypeTag type={r.type} />
                 </td>
-                <td className="p-2">
-                  {r.grade}학년 {r.semester}학기
+                <td className="p-2">{r.grade}학년</td>
+                <td className="p-2">{r.semester}학기</td>
+                <td className="w-full max-w-0 p-2 text-left font-semibold">
+                  <span className="block truncate" title={r.name}>
+                    {r.name}
+                  </span>
                 </td>
-                <td className="p-2 font-semibold">{r.name}</td>
-                <td className="p-2 text-xs text-gray-500">{new Date(r.uploadedAt).toLocaleDateString("ko-KR")}</td>
+                <td className="p-2 text-xs text-gray-500">{fmtDate(r.uploadedAt)}</td>
                 <td className="p-2">
-                  <a href={`/api/examples/${r.id}`} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline">
-                    {r.fileName} ({fileSize(r.size)}) <DownloadIcon className="h-3.5 w-3.5" />
+                  <a href={`/api/examples/${r.id}`} title={r.fileName} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline">
+                    {r.fileName.split(".").pop()?.toUpperCase()} · {fileSize(r.size)} <DownloadIcon className="h-3.5 w-3.5" />
                   </a>
                 </td>
                 <td className="p-2">
@@ -144,8 +150,8 @@ export function AdminExamples() {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="p-4 text-center text-gray-500">
-                  아직 올린 예시안이 없어요.
+                <td colSpan={8} className="p-4 text-center text-gray-500">
+                  {data ? "아직 올린 예시안이 없어요." : "불러오는 중…"}
                 </td>
               </tr>
             )}
