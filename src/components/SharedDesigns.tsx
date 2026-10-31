@@ -216,7 +216,7 @@ function SharedTable({ rows }: { rows: Shared[] }) {
         <span className="text-sm text-gray-500">{shown.length}건</span>
       </div>
       <div className="overflow-x-auto">
-        <table className={`${DESIGN_TABLE} [&_td]:px-2 [&_th]:px-2`}>
+        <table className={`${DESIGN_TABLE} [&_td]:px-[11px] [&_th]:px-[11px]`}>
           <thead className={DESIGN_THEAD}>
             <tr>
               <SortTh label="학년도" k="year" sort={sort} dark className="text-center" />
