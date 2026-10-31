@@ -358,7 +358,9 @@ export function AdminDesigns() {
                         확인 {d.warningCount}
                       </button>
                     )}
-                    {!d.hoursComplete && (
+                    {d.hoursComplete ? (
+                      <span className="rounded-lg border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">✓ 시수점검 완료</span>
+                    ) : (
                       <button
                         type="button"
                         onClick={() => void enterSchool(d.ownerId, `/hours?grade=${d.grade}&year=${d.schoolYear || 2027}`)}
