@@ -165,7 +165,6 @@ function UsersTable({
   };
   return (
     <div className="space-y-4">
-      <BulkUsers onDone={reload} />
       {temp && (
         <Card className="space-y-2 border-2 border-brand-500">
           <p className="font-bold">{temp.school} 임시 비밀번호</p>
@@ -192,6 +191,7 @@ function UsersTable({
           ))}
         </Card>
       )}
+      <BulkUsers onDone={reload} />
       <Card className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-sm">
           <thead className="text-left text-xs text-gray-500">
