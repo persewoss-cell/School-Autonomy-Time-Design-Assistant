@@ -13,7 +13,8 @@ import { Card, Chips, Field, ListEditor, NavButtons, StepHeader, StepIssues, inp
 
 export interface StepProps {
   doc: DesignDoc;
-  setDoc: (fn: (d: DesignDoc) => void) => void;
+  /** track=false: 되돌리기 기록에 넣지 않는 자동 맞춤 */
+  setDoc: (fn: (d: DesignDoc) => void, track?: boolean) => void;
   onBack: () => void;
   onNext: () => void;
   onParseFail?: (step: string, error: string) => void;

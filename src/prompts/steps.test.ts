@@ -95,18 +95,18 @@ describe("목표", () => {
 
 describe("단원 지도계획 — 목록 밖 성취기준 코드 걸러 내기", () => {
   const lesson = { hours: "12", topic: "주제", goal: "", activities: "조사하기", assessment: "[과정중심평가] 발표" };
-  it("코드를 id로 바꾸고 모르는 코드는 뺀다", () => {
+  it("n번째 단원에는 n번째 영역의 성취기준이 들어간다 (AI가 적은 코드와 관계없이)", () => {
     const r = planPrompt.parse(
       wrap({ plans: [{ title: "가", units: [{ unitName: "단원", standards: ["[3사지구01-01]", "[3 사지구02-02]", "[9국가짜01-01]"], lessons: [lesson] }] }] }),
       doc,
     );
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.data[0].units[0].standardIds).toEqual(["s1", "s4"]);
+      // 1단원 = 1영역의 성취기준 (AI가 다른 영역 코드를 적어도 영역 기준으로 맞춤)
+      expect(r.data[0].units[0].standardIds).toEqual(doc.standards.filter((x) => x.areaIndex === 0).map((x) => x.id));
       const l = r.data[0].units[0].lessons[0];
       expect(l.hours).toBe(12);
       expect(l.assessment).toBe("발표");
-      expect(r.notes.join()).toContain("[9국가짜01-01]");
       expect(r.notes.join()).toContain("1개 안만");
     }
   });

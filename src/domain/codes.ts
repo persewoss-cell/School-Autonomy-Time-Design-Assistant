@@ -42,3 +42,7 @@ export function hasSameCategory(areas: Area[], elements: string[]): boolean {
   const cats = elements.map((e) => categoryOf(areas, e)).filter((c): c is Category => c !== null);
   return new Set(cats).size < cats.length;
 }
+
+/** 단원 지도계획: n번째 단원은 n번째 영역의 성취기준만 다룬다 */
+export const areaStandardIds = (doc: Pick<DesignDoc, "standards">, areaIndex: number): string[] =>
+  doc.standards.filter((s) => s.areaIndex === areaIndex).map((s) => s.id);

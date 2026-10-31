@@ -311,7 +311,7 @@ export function checkUnitPlan(doc: Pick<DesignDoc, "basic" | "abbrev" | "standar
   const used = new Set(plan.units.flatMap((u) => u.standardIds));
   plan.units.forEach((u, i) => {
     if (u.standardIds.filter((id) => codes.has(id)).length === 0) {
-      issues.push({ level: "error", field: `${i + 1}단원(${u.unitName}) 성취기준`, message: "이 단원에 배치한 성취기준이 없습니다.", fix: "단원에 맞는 성취기준을 골라 주세요." });
+      issues.push({ level: "error", field: `${i + 1}단원(${u.unitName}) 성취기준`, message: `${i + 1}번째 영역의 성취기준이 없습니다. (n번째 단원은 n번째 영역의 성취기준을 다룹니다)`, fix: "성취기준 단계에서 이 영역의 성취기준을 만들거나, 단원 수를 영역 수와 같게 맞춰 주세요." });
     }
   });
   const coverage = planCoverage(doc, plan);

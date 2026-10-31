@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Lesson, Plan } from "@/domain/types";
-import { codeMap } from "@/domain/codes";
+import { areaStandardIds, codeMap } from "@/domain/codes";
 import { planPrompt } from "@/prompts/steps";
 import { makeDemoPlans } from "@/prompts/demoPlans";
 import { checkUnitPlan, planCoverage } from "@/validation/design";
@@ -284,6 +284,11 @@ function EditPlan({ doc, setDoc, onBack, onNext, tips, designId }: StepProps & {
   const total = totalLessonHours(plan.units);
   const labels = lessonLabels(plan.units, doc.basic.hours);
   const mutate = (fn: (p: Plan) => void) => setDoc((d) => fn(d.plan.selected!));
+  // n번째 단원 = n번째 영역의 성취기준: 성취기준을 고치거나 단원이 바뀌면 맞춰 둔다 (되돌리기 기록에는 넣지 않음)
+  const synced = plan.units.every((u, ui) => u.standardIds.join() === areaStandardIds(doc, ui).join());
+  useEffect(() => {
+    if (!synced) setDoc((d) => d.plan.selected!.units.forEach((u, ui) => (u.standardIds = areaStandardIds(d, ui))), false);
+  }, [synced, setDoc]);
   const setLesson = (ui: number, li: number, patch: Partial<Lesson>) => mutate((p) => Object.assign(p.units[ui].lessons[li], patch));
 
   return (
@@ -333,17 +338,19 @@ function EditPlan({ doc, setDoc, onBack, onNext, tips, designId }: StepProps & {
               단원 삭제
             </button>
           </div>
-          <div>
-            <p className="mb-1 text-xs text-gray-500">이 단원의 성취기준 (눌러서 고르기)</p>
-            <Chips
-              options={doc.standards.map((s) => s.id)}
-              selected={u.standardIds}
-              onToggle={(id) => mutate((p) => void (p.units[ui].standardIds = toggle(p.units[ui].standardIds, id)))}
-              render={(id) => {
-                const s = doc.standards.find((x) => x.id === id);
-                return `${codes.get(id)} ${s ? s.text.slice(0, 18) + (s.text.length > 18 ? "…" : "") : ""}`;
-              }}
-            />
+          <div className="rounded-lg bg-gray-50 p-2 text-sm">
+            <p className="mb-1 text-xs text-gray-500">이 단원의 성취기준 ({ui + 1}번째 영역)</p>
+            {u.standardIds.filter((id) => codes.has(id)).length === 0 ? (
+              <p className="text-xs text-red-600">{ui + 1}번째 영역에 성취기준이 없어요. 영역 수와 단원 수가 같은지 확인해 주세요.</p>
+            ) : (
+              u.standardIds
+                .filter((id) => codes.has(id))
+                .map((id) => (
+                  <p key={id}>
+                    <span className="font-mono text-xs font-bold text-brand-700">{codes.get(id)}</span> {doc.standards.find((x) => x.id === id)?.text}
+                  </p>
+                ))
+            )}
           </div>
 
           {u.lessons.map((l, li) => (

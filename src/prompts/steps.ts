@@ -2,6 +2,7 @@ import { z } from "zod";
 import { CATEGORIES, newId, planSchema, standardNeedsRewrite, type Area, type AssessmentRow, type DesignDoc, type Intro, type Plan, type Standard, type Teaching } from "@/domain/types";
 import { categoryOf, codeMap, hasSameCategory } from "@/domain/codes";
 import { categorySplit, elementCount, splitProblem, standardCountsFor } from "@/domain/standardCounts";
+import { areaStandardIds } from "@/domain/codes";
 import { planCoverage } from "@/validation/design";
 import { unitHoursFor } from "@/domain/unitHours";
 import { COMMON_RULES, contextBlock, formatBlock, parseAiJson, toList, type AiParse } from "./common";
@@ -406,7 +407,7 @@ ${doc.planRequest?.notes.trim() || "(없음)"}
 3. 단원은 내용 체계의 영역 순서대로 하나씩 만듭니다. (단원 ${doc.areas.length}개) 단원명은 영역명을 그대로 쓰거나, 영역을 포함하는 의미로 재구성합니다.
    각 단원의 차시 합계는 위 '단원별 차시'와 **정확히** 같아야 합니다.
    단원마다 unitHours에 정한 차시를 적고, 그 단원 lessons의 hours를 **하나씩 더해** unitHours와 같은지 확인한 뒤 답합니다. 다르면 차시를 합치거나 나누어 맞춥니다.
-4. 각 단원의 standards에는 그 단원에서 다루는 성취기준 코드를 위 목록에서 **그대로** 넣습니다. 모든 성취기준이 어느 단원엔가 들어가야 하고, 목록에 없는 코드는 쓰지 않습니다.
+4. n번째 단원은 n번째 영역의 성취기준만 다룹니다. 각 단원의 standards에는 그 영역의 성취기준 코드(영역 번호가 같은 코드)를 **모두, 그대로** 넣습니다.
 5. 학습주제(topic)는 짧은 개괄식으로 씁니다.
 6. 학습 목표(goal)는 '~해 봅시다.'로 끝나는 한 문장으로 씁니다.
 7. 세부 활동(activities)은 2~4개, 학습 순서대로, 각각 '~하기'로 끝나는 구절로 씁니다.
@@ -500,9 +501,10 @@ ${formatBlock(`{
       planSchema.parse({
         title: p.title,
         concept: p.concept || p.title,
-        units: p.units.map((u) => ({
+        units: p.units.map((u, ui) => ({
           unitName: u.unitName,
-          standardIds: [...new Set(u.standards.flatMap((c) => toId(c) ?? []))],
+          // n번째 단원 = n번째 영역의 성취기준 (AI가 적은 것과 관계없이)
+          standardIds: areaStandardIds(doc, ui),
           lessons: u.lessons.map(({ assessStandard, fromActivities, ...l }) => ({
             ...l,
             goal: l.goal || `${l.topic}을(를) 해 봅시다.`,
