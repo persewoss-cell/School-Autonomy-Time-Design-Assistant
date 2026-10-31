@@ -347,7 +347,7 @@ function DesignTable({
   return (
     <Card className="overflow-x-auto">
       {/* 과목(활동)명 말고는 내용 폭만큼만(w-px), 남는 폭은 모두 과목(활동)명. 제목은 모두 가운데, 내용은 과목(활동)명만 왼쪽 */}
-      <table className="w-full text-sm whitespace-nowrap [&_td]:px-1.5 [&_td]:py-2 [&_th]:px-1.5">
+      <table className="w-full text-sm whitespace-nowrap [&_td]:px-2 [&_td]:py-2 [&_th]:px-2 [&_td+td]:border-l [&_td]:border-gray-200 [&_th+th]:border-l [&_th]:border-gray-200">
         <thead className="border-b border-gray-300 text-xs text-gray-500">
           <tr>
             <SortTh label="학년도" k="year" sort={sort} className={NARROW} />
