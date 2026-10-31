@@ -28,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </header>
         <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
         <footer className="py-8 text-center text-xs text-gray-400">
-          「2027학년도 초등 학교자율시간 설계·운영 지침」(전라남도교육청) 기준 · 학생 개인정보는 입력하지 마세요.
+          만든 이: 광양중동초등학교 강형권, 강지훈 선생님 / 문의: 나이스 업무메일 또는 메신저
         </footer>
       </body>
     </html>

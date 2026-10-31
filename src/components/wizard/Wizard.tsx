@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { emptyDesign, type DesignDoc } from "@/domain/types";
-import { sampleSubject } from "@/domain/sample";
 import type { StepKey } from "@/validation/types";
 import { checklistResults, validateDesign } from "@/validation/design";
 import { useHourChecks } from "../hours/useHourChecks";
@@ -380,17 +379,6 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
             setDoc((d) => void (d.basic.type = type));
             goIndex(1);
           }}
-          onLoadSample={
-            isNew && !designId
-              ? () => {
-                  if (doc.basic.name && !confirm("작성 중인 내용 대신 예시를 불러올까요?")) return;
-                  remember();
-                  commit(sampleSubject());
-                  setStepKey("final");
-                  setMaxIndex(99);
-                }
-              : undefined
-          }
         />
       )}
       {stepKey === "basic" && (

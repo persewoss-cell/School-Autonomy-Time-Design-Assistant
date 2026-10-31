@@ -6,6 +6,27 @@ import { api } from "@/lib/api";
 import { REGION_VALUES } from "@/domain/regions";
 import { Card, Field, inputClass } from "../ui";
 import { useMe } from "../useMe";
+import { Modal } from "../Modal";
+
+/** 가입 승인·비밀번호 재설정을 빨리 처리받는 방법 (팝업으로 안내) */
+function FastContact({ what, onClose }: { what: string; onClose: () => void }) {
+  return (
+    <Modal
+      tone="amber"
+      title="더 빠르게 처리하려면"
+      onClose={onClose}
+      actions={
+        <button type="button" onClick={onClose} className="rounded-lg bg-brand-600 px-5 py-2 font-semibold text-white hover:bg-brand-700">
+          확인
+        </button>
+      }
+    >
+      <p>
+        {what}을 <b>나이스 업무메일 또는 메신저</b>로 <b>광양중동초등학교 강형권·강지훈 선생님</b>께 알려 주시면 더 빠르게 처리할 수 있어요.
+      </p>
+    </Modal>
+  );
+}
 
 
 /** 계정은 학교 단위(한 학교당 1개). 가입: 지역 → 학교명 → 비밀번호·확인. 로그인: 학교명 + 비밀번호. */
@@ -15,6 +36,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
   const [busy, setBusy] = useState(false);
+  const [contactPopup, setContactPopup] = useState(false);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm({ ...form, [k]: e.target.value });
 
   const submit = async (e: React.FormEvent) => {
@@ -38,7 +60,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       } else {
         const r = await api<{ user: { status: string } }>("/api/auth/signup", { method: "POST", body: form });
         if (r.user.status === "active") window.location.href = "/designs";
-        else setDone("가입 신청이 완료되었습니다. 관리자가 확인하고 승인하면 학교명과 비밀번호로 로그인할 수 있어요.");
+        else {
+          setDone("가입 신청이 완료되었습니다. 관리자가 확인하고 승인하면 학교명과 비밀번호로 로그인할 수 있어요.");
+          setContactPopup(true);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "처리하지 못했습니다.");
@@ -59,6 +84,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
   return (
     <div className="mx-auto max-w-md space-y-4">
+      {contactPopup && <FastContact what="가입 승인 요청" onClose={() => setContactPopup(false)} />}
       <Card>
         <form onSubmit={submit} className="space-y-4">
           <h1 className="text-xl font-bold">{mode === "login" ? "로그인" : "회원가입 신청"}</h1>
@@ -137,6 +163,7 @@ function ResetRequest() {
   const [contact, setContact] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [contactPopup, setContactPopup] = useState(false);
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,6 +171,7 @@ function ResetRequest() {
     try {
       await api("/api/auth/reset-request", { method: "POST", body: { schoolName, contact } });
       setMsg({ ok: true, text: "관리자에게 비밀번호 재설정을 신청했습니다. 관리자가 확인한 뒤 적어 주신 연락처로 임시 비밀번호를 알려 드려요." });
+      setContactPopup(true);
     } catch (err) {
       setMsg({ ok: false, text: err instanceof Error ? err.message : "신청하지 못했습니다." });
     } finally {
@@ -153,6 +181,7 @@ function ResetRequest() {
 
   return (
     <Card className="space-y-3">
+      {contactPopup && <FastContact what="비밀번호 재설정 요청" onClose={() => setContactPopup(false)} />}
       <p className="text-sm text-gray-700">비밀번호를 잊으셨나요?</p>
       {!open ? (
         <button type="button" onClick={() => setOpen(true)} className="rounded-lg border border-brand-500 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50">

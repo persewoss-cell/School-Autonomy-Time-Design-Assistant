@@ -2,7 +2,7 @@ import type { DesignDoc, Lesson } from "./types";
 
 /**
  * 예시 설계: 광양중동초 「지구마을 첫걸음」(3학년 2학기, 학교자율시간 과목) 문서를 옮긴 것.
- * 테스트와 '예시 불러오기'에 쓴다.
+ * 테스트에 쓴다.
  */
 const L = (
   hours: number,

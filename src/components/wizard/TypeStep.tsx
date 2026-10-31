@@ -19,7 +19,7 @@ const OPTIONS: { type: DesignType; title: string; points: string[] }[] = [
     type: "subject",
     title: "과목",
     points: [
-      "교육감 승인 (신청 기한: 2026. 9. 11.)",
+      "교육감 승인",
       "문서: 성격, 목표, 내용 체계, 성취기준, 교수·학습 방법 및 평가, 지도의 실제",
       "성취기준을 새로 개발해야 해요",
       "전국 과목명과 겹치면 안 돼요",
@@ -27,7 +27,7 @@ const OPTIONS: { type: DesignType; title: string; points: string[] }[] = [
   },
 ];
 
-export function TypeStep({ value, onNext, onLoadSample }: { value: DesignType; onNext: (t: DesignType) => void; onLoadSample?: () => void }) {
+export function TypeStep({ value, onNext }: { value: DesignType; onNext: (t: DesignType) => void }) {
   const [type, setType] = useState<DesignType>(value);
   return (
     <Card className="space-y-4">
@@ -52,14 +52,6 @@ export function TypeStep({ value, onNext, onLoadSample }: { value: DesignType; o
         ))}
       </div>
       <NavButtons onNext={() => onNext(type)} />
-      {onLoadSample && (
-        <p className="border-t border-gray-100 pt-3 text-sm text-gray-500">
-          완성된 예시를 먼저 보고 싶다면{" "}
-          <button type="button" onClick={onLoadSample} className="font-semibold text-brand-600 underline">
-            예시 불러오기 (광양중동초 「지구마을 첫걸음」 과목)
-          </button>
-        </p>
-      )}
     </Card>
   );
 }

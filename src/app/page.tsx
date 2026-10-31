@@ -6,18 +6,17 @@ const steps = [
   ["AI에게 묻기", "프롬프트를 복사해 내 AI에 붙여 넣고, 답을 다시 붙여 넣어요"],
   ["고르고 고치기", "마음에 드는 안을 골라 차시를 고쳐요"],
   ["자동 점검", "시수·양식이 지침에 맞는지 코드가 검사해요"],
-  ["내려받기", "한글에서 열리는 문서로 받아요 (준비 중)"],
+  ["내려받기", "한글에서 열리는 .docx 파일로 내려받아요"],
 ];
 
 export default function Home() {
   return (
     <div className="space-y-10">
       <section className="rounded-2xl bg-white p-8 shadow-sm">
-        <p className="text-sm font-semibold text-brand-600">2027학년도 3~6학년 학교자율시간</p>
+        <p className="text-lg font-bold text-brand-600">학교자율시간</p>
         <h1 className="mt-2 text-3xl font-bold">과목·활동 설계, 단계별로 함께 해요</h1>
         <p className="mt-3 text-gray-600">
-          주제와 원하는 활동을 입력하면 평소 쓰는 AI에 붙여 넣을 프롬프트를 만들어 드려요.
-          AI가 준 단원 지도계획 3안을 붙여 넣으면, 시수·양식 같은 지침 준수 여부는 프로그램이 자동으로 점검합니다.
+          내 AI에 붙여 넣을 프롬프트를 만들고, AI 답을 지침대로 점검해 한글 문서로 완성해요.
         </p>
         <LoginGateLink
           href="/designs/new"

@@ -416,8 +416,7 @@ function StandardCountPicker({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">)
         )}
       </div>
       <p className="text-sm text-gray-600">
-        성취기준 하나는 서로 다른 범주의 내용 요소 2~3개를 묶고, 내용 요소 하나는 성취기준 하나에만 들어가요. 그래서 범주별 내용 요소 수에 따라 고를 수 있는 개수가 정해져요.
-        정한 개수는 AI 프롬프트에 그대로 들어가요.
+        성취기준 하나에 서로 다른 범주의 내용 요소 2~3개를 묶고, 내용 요소는 한 번씩만 써요.
       </p>
       <div className="divide-y divide-gray-100">
         {doc.areas.map((a, i) => {
@@ -513,10 +512,10 @@ export function IntroStep({ doc, setDoc, onBack, onNext, onParseFail }: StepProp
 // ───────────── (과목) 교수·학습 및 평가의 방향과 방법 ─────────────
 export function TeachingStep({ doc, setDoc, onBack, onNext, onParseFail }: StepProps) {
   const parts = [
-    ["teachingDirection", "교수·학습의 방향", "과목 목표 달성을 위한 교수·학습의 원칙과 중점 (학생 맞춤형 수업, 다양한 학습자 고려 등)"],
+    ["teachingDirection", "교수·학습의 방향", "과목 목표 달성을 위한 교수·학습의 원칙과 중점"],
     ["teachingMethods", "교수·학습의 방법", "방향에 따라 활용할 교수·학습 방법이나 활용 상의 유의 사항"],
     ["assessDirection", "평가의 방향", "과목 목표를 달성하고 학습을 지원하기 위한 평가의 원칙과 중점 (과정 중심 평가 등)"],
-    ["assessMethods", "평가의 방법", "평가 방법, 평가상의 유의점, 디지털·AI 도구 활용 시 유의점 등"],
+    ["assessMethods", "평가의 방법", "평가 방법, 평가상의 유의점"],
   ] as const;
   return (
     <div className="space-y-4">
