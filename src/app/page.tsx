@@ -1,4 +1,5 @@
 import { LoginGateLink } from "@/components/LoginGate";
+import { ExamplesButton } from "@/components/Examples";
 
 const steps = [
   ["기본 정보", "학년·학기를 고르면 시수가 자동으로 채워져요"],
@@ -30,6 +31,7 @@ export default function Home() {
         >
           시수 편성 점검하기
         </LoginGateLink>
+        <ExamplesButton />
       </section>
 
       <section>

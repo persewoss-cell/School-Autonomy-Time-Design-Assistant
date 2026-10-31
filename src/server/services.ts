@@ -339,3 +339,40 @@ export async function adminStats(repo: Repo) {
     },
   };
 }
+
+// ───────────── 예시안 파일 (관리자가 올리고 누구나 내려받음) ─────────────
+/** Vercel 서버 함수가 받을 수 있는 요청 크기(약 4.5MB) 안으로 */
+export const EXAMPLE_MAX_BYTES = 4 * 1024 * 1024;
+const EXAMPLE_EXTS = ["hwp", "hwpx", "docx", "pdf"];
+
+const exampleMetaSchema = z.object({
+  schoolYear: z.string().trim().regex(/^\d{4}$/, "학년도는 2027처럼 네 자리 숫자로 적어 주세요."),
+  type: z.enum(["subject", "activity"]),
+  grade: z.coerce.number().int().min(3).max(6),
+  semester: z.coerce.number().int().min(1).max(2),
+  name: z.string().trim().min(1, "과목·활동 이름을 적어 주세요.").max(60),
+});
+
+export async function listExamples(repo: Repo) {
+  return repo.examples.list();
+}
+
+export async function uploadExample(repo: Repo, admin: User, raw: unknown, file: { name: string; type: string; data: Buffer }) {
+  const r = exampleMetaSchema.safeParse(raw);
+  if (!r.success) throw new ServiceError(400, r.error.issues[0]?.message ?? "입력값을 확인해 주세요.");
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  if (!EXAMPLE_EXTS.includes(ext)) throw new ServiceError(400, "한글(hwp·hwpx), docx, pdf 파일만 올릴 수 있어요.");
+  if (file.data.length === 0) throw new ServiceError(400, "빈 파일입니다.");
+  if (file.data.length > EXAMPLE_MAX_BYTES) throw new ServiceError(413, "파일이 너무 커요. 4MB 이하로 올려 주세요.");
+  const meta = await repo.examples.create(
+    { ...r.data, fileName: file.name.slice(0, 120), contentType: file.type || "application/octet-stream", size: file.data.length, uploadedAt: new Date() },
+    file.data,
+  );
+  await repo.logs.add({ kind: "admin", userId: admin.id, school: admin.schoolName, detail: `예시안 올림: ${meta.name}` });
+  return meta;
+}
+
+export async function deleteExample(repo: Repo, admin: User, id: string) {
+  await repo.examples.delete(id);
+  await repo.logs.add({ kind: "admin", userId: admin.id, school: admin.schoolName, detail: `예시안 삭제: ${id}` });
+}

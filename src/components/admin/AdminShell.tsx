@@ -7,8 +7,9 @@ import { Card } from "../ui";
 
 const TABS = [
   ["/admin", "대시보드"],
-  ["/admin/users", "사용자"],
+  ["/admin/users", "사용학교"],
   ["/admin/designs", "전체 설계"],
+  ["/admin/examples", "예시안"],
   ["/admin/logs", "이용 기록"],
 ] as const;
 

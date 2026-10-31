@@ -13,6 +13,9 @@ import {
   saveDesign,
   signup,
   updateUserByAdmin,
+  uploadExample,
+  deleteExample,
+  listExamples,
 } from "./services";
 import { createSessionToken, readSessionToken } from "./session";
 
@@ -196,5 +199,23 @@ describe("시수 점검 저장", () => {
     expect(list).toHaveLength(2); // 학년도마다 따로
     expect(list.map((c) => (c.data as { schoolYear: number }).schoolYear).sort()).toEqual([2026, 2027]);
     await expect(saveHourCheck(repo, t, 4, initialCheck(3, 2026, []))).rejects.toThrow("형식");
+  });
+});
+
+describe("예시안 파일", () => {
+  it("한글·docx·pdf만, 4MB 이하만 올리고, 목록에는 파일 내용 없이", async () => {
+    const { repo, admin } = await setup();
+    const meta = { schoolYear: "2027", type: "activity", grade: "3", semester: "2", name: "지구마을 속으로" };
+    const e = await uploadExample(repo, admin, meta, { name: "예시.hwpx", type: "", data: Buffer.from("abc") });
+    expect(e).toMatchObject({ grade: 3, semester: 2, size: 3, fileName: "예시.hwpx" });
+    await expect(uploadExample(repo, admin, meta, { name: "x.exe", type: "", data: Buffer.from("a") })).rejects.toThrow("hwp");
+    await expect(uploadExample(repo, admin, meta, { name: "x.pdf", type: "", data: Buffer.alloc(5 * 1024 * 1024) })).rejects.toThrow("4MB");
+    await expect(uploadExample(repo, admin, { ...meta, schoolYear: "27" }, { name: "x.pdf", type: "", data: Buffer.from("a") })).rejects.toThrow("학년도");
+    const list = await listExamples(repo);
+    expect(list).toHaveLength(1);
+    expect("data" in list[0]).toBe(false);
+    expect((await repo.examples.getFile(e.id))?.data.toString()).toBe("abc");
+    await deleteExample(repo, admin, e.id);
+    expect(await listExamples(repo)).toEqual([]);
   });
 });

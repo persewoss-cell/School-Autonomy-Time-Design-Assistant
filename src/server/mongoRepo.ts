@@ -1,7 +1,7 @@
 import "server-only";
 import { ObjectId, type Db, type WithId, type Document } from "mongodb";
 import { nameKey } from "@/validation/names";
-import type { DesignRecord, DesignSummary, HourCheckRecord, LogEntry, Repo, User } from "./repo";
+import type { DesignRecord, DesignSummary, ExampleFile, HourCheckRecord, LogEntry, Repo, User } from "./repo";
 
 /**
  * MongoDB 저장소. 컬렉션: users, designs, designVersions, hourChecks, activityLogs
@@ -36,7 +36,10 @@ function ensureIndexes(db: Db) {
     db.collection("designs").createIndex({ ownerId: 1, updatedAt: -1 }),
     db.collection("designs").createIndex({ type: 1, schoolName: 1, schoolYear: 1, name: 1 }),
     db.collection("designVersions").createIndex({ designId: 1, savedAt: -1 }),
-    db.collection("activityLogs").createIndex({ createdAt: -1 }),
+    // 이용 기록은 1년 지나면 MongoDB가 알아서 지운다 (사용자 결정, 2026-10-31). 예전 일반 인덱스는 지우고 TTL 인덱스로
+    db.collection("activityLogs").dropIndex("createdAt_-1").catch(() => {}),
+    db.collection("activityLogs").createIndex({ createdAt: 1 }, { expireAfterSeconds: 365 * 24 * 60 * 60 }),
+    db.collection("exampleFiles").createIndex({ uploadedAt: -1 }),
     // 학년도별로 저장하므로 예전 (ownerId, grade) 고유 인덱스는 지운다
     db.collection("hourChecks").dropIndex("ownerId_1_grade_1").catch(() => {}),
     db.collection("hourChecks").createIndex({ ownerId: 1, schoolYear: 1, grade: 1 }),
@@ -54,6 +57,8 @@ export function mongoRepo(db: Db): Repo {
   const versions = db.collection("designVersions");
   const logs = db.collection("activityLogs");
   const hourChecks = db.collection("hourChecks");
+  const exampleFiles = db.collection("exampleFiles");
+  const toExample = ({ _id, data: _d, ...rest }: WithId<Document>): ExampleFile => ({ ...(rest as Omit<ExampleFile, "id">), id: _id.toString() });
 
   return {
     users: {
@@ -71,6 +76,10 @@ export function mongoRepo(db: Db): Repo {
         if (_id) await users.updateOne({ _id }, { $set: patch });
       },
       list: async () => (await users.find().sort({ createdAt: -1 }).toArray()).map((d) => toUser(d)!),
+      delete: async (id) => {
+        const _id = oid(id);
+        if (_id) await users.deleteOne({ _id });
+      },
     },
     designs: {
       create: async (d) => {
@@ -108,6 +117,11 @@ export function mongoRepo(db: Db): Repo {
         const old = await versions.find({ designId }).sort({ savedAt: -1 }).skip(MAX_VERSIONS).project({ _id: 1 }).toArray();
         if (old.length) await versions.deleteMany({ _id: { $in: old.map((o) => o._id) } });
       },
+      deleteByOwner: async (ownerId) => {
+        const ids = (await designs.find({ ownerId }).project({ _id: 1 }).toArray()).map((d) => d._id.toString());
+        if (ids.length) await versions.deleteMany({ designId: { $in: ids } });
+        return (await designs.deleteMany({ ownerId })).deletedCount;
+      },
     },
     hourChecks: {
       listByOwner: async (ownerId) =>
@@ -115,13 +129,35 @@ export function mongoRepo(db: Db): Repo {
       upsert: async (r) => {
         await hourChecks.updateOne({ ownerId: r.ownerId, grade: r.grade, schoolYear: r.schoolYear }, { $set: r }, { upsert: true });
       },
+      deleteByOwner: async (ownerId) => {
+        await hourChecks.deleteMany({ ownerId });
+      },
     },
     logs: {
       add: async (l) => {
         await logs.insertOne({ ...l, createdAt: new Date() });
       },
-      list: async (limit) =>
-        (await logs.find().sort({ createdAt: -1 }).limit(limit).toArray()).map(({ _id, ...rest }) => ({ ...(rest as Omit<LogEntry, "id">), id: _id.toString() })),
+      list: async (limit, skip = 0) =>
+        (await logs.find().sort({ createdAt: -1 }).skip(skip).limit(limit).toArray()).map(({ _id, ...rest }) => ({ ...(rest as Omit<LogEntry, "id">), id: _id.toString() })),
+      count: async () => logs.countDocuments(),
+    },
+    examples: {
+      list: async () => (await exampleFiles.find({}, { projection: { data: 0 } }).sort({ uploadedAt: -1 }).toArray()).map(toExample),
+      getFile: async (id) => {
+        const _id = oid(id);
+        const d = _id ? await exampleFiles.findOne({ _id }) : null;
+        if (!d) return null;
+        const data = d.data as { buffer: ArrayBuffer | Buffer } | Buffer;
+        return { meta: toExample(d), data: Buffer.isBuffer(data) ? data : Buffer.from((data as { buffer: Buffer }).buffer) };
+      },
+      create: async (meta, data) => {
+        const r = await exampleFiles.insertOne({ ...meta, data });
+        return { ...meta, id: r.insertedId.toString() };
+      },
+      delete: async (id) => {
+        const _id = oid(id);
+        if (_id) await exampleFiles.deleteOne({ _id });
+      },
     },
   };
 }

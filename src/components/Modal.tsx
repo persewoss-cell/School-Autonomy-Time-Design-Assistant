@@ -9,9 +9,12 @@ export function Modal({
   onClose,
   children,
   actions,
+  wide,
 }: {
   title: string;
-  tone?: "red" | "amber";
+  /** 넓은 창 (표를 보여 줄 때) */
+  wide?: boolean;
+  tone?: "red" | "amber" | "brand";
   onClose: () => void;
   children: React.ReactNode;
   actions: React.ReactNode;
@@ -21,12 +24,12 @@ export function Modal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-  const head = tone === "red" ? "bg-red-600" : "bg-amber-500";
+  const head = tone === "red" ? "bg-red-600" : tone === "amber" ? "bg-amber-500" : "bg-brand-600";
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div role="alertdialog" aria-modal="true" aria-label={title} className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div role="alertdialog" aria-modal="true" aria-label={title} className={`w-full ${wide ? "max-w-3xl" : "max-w-md"} overflow-hidden rounded-2xl bg-white shadow-2xl`} onClick={(e) => e.stopPropagation()}>
         <div className={`flex items-center justify-between gap-2 px-5 py-3 text-white ${head}`}>
-          <p className="text-lg font-bold">⚠ {title}</p>
+          <p className="text-lg font-bold">{tone === "brand" ? "" : "⚠ "}{title}</p>
           <button type="button" aria-label="닫기" onClick={onClose} className="rounded-md px-2 text-2xl leading-none text-white/90 hover:bg-white/20">
             ×
           </button>

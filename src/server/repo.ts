@@ -58,7 +58,7 @@ export interface DesignRecord {
   updatedAt: Date;
 }
 
-export type LogKind = "signup" | "login" | "login_fail" | "save" | "delete" | "download" | "parse_fail" | "reset_request" | "password_reset" | "password_change";
+export type LogKind = "signup" | "login" | "login_fail" | "save" | "delete" | "download" | "parse_fail" | "reset_request" | "password_reset" | "password_change" | "admin";
 
 export interface LogEntry {
   id: string;
@@ -85,6 +85,20 @@ export interface HourCheckRecord {
   updatedAt: Date;
 }
 
+/** 첫 화면 '예시안 보기'에 올리는 파일 (관리자가 올림, 누구나 내려받음) */
+export interface ExampleFile {
+  id: string;
+  schoolYear: string;
+  type: "subject" | "activity";
+  grade: number;
+  semester: number;
+  name: string;
+  fileName: string;
+  contentType: string;
+  size: number;
+  uploadedAt: Date;
+}
+
 export interface Repo {
   users: {
     findBySchoolKey(schoolKey: string): Promise<User | null>;
@@ -92,6 +106,7 @@ export interface Repo {
     create(u: Omit<User, "id">): Promise<User>;
     update(id: string, patch: Partial<Omit<User, "id" | "schoolKey">>): Promise<void>;
     list(): Promise<User[]>;
+    delete(id: string): Promise<void>;
   };
   designs: {
     create(d: Omit<DesignRecord, "id">): Promise<DesignRecord>;
@@ -103,14 +118,24 @@ export interface Repo {
     /** 같은 학교·같은 학년도에 같은 이름(띄어쓰기 무시)의 과목·활동이 있는지 */
     findSameActivity(schoolName: string, schoolYear: string, name: string, excludeId?: string): Promise<DesignSummary | null>;
     saveVersion(designId: string, doc: DesignDoc): Promise<void>;
+    deleteByOwner(ownerId: string): Promise<number>;
   };
   hourChecks: {
     listByOwner(ownerId: string): Promise<HourCheckRecord[]>;
     upsert(r: HourCheckRecord): Promise<void>;
+    deleteByOwner(ownerId: string): Promise<void>;
   };
   logs: {
     add(l: Omit<LogEntry, "id" | "createdAt">): Promise<void>;
-    list(limit: number): Promise<LogEntry[]>;
+    /** 최근 것부터 skip개 건너뛰고 limit개 */
+    list(limit: number, skip?: number): Promise<LogEntry[]>;
+    count(): Promise<number>;
+  };
+  examples: {
+    list(): Promise<ExampleFile[]>;
+    getFile(id: string): Promise<{ meta: ExampleFile; data: Buffer } | null>;
+    create(meta: Omit<ExampleFile, "id">, data: Buffer): Promise<ExampleFile>;
+    delete(id: string): Promise<void>;
   };
 }
 
@@ -121,6 +146,7 @@ export function memoryRepo(): Repo {
   const versions: { designId: string; doc: DesignDoc; savedAt: Date }[] = [];
   const logs: LogEntry[] = [];
   const hourChecks: HourCheckRecord[] = [];
+  const examples: { meta: ExampleFile; data: Buffer }[] = [];
   let seq = 0;
   const id = () => `m${++seq}`;
   const summary = ({ doc: _doc, ...rest }: DesignRecord): DesignSummary => rest;
@@ -140,6 +166,10 @@ export function memoryRepo(): Repo {
         if (u) Object.assign(u, patch);
       },
       list: async () => [...users].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
+      delete: async (uid) => {
+        const i = users.findIndex((u) => u.id === uid);
+        if (i >= 0) users.splice(i, 1);
+      },
     },
     designs: {
       create: async (d) => {
@@ -167,6 +197,11 @@ export function memoryRepo(): Repo {
       saveVersion: async (designId, doc) => {
         versions.push({ designId, doc: structuredClone(doc), savedAt: new Date() });
       },
+      deleteByOwner: async (ownerId) => {
+        const before = designs.length;
+        for (let i = designs.length - 1; i >= 0; i--) if (designs[i].ownerId === ownerId) designs.splice(i, 1);
+        return before - designs.length;
+      },
     },
     hourChecks: {
       listByOwner: async (ownerId) => structuredClone(hourChecks.filter((h) => h.ownerId === ownerId)),
@@ -175,12 +210,29 @@ export function memoryRepo(): Repo {
         if (i >= 0) hourChecks[i] = structuredClone(r);
         else hourChecks.push(structuredClone(r));
       },
+      deleteByOwner: async (ownerId) => {
+        for (let i = hourChecks.length - 1; i >= 0; i--) if (hourChecks[i].ownerId === ownerId) hourChecks.splice(i, 1);
+      },
     },
     logs: {
       add: async (l) => {
         logs.push({ ...l, id: id(), createdAt: new Date() });
       },
-      list: async (limit) => [...logs].reverse().slice(0, limit),
+      list: async (limit, skip = 0) => [...logs].reverse().slice(skip, skip + limit),
+      count: async () => logs.length,
+    },
+    examples: {
+      list: async () => examples.map((e) => ({ ...e.meta })).sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime()),
+      getFile: async (eid) => examples.find((e) => e.meta.id === eid) ?? null,
+      create: async (meta, data) => {
+        const m = { ...meta, id: id() };
+        examples.push({ meta: m, data });
+        return { ...m };
+      },
+      delete: async (eid) => {
+        const i = examples.findIndex((e) => e.meta.id === eid);
+        if (i >= 0) examples.splice(i, 1);
+      },
     },
   };
 }

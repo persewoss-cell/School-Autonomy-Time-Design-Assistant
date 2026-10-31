@@ -12,7 +12,7 @@ import { Card, IssueList, inputClass, TypeTag } from "../ui";
 import { fmtDate, StatusBadge, type DesignRow } from "../account/MyDesigns";
 import { useMe } from "../useMe";
 
-function useLoad<T>(path: string) {
+export function useLoad<T>(path: string) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState("");
   const reload = useCallback(() => {
@@ -307,6 +307,7 @@ const KIND_LABEL: Record<string, string> = {
   reset_request: "비밀번호 재설정 신청",
   password_reset: "임시 비밀번호 발급",
   password_change: "비밀번호 변경",
+  admin: "관리자 작업",
 };
 
 export function AdminLogs() {
