@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { emptyDesign, type DesignDoc } from "@/domain/types";
 import type { StepKey } from "@/validation/types";
 import { checklistResults, validateDesign } from "@/validation/design";
+import { mergeTyping, type TypingState } from "@/domain/history";
 import { useHourChecks } from "../hours/useHourChecks";
 import { DownloadIcon } from "../icons";
 import { allocationFor, FORM_NOTICE, saveDesignDocx } from "./downloadDesign";
@@ -175,25 +176,26 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
     }
   };
   // 되돌리기·다시 실행: 이 설계를 연 뒤의 고침을 최근 100번까지 기억 (단계를 넘어도 유지).
-  // 1초 안에 이어진 입력(글자 치기 등)은 한 번으로 묶는다. 진행 위치(progress)는 되돌리지 않는다.
+  // 글은 한 어절(띄어쓰기까지)씩, 고르기·추가·삭제는 한 번씩 되돌린다 (src/domain/history.ts). 진행 위치(progress)는 되돌리지 않는다.
   const past = useRef<DesignDoc[]>([]);
   const future = useRef<DesignDoc[]>([]);
-  const lastEdit = useRef(0);
+  const typing = useRef<TypingState | null>(null);
   const [undoKey, setUndoKey] = useState(0);
-  const remember = () => {
-    const now = Date.now();
-    if (now - lastEdit.current > 1000 || past.current.length === 0) {
+  /** 바뀌기 전 문서를 기록 (이어 치는 같은 어절이면 직전 기록에 합침) */
+  const remember = (next?: DesignDoc) => {
+    const r = next ? mergeTyping(docRef.current, next, typing.current, Date.now()) : { merge: false, state: null };
+    typing.current = r.state;
+    if (!r.merge || past.current.length === 0) {
       past.current.push(docRef.current);
       if (past.current.length > 100) past.current.shift();
     }
-    lastEdit.current = now;
     future.current = [];
   };
   const travel = (from: React.RefObject<DesignDoc[]>, to: React.RefObject<DesignDoc[]>) => {
     const target = from.current.pop();
     if (!target) return;
     to.current.push(docRef.current);
-    lastEdit.current = 0;
+    typing.current = null;
     commit({ ...target, progress: docRef.current.progress });
     setUndoKey((k) => k + 1); // 단계 화면을 새로 그려 되돌린 내용이 입력칸에 보이게
   };
@@ -203,7 +205,8 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
   const setDoc = (fn: (d: DesignDoc) => void, track = true) => {
     const next = structuredClone(docRef.current);
     fn(next);
-    if (track) remember();
+    if (JSON.stringify(next) === JSON.stringify(docRef.current)) return;
+    if (track) remember(next);
     commit(next);
   };
 
@@ -387,6 +390,12 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
           designId={designId}
           schoolYear={doc.application.startYear}
           onBack={props.onBack}
+          onChange={(basic, schoolYear) =>
+            setDoc((d) => {
+              d.basic = basic;
+              d.application.startYear = schoolYear;
+            })
+          }
           onNext={(basic, schoolYear) => {
             setDoc((d) => {
               d.basic = basic;
@@ -400,6 +409,7 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
         <TopicStep
           value={doc.input}
           onBack={props.onBack}
+          onChange={(input) => setDoc((d) => void (d.input = input))}
           onNext={(input) => {
             setDoc((d) => void (d.input = input));
             goIndex(index + 1);

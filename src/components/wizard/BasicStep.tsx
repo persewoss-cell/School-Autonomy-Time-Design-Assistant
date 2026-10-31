@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import {
   DESIGN_TYPES,
@@ -27,6 +27,7 @@ export function BasicStep({
   schoolYear,
   onBack,
   onNext,
+  onChange,
 }: {
   value: BasicInfo;
   /** 지금 설계의 저장 id (같은 학기 합계에서 뺌) */
@@ -34,9 +35,20 @@ export function BasicStep({
   schoolYear: string;
   onBack: () => void;
   onNext: (b: BasicInfo, schoolYear: string) => void;
+  /** 고칠 때마다 문서에 바로 반영 (되돌리기·자동 저장이 칸 하나하나 단위로 동작) */
+  onChange?: (b: BasicInfo, schoolYear: string) => void;
 }) {
   const [b, setB] = useState<BasicInfo>(value);
   const [year, setYear] = useState(schoolYear || "2027");
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    onChange?.(b, year);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [b, year]);
   const saved = useSavedDesigns();
   const others = saved
     .filter((d) => d.id !== designId && d.grade === b.grade && d.semester === b.semester && (d.schoolYear || "2027") === year)

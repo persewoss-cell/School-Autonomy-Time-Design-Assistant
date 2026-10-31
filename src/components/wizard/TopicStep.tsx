@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { topicInputSchema, type TopicInput } from "@/domain/types";
 import { Card, Field, NavButtons, inputClass } from "../ui";
 
@@ -14,10 +14,13 @@ export function TopicStep({
   value,
   onBack,
   onNext,
+  onChange,
 }: {
   value: TopicInput;
   onBack: () => void;
   onNext: (input: TopicInput) => void;
+  /** 고칠 때마다 문서에 바로 반영 (되돌리기·자동 저장이 칸 하나하나 단위로 동작) */
+  onChange?: (input: TopicInput) => void;
 }) {
   const [topic, setTopic] = useState(value.topic);
   const [required, setRequired] = useState(value.requiredContents.join("\n"));
@@ -27,6 +30,23 @@ export function TopicStep({
   const [areaCount, setAreaCount] = useState(value.areaCount ? String(value.areaCount) : "");
   const [areaNames, setAreaNames] = useState((value.areaNames ?? []).join("\n"));
   const [error, setError] = useState("");
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    onChange?.({
+      topic,
+      requiredContents: toLines(required),
+      desiredActivities: toLines(desired),
+      schoolContext: context,
+      resources,
+      areaCount: areaCount ? Number(areaCount) : null,
+      areaNames: toLines(areaNames),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topic, required, desired, context, resources, areaCount, areaNames]);
 
   const submit = () => {
     const parsed = topicInputSchema.safeParse({
