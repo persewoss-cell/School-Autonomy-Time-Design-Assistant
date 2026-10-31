@@ -64,7 +64,7 @@ export const byYearThenSaved = (a: { schoolYear?: string; updatedAt: string }, b
 /** 명칭이 아닌 칸: 내용 폭만큼만 차지하고 가운데 정렬 (남는 폭은 명칭이 씀) */
 export const NARROW = "w-px text-center";
 
-/** 설계 표 공통: 진한 회색 제목 줄(흰 글자), 칸 사이 세로선, 한 줄 건너 연한 배경 */
+/** 목록 표 공통 (설계·사용학교·예시안·이용 기록·타학교·엑셀 등록): 연한 초록 제목 줄(흰 글자), 칸 사이 세로선, 한 줄 건너 연한 배경 */
 export const DESIGN_TABLE = "w-full text-sm whitespace-nowrap [&_td+td]:border-l [&_td]:border-gray-200 [&_th+th]:border-l [&_th]:border-white/35";
 export const DESIGN_THEAD = "bg-[#6b9a84] text-xs text-white";
 export const DESIGN_ROW = "even:bg-gray-100/70 hover:bg-brand-50";
