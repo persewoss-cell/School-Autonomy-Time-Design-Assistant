@@ -126,3 +126,23 @@ describe("checkAllocation", () => {
     expect(r.total.baseHours).toBe(2176);
   });
 });
+
+describe("학년도별 학교자율시간 운영 의무 (2025 학교당 1개, 2026 학년군당 1개, 2027부터 학년별)", () => {
+  // 5학년 1학기에만 학교자율시간, 6학년은 없음
+  const input = (): AllocationInput => ({ ...defaultAllocation("5-6"), courses: [{ name: "디지털 탐험대 5", subjectKey: "실과", semester: 0, hours: 32 }] });
+  const missing6 = (years?: number[]) => checkAllocation(input(), years).issues.filter((i) => i.field.startsWith("6학년"));
+  it("2027학년도부터는 학년별로 없으면 오류", () => {
+    expect(missing6([2027, 2027, 2028, 2028]).map((i) => i.level)).toEqual(["error"]);
+    expect(missing6().map((i) => i.level)).toEqual(["error"]); // 학년도를 모르면 2027 기준
+  });
+  it("2026학년도는 학년군에서 1개면 되므로 확인 필요(경고)만", () => {
+    const issues = missing6([2025, 2025, 2026, 2026]);
+    expect(issues.map((i) => i.level)).toEqual(["warning"]);
+    expect(issues[0].message).toContain("5~6학년에서 1개 이상");
+  });
+  it("2025학년도(학교당 1개)·2024학년도 이전(적용 전)은 학년별로 따지지 않음", () => {
+    expect(missing6([2024, 2024, 2025, 2025])).toEqual([]);
+    const none = checkAllocation(defaultAllocation("5-6"), [2023, 2023, 2024, 2024]).issues.filter((i) => i.message.includes("학교자율시간이 없습니다"));
+    expect(none).toEqual([]);
+  });
+});

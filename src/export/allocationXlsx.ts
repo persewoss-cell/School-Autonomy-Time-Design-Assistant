@@ -33,7 +33,7 @@ export async function buildAllocationXlsx(a: AllocationInput, meta: AllocationMe
   const wb = new ExcelJS.Workbook();
   wb.creator = "학교자율시간 설계 도우미 앱";
   const m = formModel(a);
-  const r = checkAllocation(a);
+  const r = checkAllocation(a, meta.years);
   const [g0, g1] = m.grades;
   const grade = meta.grade ?? g0;
   const ws = wb.addWorksheet(`${grade}학년 편성표`, {

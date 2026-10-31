@@ -259,7 +259,7 @@ export function syncWithDesigns(check: HourCheck, designs: DesignBrief[]): HourC
 /** 한 화면이 '이상없음'인지: 계산 오류가 없고 그 학년도 설계와 어긋나지 않음 */
 export function checkOk(check: HourCheck | undefined, designs: DesignBrief[]): boolean {
   if (!check) return false;
-  return checkAllocation(check.input).issues.every((i) => i.level !== "error") && designDiff(check, designs).length === 0;
+  return checkAllocation(check.input, viewYears(check.grade, check.schoolYear)).issues.every((i) => i.level !== "error") && designDiff(check, designs).length === 0;
 }
 
 export interface BandStatus {

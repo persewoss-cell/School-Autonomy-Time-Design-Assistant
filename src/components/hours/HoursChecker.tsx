@@ -129,7 +129,7 @@ export function HoursChecker() {
     setDirty(true);
   };
   const info = bandInfo(a.band);
-  const r = checkAllocation(a);
+  const r = checkAllocation(a, viewYears(grade, year));
   const mutate = (fn: (x: AllocationInput) => void) => {
     const next = structuredClone(a);
     fn(next);
@@ -311,7 +311,7 @@ export function HoursChecker() {
       <Card className="space-y-3">
         <h2 className="font-bold">① 학교자율시간 과목·활동</h2>
         <p className="text-sm text-gray-600">
-          운영하는 학기는 합계가 <b>{r.semesterTarget}시간</b>(1주 분량)이어야 하고, 학년마다 한 학기 이상 운영합니다.
+          운영하는 학기는 합계가 <b>{r.semesterTarget}시간</b>(1주 분량)이어야 하고, 학년마다 한 학기 이상 운영합니다(2027학년도부터. 2026학년도는 학년군에 1개, 2025학년도는 학교에 1개 이상).
           한 과목·활동은 10시간 이상, 학기당 {maxCoursesPerSemester(a.band)}개 이내.
         </p>
         <div className="overflow-x-auto">
@@ -438,7 +438,7 @@ export function HoursChecker() {
       </Card>
 
       <Card className="space-y-3">
-        <h2 className="font-bold">③ 점검 결과 {errorCount > 0 && <span className="text-red-600">({errorCount}건)</span>}</h2>
+        <h2 className="font-bold">③ 점검 결과 {errorCount > 0 && <span className={r.issues.some((i) => i.level === "error") ? "text-red-600" : "text-amber-600"}>({errorCount}건)</span>}</h2>
         <IssueList issues={r.issues} />
         <div className="flex flex-wrap gap-2">
           {(["docx", "xlsx"] as const).map((kind) => (

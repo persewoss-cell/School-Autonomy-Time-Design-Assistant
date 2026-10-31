@@ -174,7 +174,16 @@ function row(label: string, base: number, planned: number, autonomy: number, noR
   };
 }
 
-export function checkAllocation(input: AllocationInput): AllocationResult {
+/**
+ * 학년도별 학교자율시간 운영 의무 (사용자 확인, 2026-10-31)
+ * - 2024학년도까지: 학교자율시간 적용 전 → 의무 없음
+ * - 2025학년도: 학교당 1개 이상 (다른 학년군 화면에서 운영할 수 있어 학년별로는 따지지 않음)
+ * - 2026학년도: 3~4학년군에서 1개, 5~6학년군에서 1개 (같은 학년도의 다른 학년은 다른 화면에 있어 확인 필요로만 알림)
+ * - 2027학년도부터: 3~6학년 학년별로 1개 이상 (오류)
+ */
+export const AUTONOMY_FROM = { school: 2025, band: 2026, grade: 2027 } as const;
+
+export function checkAllocation(input: AllocationInput, years?: readonly number[]): AllocationResult {
   const b = data.bands[input.band];
   const issues: Issue[] = [];
 
@@ -275,14 +284,25 @@ export function checkAllocation(input: AllocationInput): AllocationResult {
     }
   });
   b.grades.forEach((g, gi) => {
-    if (bySem[gi * 2] === 0 && bySem[gi * 2 + 1] === 0) {
+    if (bySem[gi * 2] !== 0 || bySem[gi * 2 + 1] !== 0) return;
+    // 학년도를 모르면(예전 호출) 2027 지침대로 본다
+    const year = years?.[gi * 2] ?? AUTONOMY_FROM.grade;
+    if (year >= AUTONOMY_FROM.grade) {
       issues.push({
         level: "error",
         field: `${g}학년 학교자율시간`,
-        message: `${g}학년에 학교자율시간이 없습니다. 3~6학년은 학년별로 한 학기 이상 운영해야 합니다.`,
+        message: `${g}학년에 학교자율시간이 없습니다. 2027학년도부터 3~6학년은 학년별로 한 학기 이상 운영해야 합니다.`,
         fix: `${g}학년 1학기 또는 2학기에 ${target}시간을 편성해 주세요.`,
       });
+    } else if (year >= AUTONOMY_FROM.band) {
+      issues.push({
+        level: "warning",
+        field: `${g}학년(${year}) 학교자율시간`,
+        message: `${year}학년도에는 ${b.label}에서 1개 이상 운영하면 됩니다. 같은 학년도의 ${b.label} 다른 학년에서 운영하는지 확인해 주세요.`,
+        fix: `${b.label} 다른 학년의 ${year}학년도 화면에 학교자율시간이 있는지 확인해 주세요.`,
+      });
     }
+    // 2025학년도(학교당 1개)·2024학년도 이전(적용 전)은 학년별로 따지지 않음
   });
   input.courses.forEach((c) => {
     if (c.hours < data.minHoursPerCourse) {
