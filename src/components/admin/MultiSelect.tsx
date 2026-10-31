@@ -39,7 +39,13 @@ export function MultiSelect({
       </button>
       {open && (
         <div className="absolute z-30 mt-1 max-h-72 min-w-52 overflow-auto rounded-lg border border-gray-200 bg-white p-1 shadow-lg">
-          <button type="button" onClick={() => onChange([])} className={`block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-gray-50 ${selected.length === 0 ? "font-semibold text-brand-700" : ""}`}>
+          <button
+            type="button"
+            onClick={() => {
+              onChange([]);
+              setOpen(false);
+            }}
+            className={`block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-gray-50 ${selected.length === 0 ? "font-semibold text-brand-700" : ""}`}>
             {allLabel}
           </button>
           {options.map((o) => (
