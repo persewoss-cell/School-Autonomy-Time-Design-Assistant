@@ -15,6 +15,8 @@ import { sameSemesterOthers, semesterHours } from "@/validation/hours";
 import { bandStatus, checkKey, isViewGrade, schoolYearOf, type Checks, type HourCheck } from "@/domain/hoursView";
 import type { Grade } from "@/domain/types";
 import { Card, TypeTag } from "../ui";
+import { MultiSelect, SingleSelect } from "../admin/MultiSelect";
+import { byYearThenSaved, SortTh, useSort } from "../admin/sort";
 import { useMe } from "../useMe";
 
 export interface DesignRow {
@@ -36,8 +38,17 @@ export interface DesignRow {
   owner?: string;
 }
 
-/** 카드용 짧은 날짜: 10. 31. 오전 9:18 */
+/** 표용 짧은 날짜: 10. 31. 오전 9:18 */
 const shortDate = (s: string) => new Date(s).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+const TYPE_OPTIONS = [
+  { value: "activity", label: "활동" },
+  { value: "subject", label: "과목" },
+];
+const STATUS_OPTIONS = [
+  { value: "complete", label: "완성" },
+  { value: "progress", label: "설계 중" },
+];
 
 export const fmtDate = (s: string | null | undefined) => (s ? new Date(s).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" }) : "-");
 
@@ -82,8 +93,10 @@ export function MyDesigns() {
   const [rows, setRows] = useState<DesignRow[] | null>(null);
   const [checks, setChecks] = useState<Checks>({});
   const [error, setError] = useState("");
-  const [gradeFilter, setGradeFilter] = useState<number | null>(null);
-  const [yearFilter, setYearFilter] = useState("");
+  const [years, setYears] = useState<string[]>([]);
+  const [type, setType] = useState("");
+  const [grades, setGrades] = useState<string[]>([]);
+  const [status, setStatus] = useState("");
   const load = useCallback(() => {
     api<{ designs: DesignRow[] }>("/api/designs")
       .then((r) => setRows(r.designs))
@@ -117,7 +130,7 @@ export function MyDesigns() {
       () => true,
       (e) => (alert(e.message), false),
     );
-    setYearFilter("");
+    setYears([]);
     load();
     // 같은 학년도로 복제해서 그 학기 시수가 넘치면 알려 준다 (복제는 허용)
     if (saved && rows && year === from) {
@@ -172,10 +185,15 @@ export function MyDesigns() {
       </Card>
     );
   }
-  const years = [...new Set((rows ?? []).map(yearOf))].sort((a, b) => b.localeCompare(a));
-  const shown = (rows ?? [])
-    .filter((r) => (gradeFilter === null || r.grade === gradeFilter) && (!yearFilter || yearOf(r) === yearFilter))
-    .sort((a, b) => (b.createdAt ?? b.updatedAt).localeCompare(a.createdAt ?? a.updatedAt));
+  const all = rows ?? [];
+  const yearOptions = [...new Set(all.map(yearOf))].sort((a, b) => b.localeCompare(a)).map((v) => ({ value: v, label: `${v}학년도` }));
+  const shown = all.filter(
+    (r) =>
+      (years.length === 0 || years.includes(yearOf(r))) &&
+      (!type || r.type === type) &&
+      (grades.length === 0 || grades.includes(String(r.grade))) &&
+      (!status || (status === "complete" ? r.errorCount === 0 : r.errorCount > 0)),
+  );
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -192,136 +210,27 @@ export function MyDesigns() {
       ) : rows.length === 0 ? (
         <Card><p className="text-gray-600">아직 저장한 설계가 없어요. 새 설계를 시작해 보세요.</p></Card>
       ) : (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white p-3 shadow-sm">
-            {[null, 3, 4, 5, 6].map((g) => (
-              <button
-                key={g ?? "all"}
-                type="button"
-                onClick={() => setGradeFilter(g)}
-                className={`rounded-lg px-4 py-2 font-semibold transition ${gradeFilter === g ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
-              >
-                {g === null ? "전체" : `${g}학년`}
-              </button>
-            ))}
-            <label className="ml-auto flex items-center gap-2 text-sm font-semibold text-gray-700">
-              학년도
-              <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-base">
-                <option value="">전체</option>
-                {years.map((y) => (
-                  <option key={y} value={y}>
-                    {y}학년도
-                  </option>
-                ))}
-              </select>
-            </label>
+        <div className="space-y-3">
+          {/* 관리자 '전체 설계'와 같은 모양 (학교·검색 빼고) */}
+          <div className="flex flex-wrap items-center gap-2">
+            <MultiSelect allLabel="전체 학년도" options={yearOptions} selected={years} onChange={setYears} />
+            <SingleSelect allLabel="전체 유형" options={TYPE_OPTIONS} value={type} onChange={setType} />
+            <MultiSelect allLabel="전체 학년" options={[3, 4, 5, 6].map((g) => ({ value: String(g), label: `${g}학년` }))} selected={grades} onChange={setGrades} />
+            <SingleSelect allLabel="전체 상태" options={STATUS_OPTIONS} value={status} onChange={setStatus} />
+            <span className="text-sm text-gray-500">{shown.length}건</span>
           </div>
-          {shown.length === 0 ? (
-            <Card><p className="text-gray-600">조건에 맞는 설계가 없어요.</p></Card>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {shown.map((r) => (
-                <div
-                  key={r.id}
-                  role="link"
-                  tabIndex={0}
-                  onClick={() => router.push(`/designs/${r.id}`)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") router.push(`/designs/${r.id}`);
-                  }}
-                  className="flex cursor-pointer flex-col gap-3 rounded-2xl border-2 border-transparent bg-white p-4 shadow-sm transition hover:border-brand-500 hover:shadow-md focus:border-brand-500 focus:outline-none"
-                >
-                  <div className="space-y-1">
-                    <div className="flex flex-nowrap gap-1 overflow-hidden">
-                      <StatusBadge compact errors={r.errorCount} warnings={0} type={r.type} progress={r.progress} />
-                      <SemesterBadge row={r} rows={rows} />
-                    </div>
-                    {/* 낱말 중간에서 줄이 바뀌지 않게 덩어리마다 묶음 */}
-                    <p className="flex items-center gap-x-1 overflow-hidden text-xs whitespace-nowrap text-gray-500">
-                      <b className="whitespace-nowrap text-gray-700">{yearOf(r)}학년도</b>
-                      <TypeTag type={r.type} />
-                      <span className="whitespace-nowrap">
-                        {r.grade}학년 {r.semester}학기
-                      </span>
-                      {typeof r.hours === "number" && <span className="whitespace-nowrap">· {r.hours}차시</span>}
-                    </p>
-                    <p className="text-lg font-bold leading-snug">{r.name || "(이름 없음)"}</p>
-                  </div>
-                  <div className="mt-auto flex items-center justify-between gap-2 text-xs text-gray-400">
-                    <span className="truncate">저장 {shortDate(r.updatedAt)}</span>
-                    <span className="flex shrink-0 gap-1 font-semibold whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void duplicate(r);
-                        }}
-                        className="rounded-full border border-brand-100 bg-brand-50 px-2.5 py-0.5 text-brand-700 hover:bg-brand-100"
-                      >
-                        복제
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void remove(r);
-                        }}
-                        className="rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-red-600 hover:bg-red-100"
-                      >
-                        삭제
-                      </button>
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {bandStatus(r.grade, Number(yearOf(r)), checks, rows).complete ? (
-                      <span className="rounded-lg border border-green-200 bg-green-50 px-2 py-1.5 text-xs font-semibold text-green-700">✓ 시수점검 완료</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/hours?grade=${r.grade}&year=${yearOf(r)}`);
-                        }}
-                        className="rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100"
-                      >
-                        ⚠ 시수점검
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      disabled={!docReady(r) || busyId === r.id}
-                      title={docReady(r) ? "문서(.docx) 내려받기" : "설계를 완성하면(오류 0개, 체크리스트 모두 확인) 내려받을 수 있어요"}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void download(r);
-                      }}
-                      className="flex items-center gap-1 rounded-lg border border-brand-500 bg-white px-2 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-300"
-                    >
-                      {busyId === r.id ? (
-                        "만드는 중…"
-                      ) : (
-                        <>
-                          문서 <DownloadIcon className="h-3.5 w-3.5" />
-                        </>
-                      )}
-                    </button>
-                    {r.warningCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void showWarnings(r);
-                        }}
-                        className="rounded-lg border border-orange-300 bg-orange-50 px-2 py-1.5 text-xs font-semibold text-orange-700 hover:bg-orange-100"
-                      >
-                        확인 {r.warningCount}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <DesignTable
+            rows={shown}
+            all={rows}
+            checks={checks}
+            busyId={busyId}
+            onOpen={(r) => router.push(`/designs/${r.id}`)}
+            onHours={(r) => router.push(`/hours?grade=${r.grade}&year=${yearOf(r)}`)}
+            onDownload={(r) => void download(r)}
+            onWarnings={(r) => void showWarnings(r)}
+            onDuplicate={(r) => void duplicate(r)}
+            onRemove={(r) => void remove(r)}
+          />
         </div>
       )}
       {warnView && (
@@ -388,5 +297,133 @@ function SemesterBadge({ row, rows }: { row: DesignRow; rows: DesignRow[] }) {
     <span title={detail} className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${cls}`}>
       {text}
     </span>
+  );
+}
+
+const yearOrder = (r: DesignRow) => ({ schoolYear: yearOf(r), updatedAt: r.updatedAt });
+
+/**
+ * 설계 현황 표: 관리자 '전체 설계'와 같은 열 순서 (학교 열 없음) + 학교 화면에만 있는 칸(차시·학기 편성·문서·복제).
+ * 기본 순서는 학년도 내림차순 → 마지막 저장 내림차순, 제목 세모로 정렬.
+ */
+function DesignTable({
+  rows,
+  all,
+  checks,
+  busyId,
+  onOpen,
+  onHours,
+  onDownload,
+  onWarnings,
+  onDuplicate,
+  onRemove,
+}: {
+  rows: DesignRow[];
+  all: DesignRow[];
+  checks: Checks;
+  busyId: string | null;
+  onOpen: (r: DesignRow) => void;
+  onHours: (r: DesignRow) => void;
+  onDownload: (r: DesignRow) => void;
+  onWarnings: (r: DesignRow) => void;
+  onDuplicate: (r: DesignRow) => void;
+  onRemove: (r: DesignRow) => void;
+}) {
+  const sort = useSort(
+    rows,
+    {
+      year: yearOf,
+      type: (r) => r.type,
+      grade: (r) => r.grade * 10 + r.semester,
+      hours: (r) => r.hours ?? 0,
+      name: (r) => r.name,
+      fill: (r) => semesterFill(r, all).left,
+      status: (r) => (r.errorCount === 0 ? 0 : 1),
+      updated: (r) => r.updatedAt,
+    },
+    (a, b) => byYearThenSaved(yearOrder(a), yearOrder(b)),
+  );
+  if (rows.length === 0) return <Card><p className="text-gray-600">조건에 맞는 설계가 없어요.</p></Card>;
+  return (
+    <Card className="overflow-x-auto">
+      <table className="w-full text-sm whitespace-nowrap [&_td]:px-1.5 [&_td]:py-2 [&_th]:px-1.5">
+        <thead className="text-left text-xs text-gray-500">
+          <tr>
+            <SortTh label="학년도" k="year" sort={sort} />
+            <SortTh label="유형" k="type" sort={sort} />
+            <SortTh label="학년-학기" k="grade" sort={sort} />
+            <SortTh label="차시" k="hours" sort={sort} />
+            <SortTh label="명칭" k="name" sort={sort} />
+            <SortTh label="학기 편성" k="fill" sort={sort} />
+            <SortTh label="상태" k="status" sort={sort} />
+            <SortTh label="마지막 저장" k="updated" sort={sort} />
+            <th className="p-2 text-center">문서</th>
+            <th className="p-2 text-center">복제</th>
+            <th className="p-2 text-center">삭제</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {sort.sorted.map((r) => (
+            <tr key={r.id} className="hover:bg-gray-50">
+              <td className="p-2">{yearOf(r)}</td>
+              <td className="p-2">
+                <TypeTag type={r.type} />
+              </td>
+              <td className="p-2">
+                {r.grade}-{r.semester}
+              </td>
+              <td className="p-2">{typeof r.hours === "number" ? `${r.hours}차시` : "-"}</td>
+              <td className="max-w-64 truncate p-2 font-semibold">
+                <button type="button" onClick={() => onOpen(r)} title={`${r.name} — 눌러서 설계 열기`} className="max-w-full truncate text-left text-brand-800 hover:text-brand-600 hover:underline">
+                  {r.name || "(이름 없음)"}
+                </button>
+              </td>
+              <td className="p-2">
+                <SemesterBadge row={r} rows={all} />
+              </td>
+              <td className="p-2">
+                <span className="flex items-center gap-1">
+                  <StatusBadge compact errors={r.errorCount} warnings={0} type={r.type} progress={r.progress} />
+                  {r.warningCount > 0 && (
+                    <button type="button" onClick={() => onWarnings(r)} className="rounded-lg border border-orange-300 bg-orange-50 px-2 py-0.5 text-xs font-semibold text-orange-700 hover:bg-orange-100">
+                      확인 {r.warningCount}
+                    </button>
+                  )}
+                  {bandStatus(r.grade, Number(yearOf(r)), checks, all).complete ? (
+                    <span className="rounded-lg border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">✓ 시수점검 완료</span>
+                  ) : (
+                    <button type="button" onClick={() => onHours(r)} className="rounded-lg border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600 hover:bg-red-100">
+                      ⚠ 시수점검
+                    </button>
+                  )}
+                </span>
+              </td>
+              <td className="p-2 text-xs text-gray-500">{shortDate(r.updatedAt)}</td>
+              <td className="p-2 text-center">
+                <button
+                  type="button"
+                  disabled={!docReady(r) || busyId === r.id}
+                  title={docReady(r) ? "문서(.docx) 내려받기" : "설계를 완성하면(오류 0개, 체크리스트 모두 확인) 내려받을 수 있어요"}
+                  onClick={() => onDownload(r)}
+                  className="inline-flex rounded-lg p-1.5 text-brand-700 hover:bg-brand-50 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent"
+                >
+                  {busyId === r.id ? "…" : <DownloadIcon />}
+                </button>
+              </td>
+              <td className="p-2 text-center">
+                <button type="button" onClick={() => onDuplicate(r)} className="rounded-full border border-brand-100 bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 hover:bg-brand-100">
+                  복제
+                </button>
+              </td>
+              <td className="p-2 text-center">
+                <button type="button" onClick={() => onRemove(r)} className="rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-600 hover:bg-red-100">
+                  삭제
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
   );
 }

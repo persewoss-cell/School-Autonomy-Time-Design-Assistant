@@ -8,10 +8,11 @@ import { useMemo, useState } from "react";
  */
 export type SortDir = "none" | "asc" | "desc";
 
-export function useSort<T>(rows: T[], getters: Record<string, (r: T) => string | number>) {
+export function useSort<T>(rows: T[], getters: Record<string, (r: T) => string | number>, defaultOrder?: (a: T, b: T) => number) {
   const [sort, setSort] = useState<{ key: string; dir: SortDir }>({ key: "", dir: "none" });
   const sorted = useMemo(() => {
-    if (sort.dir === "none" || !getters[sort.key]) return rows;
+    // 기본(세모를 안 눌렀을 때) 순서
+    if (sort.dir === "none" || !getters[sort.key]) return defaultOrder ? [...rows].sort(defaultOrder) : rows;
     const get = getters[sort.key];
     const out = [...rows].sort((a, b) => {
       const x = get(a);
@@ -39,3 +40,7 @@ export function SortTh({ label, k, sort, className = "" }: { label: string; k: s
     </th>
   );
 }
+
+/** 설계 표 기본 순서: 학년도 내림차순, 같은 학년도 안에서는 마지막 저장 내림차순 (사용자 결정, 2026-10-31) */
+export const byYearThenSaved = (a: { schoolYear?: string; updatedAt: string }, b: { schoolYear?: string; updatedAt: string }) =>
+  (b.schoolYear ?? "").localeCompare(a.schoolYear ?? "") || b.updatedAt.localeCompare(a.updatedAt);

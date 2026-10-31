@@ -14,7 +14,7 @@ import { useMe } from "../useMe";
 import { Modal } from "../Modal";
 import { enterSchool } from "../ActingBanner";
 import { MultiSelect, SingleSelect } from "./MultiSelect";
-import { SortTh, useSort } from "./sort";
+import { byYearThenSaved, SortTh, useSort } from "./sort";
 import { BulkUsers } from "./BulkUsers";
 import { SeedButton } from "./SeedButton";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -319,7 +319,7 @@ export function AdminDesigns() {
     name: (d) => d.name,
     status: (d) => (d.errorCount === 0 ? 0 : 1),
     updated: (d) => d.updatedAt,
-  });
+  }, byYearThenSaved);
   const showWarnings = async (row: AdminDesignRow) => {
     const { design } = await api<{ design: { doc: DesignDoc } }>(`/api/admin/designs/${row.id}`);
     setWarnView({ row, issues: validateDesign(design.doc).filter((i) => i.level === "warning") });
@@ -354,7 +354,7 @@ export function AdminDesigns() {
         <span className="text-sm text-gray-500">{rows.length}건</span>
       </div>
       <Card className="overflow-x-auto">
-        <table className="w-full min-w-[980px] text-sm">
+        <table className="w-full min-w-[980px] text-sm whitespace-nowrap">
           <thead className="text-left text-xs text-gray-500">
             <tr>
               <SortTh label="학년도" k="year" sort={sort} />
