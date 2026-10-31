@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { CATEGORIES, CATEGORY_KEYS, newId, standardNeedsRewrite, type Area, type DesignDoc, type Standard } from "@/domain/types";
 import { CATEGORY_STYLE } from "../categoryStyle";
-import { categoryOf, codeMap, hasSameCategory, standardCategories } from "@/domain/codes";
+import { categoryOf, codeMap, CODE_WITH_GROUP_FROM, hasSameCategory, standardCategories } from "@/domain/codes";
 import { categoryCounts, categorySplit, elementCount, recommendedStandardCount, splitProblem, standardCountRange, standardCountsFor } from "@/domain/standardCounts";
 import { contentSystemPrompt, coreIdeasPrompt, introPrompt, reviseStandardsPrompt, standardsPrompt, teachingPrompt } from "@/prompts/steps";
 import { checkContentSystem, checkCoreIdeas, checkIntro, checkStandards, checkTeaching } from "@/validation/design";
@@ -238,7 +238,7 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
           "코드 번호는 자동으로 붙어요: [편성학년][편성교과 첫 글자][과목명 약어][영역 순서]-[영역 내 순서]",
         ]}
       >
-        <Field label="성취기준 코드에 쓸 과목명 약어 (2~3자)" hint={`코드 예: [${doc.basic.grade}${doc.basic.subjectGroup.charAt(0)}${abbrev}01-01]`}>
+        <Field label="성취기준 코드에 쓸 과목명 약어 (2~3자)" hint={`코드 예: [${doc.basic.grade}${Number(doc.application.startYear) < CODE_WITH_GROUP_FROM ? "" : doc.basic.subjectGroup.charAt(0)}${abbrev}01-01]`}>
           <input
             id="abbrev"
             className={`${inputClass} max-w-40 ${doc.abbrev ? "" : "border-red-300"}`}

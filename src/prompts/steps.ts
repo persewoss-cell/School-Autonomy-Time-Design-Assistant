@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CATEGORIES, newId, planSchema, standardNeedsRewrite, type Area, type AssessmentRow, type DesignDoc, type Intro, type Plan, type Standard, type Teaching } from "@/domain/types";
+import { assessedIds, CATEGORIES, newId, planSchema, standardNeedsRewrite, type Area, type AssessmentRow, type DesignDoc, type Intro, type Plan, type Standard, type Teaching } from "@/domain/types";
 import { categoryOf, codeMap, hasSameCategory } from "@/domain/codes";
 import { categorySplit, elementCount, splitProblem, standardCountsFor } from "@/domain/standardCounts";
 import { areaStandardIds } from "@/domain/codes";
@@ -589,7 +589,7 @@ function assessLessons(doc: DesignDoc): string {
     .flatMap((u) =>
       u.lessons
         .filter((l) => l.assessment.trim())
-        .map((l) => `- ${codes.get(l.assessFor) ?? "(성취기준 미정)"} [${u.unitName}] ${l.topic}: [과정중심평가] ${l.assessment}`),
+        .map((l) => `- ${assessedIds(l).map((id) => codes.get(id)).filter(Boolean).join(" ") || "(성취기준 미정)"} [${u.unitName}] ${l.topic}: [과정중심평가] ${l.assessment}`),
     )
     .join("\n");
 }
@@ -607,7 +607,7 @@ ${assessLessons(doc)}
 위 과정중심평가를 바탕으로 '평가 계획'을 써 주세요.
 
 ## 작성 규칙
-1. 위 과정중심평가 하나에 평가 계획 한 줄씩, 그 성취기준 1개로 씁니다. (성취기준마다 과정중심평가가 1개씩 있습니다)${doc.basic.type === "subject" ? " 과목은 모든 성취기준에 대한 성취수준을 씁니다." : ""}
+1. 위 과정중심평가 하나에 평가 계획 한 줄씩, 그 줄 앞에 적힌 성취기준(같은 단원끼리 묶었으면 묶은 성취기준 모두)으로 씁니다. (성취기준마다 과정중심평가가 1개씩 있습니다)${doc.basic.type === "subject" ? " 과목은 모든 성취기준에 대한 성취수준을 씁니다." : ""}
 2. standards에는 성취기준 코드를 위 목록에서 그대로 넣습니다.
 3. month(시기)는 평가 내용에 알맞은 월을 씁니다. (${doc.basic.semester === 1 ? "1학기: 3~7월" : "2학기: 9~12월"}, 예: "9월")
 4. focus(수업·평가 방법, 연계의 주안점)는 이렇게 씁니다:

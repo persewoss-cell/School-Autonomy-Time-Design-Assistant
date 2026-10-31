@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Lesson, Plan } from "@/domain/types";
+import { assessedIds, type Lesson, type Plan } from "@/domain/types";
 import { areaStandardIds, codeMap } from "@/domain/codes";
 import { planPrompt } from "@/prompts/steps";
 import { makeDemoPlans } from "@/prompts/demoPlans";
@@ -26,7 +26,7 @@ export function PlanStep(props: StepProps & { designId?: string }) {
     "학습주제 = 계획한 활동의 주제를 개괄식으로",
     "학습내용 = 학습 순서대로 기술, 다음 단계 평가 계획의 평가 내용을 반드시 포함",
     "전단계에서 적은 '하고 싶은 활동'은 실제 수업이므로 모두 넣어요",
-    "과정중심평가는 성취기준마다 1개씩, 그 성취기준의 내용을 배우는 차시에 둬요 (성취기준 2개면 2개, 3개면 3개)",
+    "과정중심평가는 성취기준마다 1개씩, 그 성취기준의 내용을 배우는 차시에 둬요. 같은 단원(영역)의 성취기준은 하나의 평가로 묶어도 돼요",
   ];
 
   const blockers = checkUnitHours(
@@ -216,7 +216,7 @@ function Candidates({ doc, setDoc }: StepProps) {
                         <li key={li}>
                           {l.topic} <span className="text-gray-400">({l.hours})</span>
                           {l.assessment && (
-                            <span className="ml-1 rounded bg-brand-50 px-1 text-xs text-brand-700">평가 {codes.get(l.assessFor) ?? ""}</span>
+                            <span className="ml-1 rounded bg-brand-50 px-1 text-xs text-brand-700">평가 {assessedIds(l).map((id) => codes.get(id) ?? "").join(" ")}</span>
                           )}
                         </li>
                       ))}
@@ -260,9 +260,9 @@ function CoverageCard({ doc, plan, labels }: { doc: StepProps["doc"]; plan: Plan
         })}
       </div>
       <div className="space-y-1">
-        <h2 className="font-bold">과정중심평가 (성취기준마다 1개)</h2>
+        <h2 className="font-bold">과정중심평가 (성취기준마다 1개, 같은 단원의 성취기준은 묶어서 평가 가능)</h2>
         {doc.standards.map((s) => {
-          const at = where((l) => l.assessFor === s.id);
+          const at = where((l) => assessedIds(l).includes(s.id));
           return (
             <p key={s.id} className={`text-sm ${at.length === 1 ? "text-gray-700" : "font-semibold text-red-600"}`}>
               {at.length === 1 ? "✓" : "✕"} <span className="font-mono">{codes.get(s.id)}</span>{" "}
@@ -400,13 +400,13 @@ function EditPlan({ doc, setDoc, onBack, onNext, tips, designId }: StepProps & {
                     <select
                       className="rounded border border-gray-300 bg-white px-2 py-1 text-sm"
                       value={l.assessFor && codes.has(l.assessFor) ? l.assessFor : ""}
-                      onChange={(e) => setLesson(ui, li, { assessFor: e.target.value })}
+                      onChange={(e) => setLesson(ui, li, { assessFor: e.target.value, assessWith: e.target.value ? (l.assessWith ?? []).filter((id) => id !== e.target.value) : [] })}
                     >
                       <option value="">평가 안 함</option>
                       {u.standardIds
                         .filter((id) => codes.has(id))
                         .map((id) => {
-                          const elsewhere = plan.units.some((uu, uj) => uu.lessons.some((ll, lj) => (uj !== ui || lj !== li) && ll.assessFor === id));
+                          const elsewhere = plan.units.some((uu, uj) => uu.lessons.some((ll, lj) => (uj !== ui || lj !== li) && assessedIds(ll).includes(id)));
                           return (
                             <option key={id} value={id} disabled={elsewhere && l.assessFor !== id}>
                               {codes.get(id)} 평가{elsewhere && l.assessFor !== id ? " (다른 차시에 배정됨)" : ""}
@@ -416,6 +416,29 @@ function EditPlan({ doc, setDoc, onBack, onNext, tips, designId }: StepProps & {
                     </select>
                     {l.assessFor && <span className="text-xs text-gray-500">{doc.standards.find((s) => s.id === l.assessFor)?.text}</span>}
                   </div>
+                  {l.assessFor && u.standardIds.filter((id) => codes.has(id) && id !== l.assessFor).length > 0 && (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+                      <span className="font-semibold">함께 묶어 평가 (같은 단원):</span>
+                      {u.standardIds
+                        .filter((id) => codes.has(id) && id !== l.assessFor)
+                        .map((id) => {
+                          const on = (l.assessWith ?? []).includes(id);
+                          const elsewhere = plan.units.some((uu, uj) => uu.lessons.some((ll, lj) => (uj !== ui || lj !== li) && assessedIds(ll).includes(id)));
+                          return (
+                            <label key={id} className={`flex items-center gap-1 ${elsewhere && !on ? "text-gray-400" : ""}`}>
+                              <input
+                                type="checkbox"
+                                checked={on}
+                                disabled={elsewhere && !on}
+                                onChange={() => setLesson(ui, li, { assessWith: on ? (l.assessWith ?? []).filter((x) => x !== id) : [...(l.assessWith ?? []), id] })}
+                              />
+                              <span className="font-mono">{codes.get(id)}</span>
+                              {elsewhere && !on && " (다른 차시에 배정됨)"}
+                            </label>
+                          );
+                        })}
+                    </div>
+                  )}
                   {(l.assessFor || l.assessment) && (
                     <input className={inputClass} placeholder="평가 내용 (예: ~을 조사하여 발표하기)" value={l.assessment} onChange={(e) => setLesson(ui, li, { assessment: e.target.value })} />
                   )}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { memoryRepo } from "./repo";
-import { listHourChecks, listMyDesigns, signup } from "./services";
+import { listHourChecks, listMyDesigns, listSharedDesigns, signup } from "./services";
 import { SEED_EXAMPLES, seedDesigns, seedGwangyang } from "./seed";
 import { bandStatus, type Checks, type HourCheck } from "@/domain/hoursView";
 import { checkAllocation } from "@/validation/allocation";
@@ -38,6 +38,11 @@ describe("광양중동초 자료 넣기", () => {
     }
     const briefs = list.map((d) => ({ ...d, schoolYear: d.schoolYear }));
     for (const g of [3, 4, 5, 6]) expect(bandStatus(g, 2026, checks, briefs).complete, `${g}학년`).toBe(true);
+
+    // 성취기준 묶음 평가·~한다 고침·체크리스트 ○로 모두 완성 → 다른 학교의 '타학교 완성 설계안'에 보임
+    expect(list.map((d) => [d.name, d.errorCount, d.checklistLeft]).filter(([, e, c]) => e !== 0 || c !== 0)).toEqual([]);
+    const other = await signup(repo, school("광양마동초등학교"), []);
+    expect(await listSharedDesigns(repo, other)).toHaveLength(9);
   });
 
   it("학교 계정이 없으면 알려 준다", async () => {
@@ -53,6 +58,7 @@ describe("광양중동초 자료 넣기", () => {
     for (const d of seedDesigns()) {
       const sum = d.plan.selected!.units.flatMap((u) => u.lessons).reduce((s, l) => s + l.hours, 0);
       expect(sum, d.basic.name).toBe(d.basic.hours);
+      for (const st of d.standards) expect(st.text, d.basic.name).not.toMatch(/수 있다\.$/);
     }
   });
 

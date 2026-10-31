@@ -102,11 +102,16 @@ export const lessonSchema = z.object({
   assessment: z.string(),
   /** 이 차시에서 평가하는 성취기준 id (성취기준마다 과정중심평가 1개) */
   assessFor: z.string().default(""),
+  /** 같은 단원(영역)의 성취기준을 묶어 함께 평가할 때 더 묶은 성취기준 id (사용자 결정, 2026-10-31) */
+  assessWith: z.array(z.string()).optional(),
   /** 이 차시에서 하는 [전단계] '하고 싶은 활동' (문구 그대로) */
   inputActivities: z.array(z.string()).default([]),
   note: z.string(),
 });
 export type Lesson = z.infer<typeof lessonSchema>;
+
+/** 이 차시의 과정중심평가가 평가하는 성취기준 id (묶음 포함) */
+export const assessedIds = (l: Pick<Lesson, "assessFor" | "assessWith">): string[] => (l.assessFor ? [l.assessFor, ...(l.assessWith ?? [])] : []);
 
 export const unitSchema = z.object({
   unitName: z.string().min(1),

@@ -38,6 +38,13 @@ describe("성취기준 코드", () => {
     const s = [{ id: "a", areaIndex: 1, text: "", elements: [] }];
     expect(standardCode({ grade: 6, subjectGroup: "사회" }, "지구촌", s, s[0])).toBe("[6사지구촌02-01]");
   });
+  it("2026학년도까지 운영한 설계는 편성교과 글자 없이 [3지구01-01] (2027 지침부터 교과 글자)", () => {
+    const doc = sampleSubject();
+    doc.application.startYear = "2026";
+    expect([...codeMap(doc).values()][0]).toBe("[3지구01-01]");
+    doc.application.startYear = "2027";
+    expect([...codeMap(doc).values()][0]).toBe("[3사지구01-01]");
+  });
   it("범주는 연결한 내용 요소로 계산한다", () => {
     const doc = sampleSubject();
     expect(standardCategories(doc.areas, doc.standards[1]).sort()).toEqual(["knowledge", "process", "values"]);
@@ -74,11 +81,11 @@ describe("성취기준", () => {
     const doc = { ...sampleSubject(), abbrev: "지구마을첫" };
     expect(errors(checkStandards(doc)).some((i) => i.field === "성취기준 코드 약어")).toBe(true);
   });
-  it("같은 범주의 내용 요소를 함께 묶으면 오류", () => {
+  it("같은 범주의 내용 요소를 함께 묶으면 확인 필요(권장)", () => {
     const doc = sampleSubject();
     doc.standards[0].elements = ["세계와 연결된 나의 삶", "세계 문제 해결을 위한 협력의 필요성"];
     doc.standards[1].elements = ["세계 어린이의 생활 탐구하기", "세계시민 규칙 정하기", "세계시민 규칙을 실천하려는 의지"];
-    const issues = errors(checkStandards(doc));
+    const issues = checkStandards(doc).filter((i) => i.level === "warning");
     expect(issues.some((i) => i.field === "[3사지구01-01]" && i.message.includes("같은 범주(지식·이해)"))).toBe(true);
     expect(issues.some((i) => i.field === "[3사지구01-02]" && i.message.includes("같은 범주(과정·기능)"))).toBe(true);
   });
@@ -173,6 +180,23 @@ describe("단원 지도계획·평가 계획", () => {
     const issues = errors(checkUnitPlan(doc));
     expect(issues.some((i) => i.message.includes("어느 성취기준을 평가하는지"))).toBe(true);
     expect(issues.some((i) => i.message.includes("이 단원에 배치하지 않은 성취기준"))).toBe(true);
+  });
+  it("같은 단원의 성취기준은 과정중심평가 하나로 묶어 평가할 수 있다", () => {
+    const doc = sampleSubject();
+    const lessons = doc.plan.selected!.units[0].lessons;
+    lessons[2].assessFor = "";
+    lessons[2].assessment = "";
+    lessons[6].assessFor = "s1";
+    lessons[6].assessWith = ["s2"];
+    expect(errors(checkUnitPlan(doc))).toEqual([]);
+    expect(errors(checkAssessments(doc))).toEqual([]);
+  });
+  it("다른 영역(단원)의 성취기준과는 묶을 수 없다", () => {
+    const doc = sampleSubject();
+    doc.plan.selected!.units[0].lessons[6].assessWith = ["s3"];
+    const issues = errors(checkUnitPlan(doc));
+    expect(issues.some((i) => i.message.includes("같은 영역(단원)의 성취기준끼리만"))).toBe(true);
+    expect(issues.some((i) => i.field === "[3사지구02-01]" && i.message.includes("2개"))).toBe(true);
   });
   it("평가 내용이 단원 지도계획에 없으면 오류", () => {
     const doc = sampleSubject();

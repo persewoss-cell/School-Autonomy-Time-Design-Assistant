@@ -1,18 +1,24 @@
-import type { Area, BasicInfo, Category, DesignDoc, Standard } from "./types";
+import type { Application, Area, BasicInfo, Category, DesignDoc, Standard } from "./types";
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
 /**
  * 성취기준 코드: [편성학년][편성교과 맨 앞 글자][과목명 약어][영역 순서 2자리]-[영역 내 순서 2자리]
  * 예: [6사지구촌02-01]  (2027 지침 변경 형식)
+ * 2026학년도까지 운영한 설계는 편성교과 글자 없이 [학년][약어][영역]-[순서] (예: [3디탐01-01]) — 2027 지침부터 적용 (사용자 확인, 2026-10-31)
  */
-export function standardCode(basic: Pick<BasicInfo, "grade" | "subjectGroup">, abbrev: string, standards: Standard[], std: Standard): string {
+export const CODE_WITH_GROUP_FROM = 2027;
+
+export function standardCode(basic: Pick<BasicInfo, "grade" | "subjectGroup">, abbrev: string, standards: Standard[], std: Standard, startYear?: string): string {
   const order = standards.filter((s) => s.areaIndex === std.areaIndex).findIndex((s) => s.id === std.id) + 1;
-  return `[${basic.grade}${basic.subjectGroup.charAt(0)}${abbrev}${pad2(std.areaIndex + 1)}-${pad2(order)}]`;
+  const year = Number(startYear);
+  const group = year && year < CODE_WITH_GROUP_FROM ? "" : basic.subjectGroup.charAt(0);
+  return `[${basic.grade}${group}${abbrev}${pad2(std.areaIndex + 1)}-${pad2(order)}]`;
 }
 
-export function codeMap(doc: Pick<DesignDoc, "basic" | "abbrev" | "standards">): Map<string, string> {
-  return new Map(doc.standards.map((s) => [s.id, standardCode(doc.basic, doc.abbrev, doc.standards, s)]));
+/** application이 있으면 운영 학년도에 따라 코드 형식을 정한다 (2026학년도까지는 편성교과 글자 없음) */
+export function codeMap(doc: Pick<DesignDoc, "basic" | "abbrev" | "standards"> & { application?: Pick<Application, "startYear"> }): Map<string, string> {
+  return new Map(doc.standards.map((s) => [s.id, standardCode(doc.basic, doc.abbrev, doc.standards, s, doc.application?.startYear)]));
 }
 
 /** 내용 요소 문구가 어느 범주에 속하는지 (내용 체계에서 찾음) */

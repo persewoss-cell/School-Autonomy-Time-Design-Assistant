@@ -236,7 +236,10 @@
         "assessment": "세계와 연결된 나의 삶을 이해하고, 세계시민 규칙과 실천 약속을 정해 발표하기",
         "assessFor": "s1",
         "inputActivities": [],
-        "note": ""
+        "note": "",
+        "assessWith": [
+         "s2"
+        ]
        }
       ]
      },
@@ -391,9 +394,12 @@
          "발표회 후 배운 점과 느낀 점 나누기"
         ],
         "assessment": "문화 존중 사례를 바탕으로 다양한 문화 존중의 모습을 여러 가지 방법으로 표현하기",
-        "assessFor": "s4",
+        "assessFor": "s3",
         "inputActivities": [],
-        "note": "공동교육과정 연계(한중일)"
+        "note": "공동교육과정 연계(한중일)",
+        "assessWith": [
+         "s4"
+        ]
        }
       ]
      }
@@ -480,7 +486,28 @@
    "goalSummary": "",
    "contentSummary": ""
   },
-  "checklist": {}
+  "checklist": {
+   "name": true,
+   "nameDup": true,
+   "nameDupNation": true,
+   "group": true,
+   "range": true,
+   "noOverCut": true,
+   "week": true,
+   "achieve": true,
+   "min10": true,
+   "max3": true,
+   "intro": true,
+   "textbook": true,
+   "teacher": true,
+   "content": true,
+   "newSystem": true,
+   "level": true,
+   "plan": true,
+   "neutral": true,
+   "ip": true,
+   "constitution": true
+  }
  },
  {
   "version": 1,
@@ -755,7 +782,10 @@
         "assessment": "평화와 관련된 아이디어를 모으고 캠페인에 참여하기",
         "assessFor": "s1",
         "inputActivities": [],
-        "note": ""
+        "note": "",
+        "assessWith": [
+         "s2"
+        ]
        }
       ]
      },
@@ -887,7 +917,10 @@
         "assessment": "환경보호의 문제와 심각성을 이해하고 생명 존중에 대한 그림책을 창의적으로 만들기",
         "assessFor": "s3",
         "inputActivities": [],
-        "note": ""
+        "note": "",
+        "assessWith": [
+         "s4"
+        ]
        },
        {
         "hours": 1,
@@ -1015,7 +1048,28 @@
    "goalSummary": "",
    "contentSummary": ""
   },
-  "checklist": {}
+  "checklist": {
+   "name": true,
+   "nameDup": true,
+   "nameDupNation": true,
+   "group": true,
+   "range": true,
+   "noOverCut": true,
+   "week": true,
+   "achieve": true,
+   "min10": true,
+   "max3": true,
+   "intro": true,
+   "textbook": true,
+   "teacher": true,
+   "content": true,
+   "newSystem": true,
+   "level": true,
+   "plan": true,
+   "neutral": true,
+   "ip": true,
+   "constitution": true
+  }
  },
  {
   "version": 1,
@@ -1219,9 +1273,12 @@
          "디지털 도구를 활용하여 L-콘텐츠 캐릭터 홍보 상품 제작 기획서 작성하기"
         ],
         "assessment": "지역 문화 자산의 종류와 특징을 반영한 홍보 상품 기획서 작성하기",
-        "assessFor": "s2",
+        "assessFor": "s1",
         "inputActivities": [],
-        "note": ""
+        "note": "",
+        "assessWith": [
+         "s2"
+        ]
        },
        {
         "hours": 1,
@@ -1414,7 +1471,10 @@
         "assessment": "지속가능발전목표(SDGs)와 연계하여 지역 문제를 해결하는 정책 제안서 작성하기",
         "assessFor": "s3",
         "inputActivities": [],
-        "note": ""
+        "note": "",
+        "assessWith": [
+         "s4"
+        ]
        },
        {
         "hours": 1,
@@ -1526,7 +1586,28 @@
    "goalSummary": "",
    "contentSummary": ""
   },
-  "checklist": {}
+  "checklist": {
+   "name": true,
+   "nameDup": true,
+   "nameDupNation": true,
+   "group": true,
+   "range": true,
+   "noOverCut": true,
+   "week": true,
+   "achieve": true,
+   "min10": true,
+   "max3": true,
+   "intro": true,
+   "textbook": true,
+   "teacher": true,
+   "content": true,
+   "newSystem": true,
+   "level": true,
+   "plan": true,
+   "neutral": true,
+   "ip": true,
+   "constitution": true
+  }
  },
  {
   "version": 1,
@@ -1786,7 +1867,10 @@
         "assessment": "우리 지역 환경 변화 데이터를 정리하여 시각화 자료로 제작하고 발표하기",
         "assessFor": "s1",
         "inputActivities": [],
-        "note": ""
+        "note": "",
+        "assessWith": [
+         "s2"
+        ]
        },
        {
         "hours": 1,
@@ -1936,9 +2020,12 @@
          "캠페인 활동 영상 촬영·편집하여 공유하기"
         ],
         "assessment": "기후행동 캠페인에 참여하고, 활동 과정을 영상으로 제작하기",
-        "assessFor": "s4",
+        "assessFor": "s3",
         "inputActivities": [],
-        "note": ""
+        "note": "",
+        "assessWith": [
+         "s4"
+        ]
        }
       ]
      }
@@ -2026,7 +2113,28 @@
    "goalSummary": "",
    "contentSummary": ""
   },
-  "checklist": {}
+  "checklist": {
+   "name": true,
+   "nameDup": true,
+   "nameDupNation": true,
+   "group": true,
+   "range": true,
+   "noOverCut": true,
+   "week": true,
+   "achieve": true,
+   "min10": true,
+   "max3": true,
+   "intro": true,
+   "textbook": true,
+   "teacher": true,
+   "content": true,
+   "newSystem": true,
+   "level": true,
+   "plan": true,
+   "neutral": true,
+   "ip": true,
+   "constitution": true
+  }
  },
  {
   "version": 1,
@@ -2108,7 +2216,7 @@
    {
     "id": "s1",
     "areaIndex": 0,
-    "text": "문서작성 프로그램의 기능을 익히고 저작권을 준수하여 문서를 제작할 수 있다.",
+    "text": "문서작성 프로그램의 기능을 익히고 저작권을 준수하여 문서를 제작한다.",
     "elements": [
      "문서작성 프로그램 기능 익히기",
      "저작권을 준수하는 태도"
@@ -2147,7 +2255,7 @@
    {
     "id": "s4",
     "areaIndex": 1,
-    "text": "일상생활 속 절차적 사고를 이해하고 생활 속 문제를 해결을 위해 알고리즘을 만들 수 있다.",
+    "text": "일상생활 속 절차적 사고를 이해하고 생활 속 문제를 해결을 위해 알고리즘을 만든다.",
     "elements": [
      "일상생활 속 절차적 사고력",
      "일상생활의 문제를 해결하기 위한 알고리즘 만들기"
@@ -2160,7 +2268,7 @@
    {
     "id": "s5",
     "areaIndex": 2,
-    "text": "인공지능을 이해하고 생성형 인공지능 프로그램을 활용하여 주제에 맞는 자료를 제작할 수 있다.",
+    "text": "인공지능을 이해하고 생성형 인공지능 프로그램을 활용하여 주제에 맞는 자료를 제작한다.",
     "elements": [
      "인공지능의 이해",
      "생성형 인공지능을 활용한 자료 제작하기"
@@ -2348,7 +2456,10 @@
         "assessment": "내가 좋아하는 것을 소개하는 문서 발표 자료를 만들고 학교 홈페이지에 게시하기",
         "assessFor": "s1",
         "inputActivities": [],
-        "note": "마을학교 연계 코티칭"
+        "note": "마을학교 연계 코티칭",
+        "assessWith": [
+         "s2"
+        ]
        }
       ]
      },
@@ -2469,9 +2580,12 @@
          "절차적 문제 해결 과정 알고리즘 만들기"
         ],
         "assessment": "절자적 사고를 통한 문제해결 과정을 알고리즘으로 표현하기",
-        "assessFor": "s4",
+        "assessFor": "s3",
         "inputActivities": [],
-        "note": ""
+        "note": "",
+        "assessWith": [
+         "s4"
+        ]
        }
       ]
      },
@@ -2547,9 +2661,12 @@
          "인공지능 자동 영상 제작 사이트 사이트로 영상 만들기"
         ],
         "assessment": "인공지능을 올바르게 사용하는 방법에 대해 이야기하고 실천한다.",
-        "assessFor": "s6",
+        "assessFor": "s5",
         "inputActivities": [],
-        "note": ""
+        "note": "",
+        "assessWith": [
+         "s6"
+        ]
        }
       ]
      }
@@ -2652,7 +2769,28 @@
    "goalSummary": "",
    "contentSummary": ""
   },
-  "checklist": {}
+  "checklist": {
+   "name": true,
+   "nameDup": true,
+   "nameDupNation": true,
+   "group": true,
+   "range": true,
+   "noOverCut": true,
+   "week": true,
+   "achieve": true,
+   "min10": true,
+   "max3": true,
+   "intro": true,
+   "textbook": true,
+   "teacher": true,
+   "content": true,
+   "newSystem": true,
+   "level": true,
+   "plan": true,
+   "neutral": true,
+   "ip": true,
+   "constitution": true
+  }
  },
  {
   "version": 1,
@@ -2743,7 +2881,7 @@
    {
     "id": "s1",
     "areaIndex": 0,
-    "text": "협업 문서 프로그램의 기본기능을 활용하여 친구들과 함께 문서를 제작할 수 있다.",
+    "text": "협업 문서 프로그램의 기본기능을 활용하여 친구들과 함께 문서를 제작한다.",
     "elements": [
      "협업 문서 프로그램의 기초",
      "협업 문서 프로그램 활용하기",
@@ -2788,7 +2926,7 @@
    {
     "id": "s4",
     "areaIndex": 1,
-    "text": "코딩 로봇의 기본 요소와 사용법을 익히고 창의적인 작품을 만들 수 있다.",
+    "text": "코딩 로봇의 기본 요소와 사용법을 익히고 창의적인 작품을 만든다.",
     "elements": [
      "코딩 로봇의 기본 요소 및 사용법",
      "코딩 로봇으로 작품 만들기",
@@ -2818,7 +2956,7 @@
    {
     "id": "s6",
     "areaIndex": 2,
-    "text": "생성형 인공지능을 활용해 작품을 만들고 인공지능을 올바르게 사용할 수 있다.",
+    "text": "생성형 인공지능을 활용해 작품을 만들고 인공지능을 올바르게 사용한다.",
     "elements": [
      "인공지능의 기본 개념과 원리",
      "생성형 인공지능 활용하기",
@@ -2924,9 +3062,12 @@
          "모둠원과 협동하여 발표 자료 만들고 발표하기"
         ],
         "assessment": "저작권의 중요성을 알고 지키며 협업을 통해 발표 자료를 만드는 방법 설명하기",
-        "assessFor": "s2",
+        "assessFor": "s1",
         "inputActivities": [],
-        "note": ""
+        "note": "",
+        "assessWith": [
+         "s2"
+        ]
        },
        {
         "hours": 1,
@@ -3083,9 +3224,12 @@
          "모둠별 프로젝트 발표 및 시연하기"
         ],
         "assessment": "협업을 통해 조립용 코딩 로봇을 만들어 발표하기",
-        "assessFor": "s4",
+        "assessFor": "s3",
         "inputActivities": [],
-        "note": "마을학교 연계 코티칭"
+        "note": "마을학교 연계 코티칭",
+        "assessWith": [
+         "s4"
+        ]
        }
       ]
      },
@@ -3120,9 +3264,12 @@
          "그룹을 나누어 어떤 결정이 도덕적일지 토론하기"
         ],
         "assessment": "인공지능의 도덕적 딜레마 상황을 주제로 토론에 참여하고 인공지능에 대한 올바른 태도 갖기",
-        "assessFor": "s6",
+        "assessFor": "s5",
         "inputActivities": [],
-        "note": ""
+        "note": "",
+        "assessWith": [
+         "s6"
+        ]
        },
        {
         "hours": 1,
@@ -3290,7 +3437,28 @@
    "goalSummary": "",
    "contentSummary": ""
   },
-  "checklist": {}
+  "checklist": {
+   "name": true,
+   "nameDup": true,
+   "nameDupNation": true,
+   "group": true,
+   "range": true,
+   "noOverCut": true,
+   "week": true,
+   "achieve": true,
+   "min10": true,
+   "max3": true,
+   "intro": true,
+   "textbook": true,
+   "teacher": true,
+   "content": true,
+   "newSystem": true,
+   "level": true,
+   "plan": true,
+   "neutral": true,
+   "ip": true,
+   "constitution": true
+  }
  },
  {
   "version": 1,
@@ -3603,9 +3771,12 @@
          "동료 평가하기"
         ],
         "assessment": "다양한 기능을 활용하여 주제에 맞는 발표 자료 만들기",
-        "assessFor": "s2",
+        "assessFor": "s1",
         "inputActivities": [],
-        "note": ""
+        "note": "",
+        "assessWith": [
+         "s2"
+        ]
        }
       ]
      },
@@ -3708,9 +3879,12 @@
          "점수 추가 및 프로그램 수정·보완하기"
         ],
         "assessment": "입력장치 보드를 활용하여 장애물 피하기 게임 만들기",
-        "assessFor": "s4",
+        "assessFor": "s3",
         "inputActivities": [],
-        "note": "마을학교 연계 코티칭"
+        "note": "마을학교 연계 코티칭",
+        "assessWith": [
+         "s4"
+        ]
        }
       ]
      },
@@ -3807,7 +3981,10 @@
         "assessment": "인공지능의 개념과 원리를 이해하고 이를 활용하여 협동 작품 만들기",
         "assessFor": "s5",
         "inputActivities": [],
-        "note": ""
+        "note": "",
+        "assessWith": [
+         "s6"
+        ]
        }
       ]
      }
@@ -3910,7 +4087,28 @@
    "goalSummary": "",
    "contentSummary": ""
   },
-  "checklist": {}
+  "checklist": {
+   "name": true,
+   "nameDup": true,
+   "nameDupNation": true,
+   "group": true,
+   "range": true,
+   "noOverCut": true,
+   "week": true,
+   "achieve": true,
+   "min10": true,
+   "max3": true,
+   "intro": true,
+   "textbook": true,
+   "teacher": true,
+   "content": true,
+   "newSystem": true,
+   "level": true,
+   "plan": true,
+   "neutral": true,
+   "ip": true,
+   "constitution": true
+  }
  },
  {
   "version": 1,
@@ -3997,7 +4195,7 @@
    {
     "id": "s1",
     "areaIndex": 0,
-    "text": "협동하는 자세로 디지털 편집 도구를 활용하여 발표 자료를 만들 수 있다.",
+    "text": "협동하는 자세로 디지털 편집 도구를 활용하여 발표 자료를 만든다.",
     "elements": [
      "디지털 편집 도구의 개념",
      "디지털 편집 도구 기능 익히기",
@@ -4025,7 +4223,7 @@
    {
     "id": "s3",
     "areaIndex": 1,
-    "text": "코딩 로봇의 작동 원리를 이해하고 창의적으로 주어진 문제를 해결할 수 있다.",
+    "text": "코딩 로봇의 작동 원리를 이해하고 창의적으로 주어진 문제를 해결한다.",
     "elements": [
      "코딩 로봇의 작동 원리",
      "코딩 로봇 알고리즘 탐구하기",
@@ -4040,7 +4238,7 @@
    {
     "id": "s4",
     "areaIndex": 1,
-    "text": "3D펜의 기능을 활용하여 협력과 소통을 통해 작품을 완성할 수 있다.",
+    "text": "3D펜의 기능을 활용하여 협력과 소통을 통해 작품을 완성한다.",
     "elements": [
      "3D펜의 개념",
      "3D펜으로 작품 만들기",
@@ -4055,7 +4253,7 @@
    {
     "id": "s5",
     "areaIndex": 2,
-    "text": "인공지능의 활용 분야를 알고 생성형 인공지능으로 창의적인 작품을 만들 수 있다.",
+    "text": "인공지능의 활용 분야를 알고 생성형 인공지능으로 창의적인 작품을 만든다.",
     "elements": [
      "다양한 인공지능의 활용 분야",
      "모둠별 협업과 인공지능 기능을 활용해 발표 자료 만들기"
@@ -4225,7 +4423,10 @@
         "assessment": "디지털 편집도구를 활용해 저작권의 중요성을 알고, 협동하는 자세로 자료를 만들고 발표하기",
         "assessFor": "s1",
         "inputActivities": [],
-        "note": ""
+        "note": "",
+        "assessWith": [
+         "s2"
+        ]
        }
       ]
      },
@@ -4388,7 +4589,10 @@
         "assessment": "인공지능을 올바르게 사용하는 방법을 알고 인공지능 윤리를 준수하며 작품을 만들기",
         "assessFor": "s5",
         "inputActivities": [],
-        "note": ""
+        "note": "",
+        "assessWith": [
+         "s6"
+        ]
        }
       ]
      }
@@ -4505,7 +4709,28 @@
    "goalSummary": "",
    "contentSummary": ""
   },
-  "checklist": {}
+  "checklist": {
+   "name": true,
+   "nameDup": true,
+   "nameDupNation": true,
+   "group": true,
+   "range": true,
+   "noOverCut": true,
+   "week": true,
+   "achieve": true,
+   "min10": true,
+   "max3": true,
+   "intro": true,
+   "textbook": true,
+   "teacher": true,
+   "content": true,
+   "newSystem": true,
+   "level": true,
+   "plan": true,
+   "neutral": true,
+   "ip": true,
+   "constitution": true
+  }
  },
  {
   "version": 1,
@@ -4845,9 +5070,12 @@
          "영상 발표회 참여하기"
         ],
         "assessment": "지속 가능한 지구촌을 위한 영상을 제작· 발표하고 세계공동체 일원으로서 책임감 갖기",
-        "assessFor": "s4",
+        "assessFor": "s3",
         "inputActivities": [],
-        "note": ""
+        "note": "",
+        "assessWith": [
+         "s4"
+        ]
        }
       ]
      }
@@ -4926,6 +5154,27 @@
    "goalSummary": "",
    "contentSummary": ""
   },
-  "checklist": {}
+  "checklist": {
+   "name": true,
+   "nameDup": true,
+   "nameDupNation": true,
+   "group": true,
+   "range": true,
+   "noOverCut": true,
+   "week": true,
+   "achieve": true,
+   "min10": true,
+   "max3": true,
+   "intro": true,
+   "textbook": true,
+   "teacher": true,
+   "content": true,
+   "newSystem": true,
+   "level": true,
+   "plan": true,
+   "neutral": true,
+   "ip": true,
+   "constitution": true
+  }
  }
 ]

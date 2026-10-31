@@ -1,4 +1,4 @@
-import { CATEGORIES, CATEGORY_KEYS, DESIGN_TYPES, standardNeedsRewrite, type Area, type DesignDoc, type Plan } from "@/domain/types";
+import { CATEGORIES, CATEGORY_KEYS, DESIGN_TYPES, assessedIds, standardNeedsRewrite, type Area, type DesignDoc, type Plan } from "@/domain/types";
 import { categoryOf, codeMap } from "@/domain/codes";
 import { splitProblem } from "@/domain/standardCounts";
 import { checklistFor } from "@/domain/checklist";
@@ -228,11 +228,12 @@ export function checkStandards(doc: Pick<DesignDoc, "basic" | "abbrev" | "areas"
       });
     }
     const sameCats = CATEGORY_KEYS.filter((c) => s.elements.filter((e) => categoryOf(doc.areas, e) === c).length > 1);
+    // 필수는 아니고 권장 (사용자 확인, 2026-10-31) → 확인 필요
     if (sameCats.length) {
       issues.push({
-        level: "error",
+        level: "warning",
         field: code,
-        message: `같은 범주(${sameCats.map((c) => CATEGORIES[c]).join(", ")})의 내용 요소를 함께 묶었습니다. 성취기준은 서로 다른 범주의 내용 요소끼리 묶습니다.`,
+        message: `같은 범주(${sameCats.map((c) => CATEGORIES[c]).join(", ")})의 내용 요소를 함께 묶었습니다. 서로 다른 범주의 내용 요소끼리 묶는 것을 권장합니다.`,
         fix: "2개면 서로 다른 두 범주에서 하나씩, 3개면 지식·이해 + 과정·기능 + 가치·태도에서 하나씩 골라 주세요.",
       });
     }
@@ -287,7 +288,7 @@ export function planCoverage(doc: Pick<DesignDoc, "input">, plan: Plan) {
   const lessons = plan.units.flatMap((u) => u.lessons);
   const linked = new Set(lessons.flatMap((l) => l.inputActivities ?? []));
   const assessed = new Map<string, number>();
-  for (const l of lessons) if (l.assessFor) assessed.set(l.assessFor, (assessed.get(l.assessFor) ?? 0) + 1);
+  for (const l of lessons) for (const id of assessedIds(l)) assessed.set(id, (assessed.get(id) ?? 0) + 1);
   return {
     activities: doc.input.desiredActivities.map((text) => ({ text, done: linked.has(text) })),
     assessed,
@@ -327,6 +328,7 @@ export function checkUnitPlan(doc: Pick<DesignDoc, "basic" | "abbrev" | "standar
     }
   }
   // 과정중심평가: 성취기준마다 1개, 그 성취기준을 배치한 단원의 차시에 (사용자 결정, 2026-10-30)
+  // 같은 영역(단원)의 성취기준은 한 번에 묶어 평가할 수 있다 (사용자 결정, 2026-10-31)
   const labels = lessonLabels(plan.units, doc.basic.hours);
   plan.units.forEach((u, ui) =>
     u.lessons.forEach((l, li) => {
@@ -337,6 +339,15 @@ export function checkUnitPlan(doc: Pick<DesignDoc, "basic" | "abbrev" | "standar
       }
       if (target && !l.assessment.trim()) {
         issues.push({ level: "error", field: f, message: `${codes.get(target)} 과정중심평가의 평가 내용이 비어 있습니다.`, fix: "이 차시에서 무엇을 평가하는지 적어 주세요." });
+      }
+      const outside = (l.assessWith ?? []).filter((id) => target && codes.has(id) && !u.standardIds.includes(id));
+      if (outside.length) {
+        issues.push({
+          level: "error",
+          field: f,
+          message: `${outside.map((id) => codes.get(id)).join(", ")}은(는) 다른 영역의 성취기준입니다. 성취기준을 묶어 평가할 때는 같은 영역(단원)의 성취기준끼리만 묶습니다.`,
+          fix: "묶음에서 빼고, 그 성취기준을 다루는 단원의 차시에 따로 평가를 두어 주세요.",
+        });
       }
       if (target && !u.standardIds.includes(target)) {
         issues.push({
@@ -363,7 +374,7 @@ export function checkUnitPlan(doc: Pick<DesignDoc, "basic" | "abbrev" | "standar
       issues.push({
         level: "error",
         field: code,
-        message: "이 성취기준의 과정중심평가가 없습니다. 성취기준마다 과정중심평가를 1개씩 배정합니다.",
+        message: "이 성취기준의 과정중심평가가 없습니다. 성취기준마다 과정중심평가를 1개씩 배정합니다. (같은 단원의 성취기준과 묶어 평가해도 됩니다)",
         fix: "이 성취기준의 내용을 다루는 차시를 골라 평가할 성취기준과 평가 내용을 적어 주세요.",
       });
     } else if (n > 1) {
@@ -401,7 +412,7 @@ export function checkAssessments(doc: Pick<DesignDoc, "basic" | "abbrev" | "stan
     // 평가 계획의 평가 내용은 단원 지도계획에 반드시 포함 (예시 문서 메모, PPT 51쪽)
     const plan = doc.plan.selected;
     if (plan) {
-      const assessed = new Set(plan.units.flatMap((u) => u.lessons.filter((l) => l.assessment.trim()).map((l) => l.assessFor)));
+      const assessed = new Set(plan.units.flatMap((u) => u.lessons.filter((l) => l.assessment.trim()).flatMap(assessedIds)));
       if (a.standardIds.some((id) => codes.has(id) && !assessed.has(id))) {
         issues.push({
           level: "error",
