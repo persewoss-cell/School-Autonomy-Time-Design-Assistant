@@ -59,7 +59,7 @@ function LoginNeeded({ onClose }: { onClose: () => void }) {
       title="로그인이 필요해요"
       onClose={onClose}
       actions={
-        <Link href="/login?next=%2Fshared" className="rounded-lg bg-brand-600 px-4 py-2 font-semibold text-white hover:bg-brand-700">
+        <Link href="/login?next=%2Fshared" onClick={onClose} className="rounded-lg bg-brand-600 px-4 py-2 font-semibold text-white hover:bg-brand-700">
           로그인
         </Link>
       }

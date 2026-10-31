@@ -51,7 +51,11 @@ export function LoginGateLink({ href, className, children }: { href: string; cla
               </button>
               <button
                 type="button"
-                onClick={() => router.push(`/login?next=${encodeURIComponent(href)}`)}
+                onClick={() => {
+                  // 상단 메뉴는 화면이 바뀌어도 남아 있으므로 팝업을 먼저 닫는다
+                  setOpen(false);
+                  router.push(`/login?next=${encodeURIComponent(href)}`);
+                }}
                 className="rounded-lg bg-brand-600 px-4 py-2 font-semibold text-white hover:bg-brand-700"
               >
                 로그인
