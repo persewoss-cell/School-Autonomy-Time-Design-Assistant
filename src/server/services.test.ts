@@ -258,3 +258,24 @@ describe("관리자 전체 설계의 시수점검 완료", () => {
     expect((await listAllDesignsForAdmin(repo))[0].hoursComplete).toBe(true);
   });
 });
+
+describe("관리자: 학교 일괄 등록", () => {
+  it("되는 줄은 바로 사용 중으로 만들고, 안 되는 줄은 이유를 알려 준다", async () => {
+    const { createUsersByAdmin } = await import("./services");
+    const { repo, admin } = await setup();
+    const r = await createUsersByAdmin(repo, admin, [
+      { region: "여수시", schoolName: "여수 서 초등학교", password: "password12" },
+      { region: "여수시", schoolName: "여수서초등학교", password: "password12" },
+      { region: "없는시", schoolName: "목포상동초등학교", password: "password12" },
+      { region: "목포시", schoolName: "목포초", password: "password12" },
+      { region: "목포시", schoolName: "목포상동초등학교", password: "short" },
+      { region: "광양시", schoolName: "광양 마동 초등학교", password: "password12" },
+    ]);
+    expect(r.map((x) => x.ok)).toEqual([true, false, false, false, false, false]);
+    expect(r[1].message).toContain("두 번");
+    expect(r[5].message).toContain("이미 가입");
+    const u = await repo.users.findBySchoolKey("여수서초등학교");
+    expect(u).toMatchObject({ status: "active", role: "teacher", region: "여수시" });
+    expect((await login(repo, "여수서초등학교", "password12")).id).toBe(u!.id);
+  });
+});

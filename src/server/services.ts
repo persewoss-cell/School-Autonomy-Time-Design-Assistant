@@ -28,7 +28,7 @@ const schoolNameSchema = z
   .pipe(
     z
       .string()
-      .min(4, "학교명을 입력해 주세요.")
+      .min(1, "학교명을 입력해 주세요.")
       .max(40, "학교명이 너무 깁니다.")
       .regex(/^[가-힣0-9]+초등학교$/, "학교명은 정식 명칭으로 입력해 주세요. 예: 광양중동초등학교 (○○초 X)"),
   );
@@ -426,4 +426,62 @@ export async function uploadExample(repo: Repo, admin: User, raw: unknown, file:
 export async function deleteExample(repo: Repo, admin: User, id: string) {
   await repo.examples.delete(id);
   await repo.logs.add({ kind: "admin", userId: admin.id, school: admin.schoolName, detail: `예시안 삭제: ${id}` });
+}
+
+// ───────────── 관리자: 학교 일괄·개별 등록 ─────────────
+export interface BulkRow {
+  region: unknown;
+  schoolName: unknown;
+  password: unknown;
+}
+export interface BulkResult {
+  row: number;
+  schoolName: string;
+  ok: boolean;
+  message: string;
+}
+
+/**
+ * 관리자가 학교 계정을 한꺼번에(또는 하나) 만든다. 바로 '사용 중'.
+ * 줄마다 따로 검사해 되는 것은 만들고, 안 되는 줄은 이유를 돌려준다. (한 번에 최대 500개)
+ */
+export async function createUsersByAdmin(repo: Repo, admin: User, rows: BulkRow[]): Promise<BulkResult[]> {
+  if (!Array.isArray(rows) || rows.length === 0) throw new ServiceError(400, "등록할 학교가 없습니다.");
+  if (rows.length > 500) throw new ServiceError(400, "한 번에 500개까지 등록할 수 있어요.");
+  const seen = new Set<string>();
+  const out: BulkResult[] = [];
+  for (const [i, raw] of rows.entries()) {
+    const password = String(raw.password ?? "");
+    const r = signupSchema.safeParse({ region: String(raw.region ?? "").trim(), schoolName: String(raw.schoolName ?? ""), password, passwordConfirm: password });
+    const name = schoolKeyOf(String(raw.schoolName ?? ""));
+    if (!r.success) {
+      out.push({ row: i + 1, schoolName: name, ok: false, message: r.error.issues[0].message });
+      continue;
+    }
+    if (seen.has(r.data.schoolName)) {
+      out.push({ row: i + 1, schoolName: name, ok: false, message: "파일 안에 같은 학교가 두 번 있습니다." });
+      continue;
+    }
+    seen.add(r.data.schoolName);
+    if (await repo.users.findBySchoolKey(r.data.schoolName)) {
+      out.push({ row: i + 1, schoolName: name, ok: false, message: "이미 가입된 학교입니다." });
+      continue;
+    }
+    await repo.users.create({
+      region: r.data.region,
+      schoolName: r.data.schoolName,
+      schoolKey: r.data.schoolName,
+      passwordHash: await bcrypt.hash(r.data.password, 10),
+      role: "teacher",
+      status: "active",
+      mustChangePassword: false,
+      resetRequest: null,
+      createdAt: new Date(),
+      lastLoginAt: null,
+    });
+    out.push({ row: i + 1, schoolName: name, ok: true, message: "등록됨" });
+  }
+  const made = out.filter((x) => x.ok).length;
+  if (made) await adminLog(repo, admin, `학교 등록: ${made}개 (${out.filter((x) => x.ok).map((x) => x.schoolName).slice(0, 5).join(", ")}${made > 5 ? " 외" : ""})`);
+  return out;
 }

@@ -15,6 +15,7 @@ import { Modal } from "../Modal";
 import { enterSchool } from "../ActingBanner";
 import { MultiSelect } from "./MultiSelect";
 import { SortTh, useSort } from "./sort";
+import { BulkUsers } from "./BulkUsers";
 import { useSearchParams, useRouter } from "next/navigation";
 import type { Issue } from "@/validation/types";
 
@@ -164,6 +165,7 @@ function UsersTable({
   };
   return (
     <div className="space-y-4">
+      <BulkUsers onDone={reload} />
       {temp && (
         <Card className="space-y-2 border-2 border-brand-500">
           <p className="font-bold">{temp.school} 임시 비밀번호</p>

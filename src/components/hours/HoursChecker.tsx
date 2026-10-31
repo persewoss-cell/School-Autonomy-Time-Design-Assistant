@@ -34,6 +34,7 @@ import {
 } from "@/validation/allocation";
 import { Packer } from "docx";
 import { buildAllocationDocx } from "@/export/allocationDocx";
+import { buildAllocationXlsx } from "@/export/allocationXlsx";
 import { Card, IssueList } from "../ui";
 import { GuestBanner, GUEST_LIMIT } from "../LoginGate";
 
@@ -135,6 +136,23 @@ export function HoursChecker() {
     setA(next);
   };
   const label = (s: SemesterIndex) => semesterLabelWithYear(grade, year, s);
+  /** 편성표 내려받기: 한글용 .docx 또는 수식이 들어간 엑셀 .xlsx */
+  const downloadForm = async (kind: "docx" | "xlsx") => {
+    if (guest) return;
+    const meta = { years: viewYears(grade, year), grade, schoolYear: year, schoolName: me?.user?.schoolName };
+    const blob =
+      kind === "docx"
+        ? await Packer.toBlob(buildAllocationDocx(a, meta))
+        : new Blob([await buildAllocationXlsx(a, meta)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${grade}학년_교육과정_편성표.${kind}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
   const errorCount = r.issues.length;
   const diff = designDiff(check, designs);
   const all: Checks = { ...checks, [key]: check };
@@ -422,25 +440,20 @@ export function HoursChecker() {
       <Card className="space-y-3">
         <h2 className="font-bold">③ 점검 결과 {errorCount > 0 && <span className="text-red-600">({errorCount}건)</span>}</h2>
         <IssueList issues={r.issues} />
-        <button
-          type="button"
-          disabled={guest}
-          title={guest ? GUEST_LIMIT : undefined}
-          className="rounded-lg border-2 border-brand-600 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400 disabled:hover:bg-transparent"
-          onClick={async () => {
-            if (guest) return;
-            const url = URL.createObjectURL(await Packer.toBlob(buildAllocationDocx(a, { years: viewYears(grade, year), grade, schoolYear: year, schoolName: me?.user?.schoolName })));
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = `${grade}학년_교육과정_편성표.docx`;
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
-          }}
-        >
-          📄 편성표 내려받기 (.docx)
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {(["docx", "xlsx"] as const).map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              disabled={guest}
+              title={guest ? GUEST_LIMIT : kind === "xlsx" ? "엑셀에서 노란 칸을 바꾸면 합계·증감·판정이 자동으로 다시 계산돼요" : undefined}
+              className="rounded-lg border-2 border-brand-600 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400 disabled:hover:bg-transparent"
+              onClick={() => void downloadForm(kind)}
+            >
+              {kind === "docx" ? "📄 편성표 내려받기 (.docx)" : "📊 편성표 내려받기 (.xlsx, 수식 포함)"}
+            </button>
+          ))}
+        </div>
         <p className={`text-xs ${guest ? "font-semibold text-red-600" : "text-gray-500"}`}>
           {guest ? "로그인해야 편성표를 내려받을 수 있어요." : "계획서·신청서의 붙임 '( )학년 교육과정 편성표'로 쓸 수 있어요."}
         </p>
