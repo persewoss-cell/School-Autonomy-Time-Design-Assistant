@@ -270,8 +270,8 @@ describe("영역별 성취기준 수", () => {
     d.areas[0].knowledge.push("세계 공동체의 구성원");
     d.standardCounts = [3, null];
     const p = standardsPrompt.build(d);
-    expect(p).toContain("- (1) 세계시민의 이해: 성취기준 3개 — 묶을 범주: ① 지식·이해 + 가치·태도  ② 지식·이해 + 과정·기능  ③ 지식·이해 + 과정·기능");
-    expect(p).toContain("- (2) 문화 다양성과 존중: 성취기준 2개");
+    expect(p).toContain("성취기준 3개 — 묶을 범주: ① 지식·이해 + 가치·태도 (2개)  ② 지식·이해 + 과정·기능 (2개)  ③ 지식·이해 + 과정·기능 (2개)");
+    expect(p).toMatch(/- \(2\) 문화 다양성과 존중: 내용 요소 \d+개 → 성취기준 2개/);
     const r = standardsPrompt.parse(wrap({ standards: [{ area: 1, text: "가.", elements: ["세계와 연결된 나의 삶"] }, { area: 2, text: "나.", elements: ["세계의 다양한 문화"] }, { area: 2, text: "다.", elements: ["세계의 다양한 문화"] }] }), d);
     expect(r.ok).toBe(true);
     if (r.ok) {
@@ -284,7 +284,8 @@ describe("영역별 성취기준 수", () => {
 describe("성취기준 내용 요소 최소 2개와 문장 고치기", () => {
   it("프롬프트에 묶을 범주와 '같은 범주끼리 묶지 않기' 규칙이 들어간다", () => {
     const p = standardsPrompt.build(sampleSubject());
-    expect(p).toContain("성취기준 2개 — 묶을 범주: ① 지식·이해 + 과정·기능  ② 지식·이해 + 과정·기능 + 가치·태도");
+    expect(p).toContain("고르게");
+    expect(p).toContain("성취기준 2개 — 묶을 범주: ① 지식·이해 + 과정·기능 (2개)  ② 지식·이해 + 과정·기능 + 가치·태도 (3개)");
     expect(p).toContain("같은 범주의 내용 요소 2개를 함께 묶지 않습니다");
   });
   it("같은 범주끼리 묶은 답은 알림", () => {

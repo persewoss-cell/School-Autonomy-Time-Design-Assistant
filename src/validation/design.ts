@@ -133,8 +133,8 @@ export function checkStandards(doc: Pick<DesignDoc, "basic" | "abbrev" | "areas"
     issues.push({
       level: "error",
       field: "성취기준 코드 약어",
-      message: `과목명 약어 '${doc.abbrev}'가 올바르지 않습니다. 과목명 앞 글자 또는 요약 2~3자여야 합니다.`,
-      fix: "예: 지구마을 첫걸음 → 지구, 지구촌, 함께 걷는 우리 → 지구촌",
+      message: doc.abbrev ? `과목명 약어 '${doc.abbrev}'가 올바르지 않습니다. 과목명 앞 글자 또는 요약 2~3자여야 합니다.` : "성취기준 코드에 쓸 과목명 약어가 비어 있습니다.",
+      fix: "성취기준 단계에서 과목명 앞 글자나 요약 2~3자(한글·영문)로 적어 주세요.",
     });
   }
   if (doc.standards.length === 0) {

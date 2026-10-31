@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { CATEGORIES, CATEGORY_KEYS, newId, standardNeedsRewrite, type Area, type DesignDoc, type Standard } from "@/domain/types";
 import { CATEGORY_STYLE } from "../categoryStyle";
-import { categoryOf, codeMap, defaultAbbrev, hasSameCategory, standardCategories } from "@/domain/codes";
+import { categoryOf, codeMap, hasSameCategory, standardCategories } from "@/domain/codes";
 import { categoryCounts, categorySplit, elementCount, recommendedStandardCount, splitProblem, standardCountRange, standardCountsFor } from "@/domain/standardCounts";
 import { contentSystemPrompt, coreIdeasPrompt, introPrompt, reviseStandardsPrompt, standardsPrompt, teachingPrompt } from "@/prompts/steps";
 import { checkContentSystem, checkCoreIdeas, checkIntro, checkStandards, checkTeaching } from "@/validation/design";
@@ -217,7 +217,8 @@ export function CoreIdeasStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
 
 // ───────────── ⑤ 성취기준 (PPT 48~49쪽) ─────────────
 export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: StepProps) {
-  const abbrev = doc.abbrev || defaultAbbrev(doc.basic.name);
+  // 약어는 선생님이 꼭 정한다 (자동으로 채우지 않음). 비어 있는 동안 코드 미리보기는 ○○
+  const abbrev = doc.abbrev || "○○";
   const codes = codeMap({ ...doc, abbrev });
   const allElements = (a: Area) => [...clean(a.knowledge), ...clean(a.process), ...clean(a.values)];
 
@@ -236,8 +237,14 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
           "코드 번호는 자동으로 붙어요: [편성학년][편성교과 첫 글자][과목명 약어][영역 순서]-[영역 내 순서]",
         ]}
       >
-        <Field label="성취기준 코드에 쓸 과목명 약어 (선택, 2~3자)" hint={`비우면 과목명 앞 글자로 자동 · 예: 지구촌, 함께 걷는 우리 → 지구촌  ·  코드 예: [${doc.basic.grade}${doc.basic.subjectGroup.charAt(0)}${abbrev}01-01]`}>
-          <input className={`${inputClass} max-w-40`} value={doc.abbrev} placeholder={defaultAbbrev(doc.basic.name)} onChange={(e) => setDoc((d) => void (d.abbrev = e.target.value.trim()))} />
+        <Field label="성취기준 코드에 쓸 과목명 약어 (2~3자)" hint={`코드 예: [${doc.basic.grade}${doc.basic.subjectGroup.charAt(0)}${abbrev}01-01]`}>
+          <input
+            id="abbrev"
+            className={`${inputClass} max-w-40 ${doc.abbrev ? "" : "border-red-300"}`}
+            value={doc.abbrev}
+            placeholder="예: 지구"
+            onChange={(e) => setDoc((d) => void (d.abbrev = e.target.value.trim()))}
+          />
         </Field>
       </StepHeader>
       <StandardCountPicker doc={doc} setDoc={setDoc} />
@@ -270,13 +277,11 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
         onParseFail={(e) => onParseFail?.("standards", e)}
         onApply={(standards) =>
           setDoc((d) => {
-            d.abbrev = d.abbrev || abbrev;
             d.standards = standards;
           })
         }
         onManual={() =>
           setDoc((d) => {
-            d.abbrev = d.abbrev || abbrev;
             d.standards = manualStandards(d);
           })
         }
@@ -383,11 +388,16 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
           </button>
         </Card>
       ))}
-      <StepIssues issues={checkStandards({ ...doc, abbrev })} />
+      <StepIssues issues={checkStandards(doc)} />
       <NavButtons
         onBack={onBack}
         onNext={() => {
-          if (!doc.abbrev) setDoc((d) => void (d.abbrev = abbrev));
+          // 약어가 비면 다음 단계로 못 넘어간다
+          if (!doc.abbrev) {
+            alert("성취기준 코드에 쓸 과목명 약어(2~3자)를 먼저 적어 주세요.");
+            document.getElementById("abbrev")?.focus();
+            return;
+          }
           onNext();
         }}
       />

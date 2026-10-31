@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { CATEGORIES, newId, planSchema, standardNeedsRewrite, type Area, type AssessmentRow, type DesignDoc, type Intro, type Plan, type Standard, type Teaching } from "@/domain/types";
 import { categoryOf, codeMap, hasSameCategory } from "@/domain/codes";
-import { categorySplit, splitProblem, standardCountsFor } from "@/domain/standardCounts";
+import { categorySplit, elementCount, splitProblem, standardCountsFor } from "@/domain/standardCounts";
 import { planCoverage } from "@/validation/design";
 import { unitHoursFor } from "@/domain/unitHours";
 import { COMMON_RULES, contextBlock, formatBlock, parseAiJson, toList, type AiParse } from "./common";
@@ -167,12 +167,16 @@ ${areasBlock(doc.areas)}
 ${doc.coreIdeas.map((s) => `- ${s}`).join("\n")}
 
 ## 할 일
-위 내용 체계로 성취기준을 써 주세요. 영역마다 아래 개수를 **정확히** 지킵니다.
+위 내용 체계로 성취기준을 써 주세요. 영역마다 아래 개수와 묶을 범주를 **정확히** 지킵니다.
+내용 요소는 성취기준마다 **고르게** 나눕니다. 각 성취기준의 내용 요소 수는 아래 괄호 속 숫자와 같아야 합니다. (예: 내용 요소 6개를 성취기준 2개로 → 3개·3개. 4개·2개 ✕)
 ${standardCountsFor(doc)
   .map((n, i) => {
     const split = categorySplit(doc.areas[i], n);
-    return `- (${i + 1}) ${doc.areas[i].name}: 성취기준 ${n}개 — ${
-      split ? `묶을 범주: ${split.map((cs, j) => `${CIRCLED[j] ?? `${j + 1})`} ${cs.map((c) => CATEGORIES[c]).join(" + ")}`).join("  ")}` : `(내용 체계를 고쳐야 합니다: ${splitProblem(doc.areas[i]) ?? "범주별 내용 요소 수를 확인하세요."})`
+    const total = elementCount(doc.areas[i]);
+    return `- (${i + 1}) ${doc.areas[i].name}: 내용 요소 ${total}개 → 성취기준 ${n}개 — ${
+      split
+        ? `묶을 범주: ${split.map((cs, j) => `${CIRCLED[j] ?? `${j + 1})`} ${cs.map((c) => CATEGORIES[c]).join(" + ")} (${cs.length}개)`).join("  ")}`
+        : `(내용 체계를 고쳐야 합니다: ${splitProblem(doc.areas[i]) ?? "범주별 내용 요소 수를 확인하세요."})`
     }`;
   })
   .join("\n")}
@@ -216,6 +220,7 @@ ${formatBlock(`{
     const usedElements = new Set<string>();
     const repeated = new Set<string>();
     const short = new Set<string>();
+    const over = new Set<string>();
     const sameCat = new Set<string>();
     for (const s of r.data) {
       const areaIndex = s.area - 1;
@@ -235,11 +240,13 @@ ${formatBlock(`{
       });
       normalized.forEach((e) => usedElements.add(e));
       if (normalized.length < 2) short.add(s.text.slice(0, 20));
+      if (normalized.length > 3) over.add(s.text.slice(0, 20));
       if (hasSameCategory(doc.areas, normalized)) sameCat.add(s.text.slice(0, 20));
       data.push({ id: newId(), areaIndex, text: s.text.replace(/^\[[^\]]+\]\s*/, ""), elements: normalized, textFor: normalized });
     }
     if (data.length === 0) return { ok: false, error: "쓸 수 있는 성취기준이 없습니다. 영역 번호(area)를 확인하세요." };
     if (short.size) notes.push(`내용 요소가 2개 미만인 성취기준이 있습니다: ${[...short].map((t) => `'${t}…'`).join(", ")} — 아래에서 내용 요소를 더 고르고 문장을 고쳐 주세요.`);
+    if (over.size) notes.push(`내용 요소를 4개 이상 묶은 성취기준이 있습니다: ${[...over].map((t) => `'${t}…'`).join(", ")} — 성취기준마다 2~3개로 고르게 나누도록 아래에서 고치거나 AI에게 다시 요청하세요.`);
     if (sameCat.size) notes.push(`같은 범주의 내용 요소를 함께 묶은 성취기준이 있습니다: ${[...sameCat].map((t) => `'${t}…'`).join(", ")} — 서로 다른 범주끼리 묶이도록 아래에서 내용 요소를 바꾸고 문장을 고쳐 주세요.`);
     if (repeated.size) notes.push(`여러 성취기준에 겹쳐 들어간 내용 요소는 처음 것에만 남겼습니다: ${[...repeated].join(", ")}`);
     standardCountsFor(doc).forEach((want, i) => {

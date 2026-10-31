@@ -2,11 +2,6 @@ import type { Area, BasicInfo, Category, DesignDoc, Standard } from "./types";
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
-/** 과목명에서 약어 기본값 (공백·기호 빼고 앞 2글자) */
-export function defaultAbbrev(name: string): string {
-  return name.replace(/[^가-힣A-Za-z0-9]/g, "").slice(0, 2);
-}
-
 /**
  * 성취기준 코드: [편성학년][편성교과 맨 앞 글자][과목명 약어][영역 순서 2자리]-[영역 내 순서 2자리]
  * 예: [6사지구촌02-01]  (2027 지침 변경 형식)
