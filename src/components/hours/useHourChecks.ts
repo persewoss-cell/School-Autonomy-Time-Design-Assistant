@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, clearApiCache } from "@/lib/api";
 import { checkKey, isViewGrade, type Checks, type DesignBrief, type HourCheck } from "@/domain/hoursView";
 import { useMe } from "../useMe";
 
@@ -64,6 +64,7 @@ export function useHourChecks() {
       });
       if (!loggedIn) return;
       if (opts.keepalive) {
+        clearApiCache();
         void fetch(`/api/hours/${check.grade}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

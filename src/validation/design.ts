@@ -504,8 +504,13 @@ function allIssues(doc: DesignDoc, ctx: DesignContext): Issue[] {
 }
 
 /** 체크리스트 결과: 프로그램이 판정하는 항목은 점검 결과로, 나머지는 교사 확인 표시로 */
-export function checklistResults(doc: DesignDoc, ctx: DesignContext = {}): { id: string; area: string; label: string; ok: boolean; auto: boolean }[] {
-  const issues = validateDesign(doc, ctx);
+export function checklistResults(
+  doc: DesignDoc,
+  ctx: DesignContext = {},
+  /** 이미 구한 validateDesign 결과가 있으면 넘겨 다시 계산하지 않음 */
+  precomputed?: Issue[],
+): { id: string; area: string; label: string; ok: boolean; auto: boolean }[] {
+  const issues = precomputed ?? validateDesign(doc, ctx);
   const noErrorIn = (...steps: StepKey[]) => !issues.some((i) => i.level === "error" && i.step && steps.includes(i.step));
   const kind = doc.basic.type === "subject" ? "과목" : "활동";
   const auto: Record<string, () => boolean> = {

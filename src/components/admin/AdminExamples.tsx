@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "@/lib/api";
+import { api, clearApiCache } from "@/lib/api";
 import { fileSize, type ExampleRow } from "../Examples";
 import { DownloadIcon } from "../icons";
 import { Card, Field, TypeTag, inputClass } from "../ui";
@@ -36,6 +36,7 @@ export function AdminExamples() {
       const body = new FormData();
       Object.entries(form).forEach(([k, v]) => body.append(k, v));
       body.append("file", file);
+      clearApiCache();
       const res = await fetch("/api/admin/examples", { method: "POST", body });
       const r = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(r.error ?? "올리지 못했어요.");

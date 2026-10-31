@@ -241,3 +241,20 @@ describe("관리자: 계정·설계 삭제, 전체 설계 목록", () => {
     expect(await listAllDesignsForAdmin(repo)).toEqual([]);
   });
 });
+
+describe("관리자 전체 설계의 시수점검 완료", () => {
+  it("설계 현황과 같은 규칙: 설계가 들어간 화면이 이상없음이면 완료 (예전 저장본도)", async () => {
+    const { initialCheck } = await import("@/domain/hoursView");
+    const { autoReduce } = await import("@/validation/allocation");
+    const { saveHourCheck } = await import("./services");
+    const { repo, t } = await setup();
+    const d = sampleSubject();
+    d.basic = { ...d.basic, grade: 5, semester: 1, hours: 32, subjectGroup: "사회" };
+    const { record } = await saveDesign(repo, t, d);
+    await repo.designs.update(record.id, { hours: undefined, subjectGroup: undefined }); // 예전 저장본처럼
+    const c = initialCheck(5, 2027, await listMyDesigns(repo, t));
+    c.input.courses.push({ name: "6학년 직접 입력", subjectKey: "국어", semester: 2, hours: 32 });
+    await saveHourCheck(repo, t, 5, { ...c, input: autoReduce(c.input) });
+    expect((await listAllDesignsForAdmin(repo))[0].hoursComplete).toBe(true);
+  });
+});

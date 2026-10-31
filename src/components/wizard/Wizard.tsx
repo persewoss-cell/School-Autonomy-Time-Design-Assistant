@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { emptyDesign, type DesignDoc } from "@/domain/types";
 import type { StepKey } from "@/validation/types";
 import { checklistResults, validateDesign } from "@/validation/design";
@@ -233,7 +233,11 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
 
   const steps = stepsFor(doc);
   const index = Math.max(0, steps.findIndex((s) => s.key === stepKey));
-  const errorSteps = new Set(validateDesign(doc).filter((i) => i.level === "error").map((i) => i.step));
+  // 지침 점검은 문서가 바뀔 때 한 번만 (단계 색·문서 버튼이 함께 씀)
+  const issues = useMemo(() => validateDesign(doc), [doc]);
+  const checklistLeft = useMemo(() => checklistResults(doc, {}, issues).filter((c) => !c.ok).length, [doc, issues]);
+  const errorCount = issues.filter((i) => i.level === "error").length;
+  const errorSteps = new Set(issues.filter((i) => i.level === "error").map((i) => i.step));
   /** 단계 이동: 진행 위치를 문서에 적고, 로그인했으면 서버에 자동 저장 */
   const goIndex = (i: number) => {
     const list = stepsFor(docRef.current);
@@ -276,8 +280,6 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
   // 위 줄의 '문서' 버튼: 최종 점검과 같은 조건(오류 0개 + 체크리스트 모두 ○ + 로그인)일 때만 내려받는다
   const hc = useHourChecks();
   const guest = !!hc.me?.enabled && !hc.loggedIn;
-  const errorCount = validateDesign(doc).filter((i) => i.level === "error").length;
-  const checklistLeft = checklistResults(doc).filter((c) => !c.ok).length;
   const docReady = guest
     ? { ok: false, reason: "로그인해야 문서를 내려받을 수 있어요." }
     : errorCount > 0 || checklistLeft > 0

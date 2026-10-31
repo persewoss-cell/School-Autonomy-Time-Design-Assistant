@@ -220,15 +220,18 @@ function withLiveHoursWarnings(list: DesignSummary[]): DesignSummary[] {
 
 /** 내 설계 목록 (예전 저장본은 운영 시수를 문서에서 채움) */
 export async function listMyDesigns(repo: Repo, user: User): Promise<DesignSummary[]> {
-  const list = await repo.designs.listByOwner(user.id);
-  const filled = await Promise.all(
+  return withLiveHoursWarnings(await fillLegacy(repo, await repo.designs.listByOwner(user.id)));
+}
+
+/** 예전 저장본에 없는 운영 시수·편성 교과를 문서에서 채운다 (시수 점검 비교에 필요) */
+async function fillLegacy(repo: Repo, list: DesignSummary[]): Promise<DesignSummary[]> {
+  return Promise.all(
     list.map(async (d) => {
       if (typeof d.hours === "number" && d.subjectGroup) return d;
       const full = await repo.designs.get(d.id);
       return { ...d, hours: full?.doc.basic.hours ?? 0, subjectGroup: full?.doc.basic.subjectGroup };
     }),
   );
-  return withLiveHoursWarnings(filled);
 }
 
 /** 학교의 시수 점검 화면 저장본 (학년 화면별) */
@@ -315,14 +318,18 @@ export async function deleteUserByAdmin(repo: Repo, admin: User, targetId: strin
 
 /** 관리자 전체 설계 목록: 학교명과 그 학년도 학년군의 시수 점검 완료 여부를 붙인다 */
 export async function listAllDesignsForAdmin(repo: Repo) {
-  const [designs, users] = await Promise.all([repo.designs.listAll(), repo.users.list()]);
+  const [all, users] = await Promise.all([repo.designs.listAll(), repo.users.list()]);
+  const designs = await fillLegacy(repo, all);
   const owner = new Map(users.map((u) => [u.id, u]));
   const byOwner = new Map<string, DesignSummary[]>();
   for (const d of designs) byOwner.set(d.ownerId, [...(byOwner.get(d.ownerId) ?? []), d]);
   const out = [];
+  // 학교별 시수 점검은 한꺼번에 불러온다
+  const owners = [...byOwner.keys()];
+  const checkLists = new Map(await Promise.all(owners.map(async (id) => [id, await repo.hourChecks.listByOwner(id)] as const)));
   for (const [ownerId, list] of byOwner) {
     const checks: Checks = {};
-    for (const c of await repo.hourChecks.listByOwner(ownerId)) {
+    for (const c of checkLists.get(ownerId) ?? []) {
       const data = c.data as HourCheck | undefined;
       if (data?.schoolYear && isViewGrade(c.grade)) checks[checkKey(data.schoolYear, c.grade)] = data;
     }

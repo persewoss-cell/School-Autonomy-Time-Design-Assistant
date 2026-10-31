@@ -446,26 +446,23 @@ function unitPlanTable(doc: DesignDoc): Table | Paragraph {
   return table(rows, widths, { headerRows: 1, insideH: NONE });
 }
 
-/** 평가 계획 한 시기(성취기준 + A·B·C)의 어림 높이 (pt) */
-function assessmentBlockHeight(doc: DesignDoc, a: DesignDoc["assessments"][number], widths: number[]): number {
-  const codes = codeMap(doc);
-  const std = a.standardIds.reduce((h, id) => h + parasHeight([codes.get(id) ?? "", doc.standards.find((x) => x.id === id)?.text ?? ""], widths[1], 9), 0);
-  const levels = (["A", "B", "C"] as const).reduce((h, lv) => h + parasHeight([a.levels[lv]], widths[4], 9) + 2, 0);
-  return Math.max(std, parasHeight([a.focus], widths[2], 9), levels) + 4;
-}
 
 const ASSESS_WIDTHS = [600, 1250, 2350, 400, 3526, 900];
 
-/** 평가 계획: 한 쪽에 들어가면 제목과 표를 통째로 한 쪽에, 아니면 시기 묶음 단위로 쪽이 넘어감 */
+/**
+ * 평가 계획: 쪽이 넘어가면 표의 줄(칸) 단위로 다음 쪽에 이어진다. (한 쪽에 억지로 묶으면 한글에서 아래가 잘려 보이지 않음, 사용자 결정 2026-10-31)
+ * 앞의 표(단원 지도계획)와 바로 붙으면 한 표로 합쳐지므로 제목 문단을 사이에 둔다.
+ */
 function assessmentSection(doc: DesignDoc, title: string): (Paragraph | Table)[] {
-  const total = 30 + doc.assessments.reduce((h, a) => h + assessmentBlockHeight(doc, a, ASSESS_WIDTHS), 0);
-  // 앞의 표(단원 지도계획)와 바로 붙으면 한 표로 합쳐지므로 사이에 빈 문단을 둔다
-  return total <= PAGE_BODY_PT - 30 ? [spacer(2), keepTogether([h2(title), assessmentTable(doc)])] : [h2(title), assessmentTable(doc)];
+  return [h2(title), assessmentTable(doc)];
 }
 
-/** (과목) 성취기준 전체의 어림 높이 */
+/** 성취기준 전체의 어림 높이 (과목: 영역별 목록, 활동: 코드|문장 표) */
 function standardsHeight(doc: DesignDoc): number {
-  return doc.areas.reduce((h, _, i) => h + 24 + parasHeight(doc.standards.filter((s) => s.areaIndex === i).map((s) => `[0000000-00] ${s.text}`), PAGE_WIDTH, 10, 1.1), 0);
+  if (doc.basic.type === "subject") {
+    return doc.areas.reduce((h, _, i) => h + 24 + parasHeight(doc.standards.filter((s) => s.areaIndex === i).map((s) => `[0000000-00] ${s.text}`), PAGE_WIDTH, 10, 1.1), 0);
+  }
+  return doc.standards.reduce((h, s) => h + parasHeight([s.text], PAGE_WIDTH - 1700, 10, 1.05) + 4, 0);
 }
 
 function assessmentTable(doc: DesignDoc): Table {
@@ -475,7 +472,7 @@ function assessmentTable(doc: DesignDoc): Table {
   const th = (s: string, o: CellOpts = {}) => cell(lines(s, { size: 10, bold: true, align: AlignmentType.CENTER, line: 1.0 }), { fill: LIGHT, margins: 30, ...o });
   const rows: Row[] = [[th("시기"), th("성취기준"), th("수업·평가 방법,\n연계의 주안점"), th(subject ? "성취수준" : "평가 기준", { span: 2 }), th("방법")]];
   for (const a of doc.assessments) {
-    // 한 시기(성취기준 + A·B·C)는 쪽에서 나뉘지 않는 묶음
+    // 한 줄(A·B·C)씩 쪽이 넘어간다 (제목 줄은 쪽마다 반복)
     const block: TableCell[][] = [];
     (["A", "B", "C"] as const).forEach((lv, k) => {
       const row: TableCell[] = [];
@@ -490,7 +487,7 @@ function assessmentTable(doc: DesignDoc): Table {
       if (k === 0) row.push(cell(a.methods.map((m) => para(m, { size: 9, align: AlignmentType.CENTER, line: 1.0 })), { rows: 3 }));
       block.push(row);
     });
-    rows.push({ group: block });
+    rows.push(...block);
   }
   return table(rows, widths, { headerRows: 1 });
 }
@@ -532,10 +529,13 @@ function curriculumDoc(doc: DesignDoc): (Paragraph | Table)[] {
   } else {
     out.push(...h1(`${n++}. 필요성 및 목표`), ...rationale, para(doc.intro.overallGoal, { first: 9, before: tight ? 3 : 6, line: bodyLine }), ...goals.map((g) => para(`·${g}`, { line: bodyLine })), sp());
   }
-  out.push(...h1(`${n++}. 내용 체계`), keepTogether([ideasTable(doc), para("", { size: 4, line: 1, after: 4 }), contentTable(doc, tight)]), spacer());
+  // 한 쪽에 넉넉히 들어갈 때만 통째로 묶는다 (한 쪽보다 큰 묶음은 한글에서 아래가 잘려 보이지 않으므로 그때는 줄 단위로 넘김)
+  const fits = (h: number) => h <= PAGE_BODY_PT - 60;
+  const content = [ideasTable(doc), para("", { size: 4, line: 1, after: 4 }), contentTable(doc, tight)];
+  out.push(...h1(`${n++}. 내용 체계`), ...(fits(contentSystemHeight(doc)) ? [keepTogether(content)] : content), spacer());
   // 성취기준은 한 쪽에 들어가면 통째로 한 쪽에 (두 쪽에 걸치지 않게)
   const std = standardsBlock(doc);
-  out.push(...h1(`${n++}. 성취기준`), ...(subject && standardsHeight(doc) > PAGE_BODY_PT - 40 ? std : [keepTogether(std)]), spacer());
+  out.push(...h1(`${n++}. 성취기준`), ...(fits(standardsHeight(doc)) ? [keepTogether(std)] : std), spacer());
   if (subject) {
     // 쪽 수를 줄이려고 억지 쪽 나눔은 하지 않는다 (표 머리줄은 쪽마다 반복)
     const t = doc.teaching;
@@ -548,7 +548,8 @@ function curriculumDoc(doc: DesignDoc): (Paragraph | Table)[] {
     out.push(h2("나. 평가의 방법"), ...numbered(t.assessMethods));
     out.push(...assessmentSection(doc, "다. 평가 계획"));
   } else {
-    out.push(...h1(`${n++}. 지도의 실제`));
+    // 지도의 실제는 늘 새 쪽에서 시작 (앞 쪽 끝에 제목·머리줄만 남지 않게, 사용자 결정 2026-10-31)
+    out.push(...h1(`${n++}. 지도의 실제`, true));
     out.push(h2("가. 단원 지도계획"), unitPlanTable(doc));
     out.push(...assessmentSection(doc, "나. 평가 계획"));
   }
