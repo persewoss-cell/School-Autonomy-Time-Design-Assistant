@@ -125,6 +125,21 @@ describe("설계 저장·권한", () => {
     await repo.designs.update(record.id, { hours: undefined });
     expect((await listMyDesigns(repo, t))[0].hours).toBe(29);
   });
+  it("운영 시수 경고는 목록을 볼 때 같은 학기 설계 기준으로 다시 센다 (17차시 먼저, 12차시 나중)", async () => {
+    const { repo, t } = await setup();
+    const mk = (name: string, hours: number) => {
+      const d = sampleSubject();
+      d.basic = { ...d.basic, name, hours };
+      return d;
+    };
+    const first = await saveDesign(repo, t, mk("가 활동", 17));
+    expect(first.record.hoursWarnings).toBe(1);
+    const second = await saveDesign(repo, t, mk("나 활동", 12));
+    expect(second.record.hoursWarnings).toBe(0);
+    const list = await listMyDesigns(repo, t);
+    expect(list.map((d) => d.hoursWarnings)).toEqual([0, 0]);
+    expect(list.find((d) => d.id === first.record.id)!.warningCount).toBe(first.record.warningCount - 1);
+  });
   it("다른 교사는 열기·고치기·삭제 불가, 관리자는 열기만 가능", async () => {
     const { repo, admin, t } = await setup();
     const other = await signup(repo, school("순천남산초등학교"), []);

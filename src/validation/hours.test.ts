@@ -9,6 +9,7 @@ import {
   checkUnitHours,
   checkSemesterBudget,
   maxCourses,
+  sameSemesterOthers,
 } from "./hours";
 
 const lesson = (hours: number, assessment = "") => ({
@@ -147,5 +148,26 @@ describe("같은 학기 다른 설계를 생각한 시수 (checkSemesterBudget)"
     expect(maxCourses(6)).toBe(3);
     expect(checkSemesterBudget(b(3, 9), others.slice(0, 2))[0].message).toContain("최대 2개");
     expect(checkBasicHours({ grade: 3, hours: 15, type: "subject" })[0].fix).toContain("3학년은 학기당 최대 2개");
+  });
+});
+
+describe("운영 시수 경고는 같은 학기 다른 설계와 합쳐서 판단", () => {
+  it("혼자면 '더 편성해야' 경고, 같은 학기 17차시 설계가 있으면 12차시 설계는 경고 없음", () => {
+    expect(checkBasicHours({ grade: 3, hours: 12, type: "activity" })[0].level).toBe("warning");
+    expect(checkBasicHours({ grade: 3, hours: 12, type: "activity" }, [{ name: "가", hours: 17 }])).toEqual([]);
+  });
+  it("합쳐도 10차시 이상 모자라면 합계로 알려 준다", () => {
+    const w = checkBasicHours({ grade: 5, hours: 10, type: "activity" }, [{ name: "가", hours: 10 }]);
+    expect(w[0].message).toContain("합쳐 20시간");
+    expect(w[0].message).toContain("12시간을 더");
+  });
+  it("같은 학년도·학년·학기의 다른 설계만 고른다", () => {
+    const list = [
+      { id: "a", name: "가", grade: 3, semester: 2, hours: 17, schoolYear: "2027" },
+      { id: "b", name: "나", grade: 3, semester: 2, hours: 12, schoolYear: "2027" },
+      { id: "c", name: "다", grade: 3, semester: 2, hours: 12, schoolYear: "2028" },
+      { id: "d", name: "라", grade: 4, semester: 2, hours: 12, schoolYear: "2027" },
+    ];
+    expect(sameSemesterOthers({ id: "b", grade: 3, semester: 2, schoolYear: "2027" }, list)).toEqual([{ name: "가", hours: 17 }]);
   });
 });

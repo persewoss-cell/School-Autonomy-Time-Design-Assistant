@@ -19,27 +19,7 @@ import { findSameName, sameNameMessage } from "@/validation/names";
 /** 에듀넷 티-클리어 '교육감 승인 과목' 목록 (교사 로그인해야 보임) */
 const APPROVED_SUBJECTS_URL = "https://www.edunet.net/sprApprSbjct/list/11";
 import { Card, Field, IssueList, NavButtons, inputClass } from "../ui";
-
-interface SavedDesign {
-  id: string;
-  name: string;
-  type: "subject" | "activity";
-  grade: number;
-  semester: number;
-  hours?: number;
-  schoolYear?: string;
-}
-
-/** 로그인했으면 우리 학교가 저장한 설계 목록 (아니면 빈 목록) */
-function useSavedDesigns(): SavedDesign[] {
-  const [list, setList] = useState<SavedDesign[]>([]);
-  useEffect(() => {
-    api<{ designs: SavedDesign[] }>("/api/designs")
-      .then((r) => setList(r.designs))
-      .catch(() => setList([]));
-  }, []);
-  return list;
-}
+import { useSavedDesigns } from "./useSavedDesigns";
 
 export function BasicStep({
   value,

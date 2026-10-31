@@ -1,8 +1,9 @@
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { basicInfoSchema, type DesignDoc } from "@/domain/types";
+import { basicInfoSchema, type DesignDoc, type Grade } from "@/domain/types";
 import { REGION_VALUES } from "@/domain/regions";
 import { checklistResults, validateDesign } from "@/validation/design";
+import { checkBasicHours, sameSemesterOthers, type SemesterOthers } from "@/validation/hours";
 import type { DesignRecord, DesignSummary, Repo, User } from "./repo";
 
 /** 서비스 계층: 로그인·저장·권한 규칙. 저장소(repo)만 바꾸면 테스트할 수 있다. */
@@ -141,8 +142,9 @@ const designDocSchema = z
   })
   .passthrough();
 
-function recordFields(doc: DesignDoc, fallbackSchool: string) {
-  const issues = validateDesign(doc);
+function recordFields(doc: DesignDoc, fallbackSchool: string, others: SemesterOthers = []) {
+  const ctx = { semesterOthers: others };
+  const issues = validateDesign(doc, ctx);
   return {
     doc,
     name: doc.basic.name.trim(),
@@ -155,7 +157,8 @@ function recordFields(doc: DesignDoc, fallbackSchool: string) {
     schoolYear: doc.application.startYear.trim() || "2027",
     errorCount: issues.filter((i) => i.level === "error").length,
     warningCount: issues.filter((i) => i.level === "warning").length,
-    checklistLeft: checklistResults(doc).filter((c) => !c.ok).length,
+    hoursWarnings: issues.filter((i) => i.level === "warning" && i.field === "운영 시수").length,
+    checklistLeft: checklistResults(doc, ctx).filter((c) => !c.ok).length,
     progress: doc.progress ?? null,
   };
 }
@@ -171,7 +174,9 @@ export async function saveDesign(repo: Repo, user: User, rawDoc: unknown, id?: s
   const parsed = designDocSchema.safeParse(rawDoc);
   if (!parsed.success) throw new ServiceError(400, "설계 문서 형식이 올바르지 않습니다.");
   const doc = rawDoc as DesignDoc;
-  const fields = recordFields(doc, user.schoolName);
+  const mine = await repo.designs.listByOwner(user.id);
+  const others = sameSemesterOthers({ id, grade: doc.basic.grade, semester: doc.basic.semester, schoolYear: doc.application.startYear.trim() }, mine);
+  const fields = recordFields(doc, user.schoolName, others);
   const now = new Date();
 
   let record: DesignRecord;
@@ -195,16 +200,32 @@ export async function saveDesign(repo: Repo, user: User, rawDoc: unknown, id?: s
   return { record: summary, duplicate };
 }
 
+/**
+ * '운영 시수' 경고는 같은 학기의 다른 설계에 따라 달라진다 (예: 17차시 설계 뒤에 12차시 설계를 만들면 둘 다 경고 없음).
+ * 저장할 때의 수 대신 지금 목록 기준으로 다시 센다.
+ */
+function withLiveHoursWarnings(list: DesignSummary[]): DesignSummary[] {
+  return list.map((d) => {
+    if (typeof d.hours !== "number") return d;
+    const basic = { grade: d.grade as Grade, hours: d.hours, type: d.type };
+    const warn = (others: SemesterOthers) => checkBasicHours(basic, others).filter((i) => i.level === "warning").length;
+    const stored = d.hoursWarnings ?? warn([]); // 예전 저장본은 같은 학기 설계를 모르고 셌음
+    const live = warn(sameSemesterOthers(d, list));
+    return { ...d, warningCount: Math.max(0, d.warningCount - stored + live), hoursWarnings: live };
+  });
+}
+
 /** 내 설계 목록 (예전 저장본은 운영 시수를 문서에서 채움) */
 export async function listMyDesigns(repo: Repo, user: User): Promise<DesignSummary[]> {
   const list = await repo.designs.listByOwner(user.id);
-  return Promise.all(
+  const filled = await Promise.all(
     list.map(async (d) => {
       if (typeof d.hours === "number" && d.subjectGroup) return d;
       const full = await repo.designs.get(d.id);
       return { ...d, hours: full?.doc.basic.hours ?? 0, subjectGroup: full?.doc.basic.subjectGroup };
     }),
   );
+  return withLiveHoursWarnings(filled);
 }
 
 /** 학교의 시수 점검 화면 저장본 (학년 화면별) */

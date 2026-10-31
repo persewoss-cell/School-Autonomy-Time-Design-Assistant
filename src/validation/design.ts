@@ -2,7 +2,12 @@ import { CATEGORIES, CATEGORY_KEYS, DESIGN_TYPES, standardNeedsRewrite, type Are
 import { categoryOf, codeMap } from "@/domain/codes";
 import { splitProblem } from "@/domain/standardCounts";
 import { checklistFor } from "@/domain/checklist";
-import { checkBasicHours, checkPlanHours, checkUnitHours, lessonLabels } from "./hours";
+import { checkBasicHours, checkPlanHours, checkUnitHours, lessonLabels, type SemesterOthers } from "./hours";
+
+/** 설계 하나만으로는 알 수 없는 것 (같은 학기의 다른 설계 등) */
+export interface DesignContext {
+  semesterOthers?: SemesterOthers;
+}
 import type { Issue, StepKey } from "./types";
 
 /**
@@ -289,13 +294,13 @@ export function planCoverage(doc: Pick<DesignDoc, "input">, plan: Plan) {
   };
 }
 
-export function checkUnitPlan(doc: Pick<DesignDoc, "basic" | "abbrev" | "standards" | "plan" | "input">): Issue[] {
+export function checkUnitPlan(doc: Pick<DesignDoc, "basic" | "abbrev" | "standards" | "plan" | "input">, ctx: DesignContext = {}): Issue[] {
   const plan = doc.plan.selected;
   if (!plan) {
     return tag("plan", [{ level: "error", field: "단원 지도계획", message: "단원 지도계획을 아직 정하지 않았습니다.", fix: "3안 중 하나를 골라 주세요." }]);
   }
   const issues: Issue[] = [
-    ...checkBasicHours(doc.basic),
+    ...checkBasicHours(doc.basic, ctx.semesterOthers),
     ...checkPlanHours(plan, doc.basic),
     // 합계는 checkPlanHours가 이미 봄
     ...checkUnitHours(doc.basic.hours, plan.units.map((u) => ({ name: u.unitName, hours: u.lessons.reduce((s, l) => s + l.hours, 0) }))).filter(
@@ -471,9 +476,9 @@ export function checkChecklist(doc: Pick<DesignDoc, "basic" | "checklist">): Iss
 }
 
 /** 설계 문서 전체 점검 */
-export function validateDesign(doc: DesignDoc): Issue[] {
+export function validateDesign(doc: DesignDoc, ctx: DesignContext = {}): Issue[] {
   return [
-    ...tag("basic", checkBasicHours(doc.basic)),
+    ...tag("basic", checkBasicHours(doc.basic, ctx.semesterOthers)),
     ...(doc.basic.name.trim() ? [] : tag("basic", [{ level: "error" as const, field: `${DESIGN_TYPES[doc.basic.type]}명`, message: "이름이 비어 있습니다.", fix: "이름을 적어 주세요." }])),
     ...checkContentSystem(doc.areas),
     ...checkCoreIdeas(doc.coreIdeas, doc.areas.length),
@@ -488,8 +493,8 @@ export function validateDesign(doc: DesignDoc): Issue[] {
 }
 
 /** 체크리스트 결과: 프로그램이 판정하는 항목은 점검 결과로, 나머지는 교사 확인 표시로 */
-export function checklistResults(doc: DesignDoc): { id: string; area: string; label: string; ok: boolean; auto: boolean }[] {
-  const issues = validateDesign(doc);
+export function checklistResults(doc: DesignDoc, ctx: DesignContext = {}): { id: string; area: string; label: string; ok: boolean; auto: boolean }[] {
+  const issues = validateDesign(doc, ctx);
   const noErrorIn = (...steps: StepKey[]) => !issues.some((i) => i.level === "error" && i.step && steps.includes(i.step));
   const kind = doc.basic.type === "subject" ? "과목" : "활동";
   const auto: Record<string, () => boolean> = {

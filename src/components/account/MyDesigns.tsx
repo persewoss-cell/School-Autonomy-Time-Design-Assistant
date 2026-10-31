@@ -9,8 +9,9 @@ import { checklistResults, validateDesign } from "@/validation/design";
 import type { Issue } from "@/validation/types";
 import { allocationFor, FORM_NOTICE, saveDesignDocx } from "../wizard/downloadDesign";
 import { Modal } from "../Modal";
+import { DownloadIcon } from "../icons";
 import { stepsFor } from "../wizard/Wizard";
-import { semesterHours } from "@/validation/hours";
+import { sameSemesterOthers, semesterHours } from "@/validation/hours";
 import { bandStatus, checkKey, isViewGrade, schoolYearOf, type Checks, type HourCheck } from "@/domain/hoursView";
 import type { Grade } from "@/domain/types";
 import { Card } from "../ui";
@@ -34,6 +35,9 @@ export interface DesignRow {
   updatedAt: string;
   owner?: string;
 }
+
+/** 카드용 짧은 날짜: 10. 31. 오전 9:18 */
+const shortDate = (s: string) => new Date(s).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 export const fmtDate = (s: string | null | undefined) => (s ? new Date(s).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" }) : "-");
 
@@ -68,7 +72,7 @@ export function StatusBadge({
   return errors === 0 ? (
     <span className={`shrink-0 rounded-full bg-green-100 font-semibold text-green-700 ${size}`}>완성{warnings ? ` · 확인 ${warnings}` : ""}</span>
   ) : (
-    <span className={`shrink-0 rounded-full bg-amber-100 font-semibold text-amber-700 ${size}`}>점검 필요 · 오류 {errors}</span>
+    <span className={`shrink-0 rounded-full bg-amber-100 font-semibold text-amber-700 ${size}`}>{compact ? "" : "점검 필요 · "}오류 {errors}</span>
   );
 }
 
@@ -137,7 +141,8 @@ export function MyDesigns() {
   const [warnView, setWarnView] = useState<{ row: DesignRow; issues: Issue[] } | null>(null);
   const showWarnings = async (row: DesignRow) => {
     const { design } = await api<{ design: { doc: DesignDoc } }>(`/api/designs/${row.id}`);
-    setWarnView({ row, issues: validateDesign(design.doc).filter((i) => i.level === "warning") });
+    const semesterOthers = sameSemesterOthers({ id: row.id, grade: row.grade, semester: row.semester, schoolYear: row.schoolYear }, rows ?? []);
+    setWarnView({ row, issues: validateDesign(design.doc, { semesterOthers }).filter((i) => i.level === "warning") });
   };
   const remove = async (row: DesignRow) => {
     if (!confirm(`「${row.name}」 설계를 삭제할까요? 되돌릴 수 없어요.`)) return;
@@ -210,26 +215,31 @@ export function MyDesigns() {
                   className="flex cursor-pointer flex-col gap-3 rounded-2xl border-2 border-transparent bg-white p-4 shadow-sm transition hover:border-brand-500 hover:shadow-md focus:border-brand-500 focus:outline-none"
                 >
                   <div className="space-y-1">
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-nowrap gap-1 overflow-hidden">
                       <StatusBadge compact errors={r.errorCount} warnings={0} type={r.type} progress={r.progress} />
                       <SemesterBadge row={r} rows={rows} />
                     </div>
-                    <p className="text-sm text-gray-500">
-                      <b className="text-gray-700">{yearOf(r)}학년도</b> · <TypeTag type={r.type} /> · {r.grade}학년 {r.semester}학기
-                      {typeof r.hours === "number" ? ` · ${r.hours}차시` : ""}
+                    {/* 낱말 중간에서 줄이 바뀌지 않게 덩어리마다 묶음 */}
+                    <p className="flex items-center gap-x-1 overflow-hidden text-xs whitespace-nowrap text-gray-500">
+                      <b className="whitespace-nowrap text-gray-700">{yearOf(r)}학년도</b>
+                      <TypeTag type={r.type} />
+                      <span className="whitespace-nowrap">
+                        {r.grade}학년 {r.semester}학기
+                      </span>
+                      {typeof r.hours === "number" && <span className="whitespace-nowrap">· {r.hours}차시</span>}
                     </p>
                     <p className="text-lg font-bold leading-snug">{r.name || "(이름 없음)"}</p>
                   </div>
                   <div className="mt-auto flex items-center justify-between gap-2 text-xs text-gray-400">
-                    <span className="truncate">저장 {fmtDate(r.updatedAt)}</span>
-                    <span className="flex shrink-0 gap-2 font-semibold whitespace-nowrap">
+                    <span className="truncate">저장 {shortDate(r.updatedAt)}</span>
+                    <span className="flex shrink-0 gap-1 font-semibold whitespace-nowrap">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           void duplicate(r);
                         }}
-                        className="text-brand-700 hover:underline"
+                        className="rounded-full border border-brand-100 bg-brand-50 px-2.5 py-0.5 text-brand-700 hover:bg-brand-100"
                       >
                         복제
                       </button>
@@ -239,7 +249,7 @@ export function MyDesigns() {
                           e.stopPropagation();
                           void remove(r);
                         }}
-                        className="text-red-500 hover:underline"
+                        className="rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-red-600 hover:bg-red-100"
                       >
                         삭제
                       </button>
@@ -268,9 +278,15 @@ export function MyDesigns() {
                         e.stopPropagation();
                         void download(r);
                       }}
-                      className="rounded-lg border border-brand-500 bg-white px-2 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-300"
+                      className="flex items-center gap-1 rounded-lg border border-brand-500 bg-white px-2 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-300"
                     >
-                      {busyId === r.id ? "만드는 중…" : "⬇ 문서"}
+                      {busyId === r.id ? (
+                        "만드는 중…"
+                      ) : (
+                        <>
+                          문서 <DownloadIcon className="h-3.5 w-3.5" />
+                        </>
+                      )}
                     </button>
                     {r.warningCount > 0 && (
                       <button

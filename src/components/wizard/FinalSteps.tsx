@@ -5,6 +5,7 @@ import { TEACHER_PLANS, TEXTBOOK_TYPES, type DesignDoc } from "@/domain/types";
 import { applicationTexts } from "@/domain/summary";
 import { codeMap } from "@/domain/codes";
 import { allocationFor, FORM_NOTICE, saveDesignDocx } from "./downloadDesign";
+import { useDesignContext } from "./useSavedDesigns";
 import { useHourChecks } from "../hours/useHourChecks";
 import { checkApplication, checklistResults, validateDesign } from "@/validation/design";
 import type { Issue, StepKey } from "@/validation/types";
@@ -121,9 +122,10 @@ export function FinalStep({
   onSave?: () => Promise<void>;
   onDownloaded?: () => void;
 }) {
-  const issues = validateDesign(doc).filter((i) => i.field !== "체크리스트");
+  const ctx = useDesignContext(doc, designId);
+  const issues = validateDesign(doc, ctx).filter((i) => i.field !== "체크리스트");
   const errors = issues.filter((i) => i.level === "error");
-  const checklist = checklistResults(doc);
+  const checklist = checklistResults(doc, ctx);
   const [busy, setBusy] = useState(false);
   // 체크리스트를 모두 점검·체크해야 문서를 만들 수 있다 (사용자 결정, 2026-10-31)
   const unchecked = checklist.filter((c) => !c.ok);

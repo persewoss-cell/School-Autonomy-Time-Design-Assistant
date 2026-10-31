@@ -10,6 +10,7 @@ import { checkPlanHours, checkUnitHours, lessonLabels, totalLessonHours } from "
 import { recommendedUnitHours, unitHoursFor } from "@/domain/unitHours";
 import type { PlanRequest } from "@/domain/types";
 import { AiAssist } from "./AiAssist";
+import { useDesignContext } from "./useSavedDesigns";
 import { manualPlan } from "@/domain/manual";
 import type { StepProps } from "./DocSteps";
 import { Card, Chips, Field, IssueList, NavButtons, StepHeader, StepIssues, inputClass, toggle } from "../ui";
@@ -17,7 +18,7 @@ import { Card, Chips, Field, IssueList, NavButtons, StepHeader, StepIssues, inpu
 const emptyLesson = (): Lesson => ({ hours: 1, topic: "", goal: "", activities: [""], assessment: "", assessFor: "", inputActivities: [], note: "" });
 
 // ───────────── ⑦ 단원 지도계획 (PPT 51쪽) ─────────────
-export function PlanStep(props: StepProps) {
+export function PlanStep(props: StepProps & { designId?: string }) {
   const { doc, setDoc, onBack, onParseFail } = props;
   const tips = [
     "단원명 = 내용 요소의 영역명 또는 재구성",
@@ -276,7 +277,8 @@ function CoverageCard({ doc, plan, labels }: { doc: StepProps["doc"]; plan: Plan
   );
 }
 
-function EditPlan({ doc, setDoc, onBack, onNext, tips }: StepProps & { tips: string[] }) {
+function EditPlan({ doc, setDoc, onBack, onNext, tips, designId }: StepProps & { tips: string[]; designId?: string }) {
+  const ctx = useDesignContext(doc, designId);
   const plan = doc.plan.selected!;
   const codes = codeMap(doc);
   const total = totalLessonHours(plan.units);
@@ -427,7 +429,7 @@ function EditPlan({ doc, setDoc, onBack, onNext, tips }: StepProps & { tips: str
       >
         + 단원 추가
       </button>
-      <StepIssues issues={checkUnitPlan(doc)} />
+      <StepIssues issues={checkUnitPlan(doc, ctx)} />
       <NavButtons onBack={onBack} onNext={onNext} />
     </div>
   );

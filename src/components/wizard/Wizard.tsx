@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { emptyDesign, type DesignDoc } from "@/domain/types";
 import { sampleSubject } from "@/domain/sample";
 import type { StepKey } from "@/validation/types";
-import { validateDesign } from "@/validation/design";
+import { checklistResults, validateDesign } from "@/validation/design";
+import { useHourChecks } from "../hours/useHourChecks";
+import { DownloadIcon } from "../icons";
+import { allocationFor, FORM_NOTICE, saveDesignDocx } from "./downloadDesign";
 import { TypeStep } from "./TypeStep";
 import { BasicStep } from "./BasicStep";
 import { TopicStep } from "./TopicStep";
@@ -172,15 +175,42 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
       /* 무시 */
     }
   };
-  const setDoc = (fn: (d: DesignDoc) => void) => {
+  // 되돌리기·다시 실행: 이 설계를 연 뒤의 고침을 최근 100번까지 기억 (단계를 넘어도 유지).
+  // 1초 안에 이어진 입력(글자 치기 등)은 한 번으로 묶는다. 진행 위치(progress)는 되돌리지 않는다.
+  const past = useRef<DesignDoc[]>([]);
+  const future = useRef<DesignDoc[]>([]);
+  const lastEdit = useRef(0);
+  const [undoKey, setUndoKey] = useState(0);
+  const remember = () => {
+    const now = Date.now();
+    if (now - lastEdit.current > 1000 || past.current.length === 0) {
+      past.current.push(docRef.current);
+      if (past.current.length > 100) past.current.shift();
+    }
+    lastEdit.current = now;
+    future.current = [];
+  };
+  const travel = (from: React.RefObject<DesignDoc[]>, to: React.RefObject<DesignDoc[]>) => {
+    const target = from.current.pop();
+    if (!target) return;
+    to.current.push(docRef.current);
+    lastEdit.current = 0;
+    commit({ ...target, progress: docRef.current.progress });
+    setUndoKey((k) => k + 1); // 단계 화면을 새로 그려 되돌린 내용이 입력칸에 보이게
+  };
+  const undo = () => travel(past, future);
+  const redo = () => travel(future, past);
+
+  const setDoc = (fn: (d: DesignDoc) => void, track = true) => {
     const next = structuredClone(docRef.current);
     fn(next);
+    if (track) remember();
     commit(next);
   };
 
   useEffect(() => {
     if (defaultSchoolName && !doc.application.schoolName.trim()) {
-      setDoc((d) => void (d.application.schoolName = defaultSchoolName));
+      setDoc((d) => void (d.application.schoolName = defaultSchoolName), false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultSchoolName, doc.application.schoolName]);
@@ -217,6 +247,7 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
   const goTo = (key: StepKey) => goIndex(stepsFor(docRef.current).findIndex((s) => s.key === key));
   const reset = () => {
     if (!confirm("작성 중인 내용을 모두 지우고 처음부터 시작할까요?")) return;
+    remember();
     commit(emptyDesign());
     setStepKey("type");
     setMaxIndex(0);
@@ -239,6 +270,28 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
             ? "단계를 넘기면 자동 저장돼요"
             : "이 브라우저에 임시 저장 중";
 
+  // 위 줄의 '문서' 버튼: 최종 점검과 같은 조건(오류 0개 + 체크리스트 모두 ○ + 로그인)일 때만 내려받는다
+  const hc = useHourChecks();
+  const guest = !!hc.me?.enabled && !hc.loggedIn;
+  const errorCount = validateDesign(doc).filter((i) => i.level === "error").length;
+  const checklistLeft = checklistResults(doc).filter((c) => !c.ok).length;
+  const docReady = guest
+    ? { ok: false, reason: "로그인해야 문서를 내려받을 수 있어요." }
+    : errorCount > 0 || checklistLeft > 0
+      ? { ok: false, reason: `문서가 아직 완성되지 않았어요. (오류 ${errorCount}개, 확인하지 않은 체크리스트 ${checklistLeft}개)` }
+      : { ok: true, reason: "" };
+  const downloadFromBar = async () => {
+    if (!docReady.ok) {
+      if (guest) return alert(docReady.reason);
+      if (confirm(`${docReady.reason}\n\n'점검·내려받기' 단계로 가서 남은 것을 확인할까요?`)) goTo("final");
+      return;
+    }
+    if (!confirm(`${FORM_NOTICE}\n\n확인을 누르면 내려받습니다.`)) return;
+    await saveDesignDocx(doc, allocationFor(doc, designId ?? "current", hc.checks, hc.designs).attachment);
+    onDownloaded?.(doc);
+  };
+  const barBtn = "rounded-lg border border-gray-300 bg-white px-2.5 py-1 font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-white";
+
   const props: StepProps = {
     doc,
     setDoc,
@@ -254,8 +307,22 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
         <p className="text-sm text-gray-500">
           {doc.basic.name ? <b className="text-gray-800">{doc.basic.name}</b> : "새 설계"} · {doc.basic.type === "subject" ? "과목" : "활동"} · {doc.basic.grade}학년 {doc.basic.semester}학기
         </p>
-        <div className="flex items-center gap-3 text-sm">
-          <span className={`text-xs ${saved.state === "error" ? "text-red-600" : "text-gray-400"}`}>{savedLabel}</span>
+        <div className="flex items-center gap-2 text-sm">
+          <span className={`mr-1 text-xs ${saved.state === "error" ? "text-red-600" : "text-gray-400"}`}>{savedLabel}</span>
+          <button type="button" onClick={undo} disabled={past.current.length === 0} title="되돌리기 (바로 전 고침 취소)" className={barBtn}>
+            ↶ 되돌리기
+          </button>
+          <button type="button" onClick={redo} disabled={future.current.length === 0} title="다시 실행 (되돌린 것 다시 하기)" className={barBtn}>
+            ↷ 다시 실행
+          </button>
+          <button
+            type="button"
+            onClick={() => void downloadFromBar()}
+            title={docReady.ok ? "문서(.docx) 내려받기" : docReady.reason}
+            className={`flex items-center gap-1 rounded-lg border px-3 py-1 font-semibold ${docReady.ok ? "border-brand-500 text-brand-700 hover:bg-brand-50" : "border-gray-200 bg-gray-50 text-gray-400"}`}
+          >
+            문서 <DownloadIcon />
+          </button>
           {save && (
             <button type="button" onClick={save} className="rounded-lg border border-brand-500 px-3 py-1 font-semibold text-brand-700 hover:bg-brand-50">
               💾 저장
@@ -304,6 +371,8 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
         {restoredNote && <p className="rounded-lg bg-blue-50 p-2 text-xs text-blue-800">{restoredNote}</p>}
       </div>
 
+      {/* 되돌리기·다시 실행하면 key가 바뀌어 단계 화면을 새로 그린다 */}
+      <div key={undoKey} className="space-y-6">
       {stepKey === "type" && (
         <TypeStep
           value={doc.basic.type}
@@ -315,6 +384,7 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
             isNew && !designId
               ? () => {
                   if (doc.basic.name && !confirm("작성 중인 내용 대신 예시를 불러올까요?")) return;
+                  remember();
                   commit(sampleSubject());
                   setStepKey("final");
                   setMaxIndex(99);
@@ -352,7 +422,7 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
       {stepKey === "coreIdeas" && <CoreIdeasStep {...props} />}
       {stepKey === "standards" && <StandardsStep {...props} />}
       {stepKey === "intro" && <IntroStep {...props} />}
-      {stepKey === "plan" && <PlanStep {...props} />}
+      {stepKey === "plan" && <PlanStep {...props} designId={designId} />}
       {stepKey === "assessment" && <AssessmentStep {...props} />}
       {stepKey === "teaching" && <TeachingStep {...props} />}
       {stepKey === "application" && <ApplicationStep {...props} />}
@@ -366,6 +436,7 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
           onDownloaded={() => onDownloaded?.(doc)}
         />
       )}
+      </div>
     </div>
   );
 }

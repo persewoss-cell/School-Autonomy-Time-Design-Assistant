@@ -30,8 +30,26 @@ export function lessonLabels(units: { lessons: { hours: number }[] }[], total: n
   );
 }
 
-/** 기본 정보의 운영 시수 검사 */
-export function checkBasicHours(basic: Pick<BasicInfo, "grade" | "hours" | "type">): Issue[] {
+/** 같은 학교·같은 학년도·같은 학년·학기의 다른 설계 (운영 시수 경고를 학기 합계로 판단할 때) */
+export type SemesterOthers = { name: string; hours: number }[];
+
+/** 저장된 설계 목록에서 이 설계와 같은 학년도·학년·학기의 다른 설계만 */
+export function sameSemesterOthers(
+  self: { id?: string; grade: number; semester: number; schoolYear?: string },
+  designs: { id: string; name: string; grade: number; semester: number; hours?: number; schoolYear?: string }[],
+): SemesterOthers {
+  const year = self.schoolYear || "2027";
+  return designs
+    .filter((d) => d.id !== self.id && d.grade === self.grade && d.semester === self.semester && (d.schoolYear || "2027") === year)
+    .map((d) => ({ name: d.name, hours: d.hours ?? 0 }));
+}
+
+/**
+ * 기본 정보의 운영 시수 검사.
+ * others(같은 학기의 다른 설계)를 주면 '더 편성해야 한다' 경고를 학기 합계로 판단한다
+ * (예: 17차시 설계가 이미 있으면 12차시 설계에는 경고 없음).
+ */
+export function checkBasicHours(basic: Pick<BasicInfo, "grade" | "hours" | "type">, others: SemesterOthers = []): Issue[] {
   const issues: Issue[] = [];
   const max = semesterHours(basic.grade);
   const kind = basic.type === "subject" ? "과목" : "활동";
@@ -50,6 +68,17 @@ export function checkBasicHours(basic: Pick<BasicInfo, "grade" | "hours" | "type
       message: `${basic.grade}학년의 한 학기 학교자율시간은 ${max}시간입니다. ${basic.hours}시간은 넘칩니다.`,
       fix: `운영 시수를 ${max}시간 이하로 줄여 주세요.`,
     });
+  } else if (others.length > 0) {
+    const used = others.reduce((t, o) => t + o.hours, 0);
+    const left = max - used - basic.hours;
+    if (left >= hours.minHoursPerCourse) {
+      issues.push({
+        level: "warning",
+        field: "운영 시수",
+        message: `${basic.grade}학년 한 학기 학교자율시간은 ${max}시간입니다. 같은 학기 다른 설계(${others.map((o) => `${o.name} ${o.hours}차시`).join(", ")})와 합쳐 ${used + basic.hours}시간이므로 ${left}시간을 더 편성해야 합니다.`,
+        fix: `같은 학기에 과목/활동을 더 만들거나, 이 ${kind}의 운영 시수를 늘려 합계를 ${max}시간으로 맞추세요. (${basic.grade}학년은 학기당 최대 ${maxCourses(basic.grade)}개)`,
+      });
+    }
   } else if (max - basic.hours >= hours.minHoursPerCourse) {
     // 남는 차시가 1~9이면 checkSemesterBudget이 오류로 알림
     issues.push({
