@@ -113,9 +113,22 @@ export function MyDesigns() {
     const doc = structuredClone(design.doc);
     doc.application.startYear = String(year);
     if (year === from) doc.basic.name = `${doc.basic.name} (복사본)`.slice(0, 40);
-    await api("/api/designs", { method: "POST", body: { doc } }).catch((e) => alert(e.message));
+    const saved = await api("/api/designs", { method: "POST", body: { doc } }).then(
+      () => true,
+      (e) => (alert(e.message), false),
+    );
     setYearFilter("");
     load();
+    // 같은 학년도로 복제해서 그 학기 시수가 넘치면 알려 준다 (복제는 허용)
+    if (saved && rows && year === from) {
+      const { max, sum } = semesterFill(row, rows);
+      const over = sum + (row.hours ?? 0) - max;
+      if (over > 0) {
+        alert(
+          `${year}학년도 ${row.grade}학년 ${row.semester}학기가 ${over}차시 넘쳐요. (${sum + (row.hours ?? 0)} / ${max}차시)\n복제한 「${doc.basic.name}」의 학년·학기·차시를 기본 정보에서 바꿔 주세요.`,
+        );
+      }
+    }
   };
   // 카드에서 바로 문서 내려받기 (최종 점검 화면과 같은 안내·같은 문서)
   const [busyId, setBusyId] = useState<string | null>(null);
