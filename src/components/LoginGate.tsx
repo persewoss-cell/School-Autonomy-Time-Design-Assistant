@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Modal } from "./Modal";
-import { useMe } from "./useMe";
+import { loadMe, useMe } from "./useMe";
 
 /** 로그인하지 않았을 때의 제한 (팝업·상단 경고에 같이 씀) */
 export const GUEST_LIMIT = "로그인하지 않으면 설계·시수 점검은 할 수 있지만, 이 브라우저에만 임시 저장되고 문서(.docx)로 내려받을 수 없어요.";
@@ -24,9 +24,11 @@ export function LoginGateLink({ href, className, children }: { href: string; cla
         href={href}
         className={className}
         onClick={(e) => {
-          if (!guest) return;
+          if (me && !guest) return;
           e.preventDefault();
-          setOpen(true);
+          if (guest) return setOpen(true);
+          // 아직 로그인 여부를 확인하는 중이면 기다렸다가 판단
+          void loadMe().then((m) => (m.enabled && !m.user ? setOpen(true) : router.push(href)));
         }}
       >
         {children}
