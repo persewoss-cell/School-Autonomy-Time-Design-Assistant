@@ -16,7 +16,7 @@ import { bandStatus, checkKey, isViewGrade, schoolYearOf, type Checks, type Hour
 import type { Grade } from "@/domain/types";
 import { Card, TypeTag } from "../ui";
 import { MultiSelect, SingleSelect } from "../admin/MultiSelect";
-import { byYearThenSaved, SortTh, useSort } from "../admin/sort";
+import { byYearThenSaved, NARROW, SortTh, useSort } from "../admin/sort";
 import { useMe } from "../useMe";
 
 export interface DesignRow {
@@ -346,23 +346,24 @@ function DesignTable({
   if (rows.length === 0) return <Card><p className="text-gray-600">조건에 맞는 설계가 없어요.</p></Card>;
   return (
     <Card className="overflow-x-auto">
+      {/* 명칭 말고는 내용 폭만큼만(w-px), 남는 폭은 모두 명칭. 제목과 내용은 가운데 정렬(명칭만 왼쪽) */}
       <table className="w-full text-sm whitespace-nowrap [&_td]:px-1.5 [&_td]:py-2 [&_th]:px-1.5">
-        <thead className="text-left text-xs text-gray-500">
+        <thead className="text-xs text-gray-500">
           <tr>
-            <SortTh label="학년도" k="year" sort={sort} />
-            <SortTh label="유형" k="type" sort={sort} />
-            <SortTh label="학년-학기" k="grade" sort={sort} />
-            <SortTh label="차시" k="hours" sort={sort} />
-            <SortTh label="명칭" k="name" sort={sort} />
-            <SortTh label="학기 편성" k="fill" sort={sort} />
-            <SortTh label="상태" k="status" sort={sort} />
-            <SortTh label="마지막 저장" k="updated" sort={sort} />
-            <th className="p-2 text-center">문서</th>
-            <th className="p-2 text-center">복제</th>
-            <th className="p-2 text-center">삭제</th>
+            <SortTh label="학년도" k="year" sort={sort} className={NARROW} />
+            <SortTh label="유형" k="type" sort={sort} className={NARROW} />
+            <SortTh label="학년-학기" k="grade" sort={sort} className={NARROW} />
+            <SortTh label="차시" k="hours" sort={sort} className={NARROW} />
+            <SortTh label="명칭" k="name" sort={sort} className="text-left" />
+            <SortTh label="학기 편성" k="fill" sort={sort} className={NARROW} />
+            <SortTh label="상태" k="status" sort={sort} className={NARROW} />
+            <SortTh label="마지막 저장" k="updated" sort={sort} className={NARROW} />
+            <th className={`p-2 ${NARROW}`}>문서</th>
+            <th className={`p-2 ${NARROW}`}>복제</th>
+            <th className={`p-2 ${NARROW}`}>삭제</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">
+        <tbody className="divide-y divide-gray-100 text-center">
           {sort.sorted.map((r) => (
             <tr key={r.id} className="hover:bg-gray-50">
               <td className="p-2">{yearOf(r)}</td>
@@ -373,8 +374,8 @@ function DesignTable({
                 {r.grade}-{r.semester}
               </td>
               <td className="p-2">{typeof r.hours === "number" ? `${r.hours}차시` : "-"}</td>
-              <td className="max-w-64 truncate p-2 font-semibold">
-                <button type="button" onClick={() => onOpen(r)} title={`${r.name} — 눌러서 설계 열기`} className="max-w-full truncate text-left text-brand-800 hover:text-brand-600 hover:underline">
+              <td className="w-full max-w-0 text-left font-semibold">
+                <button type="button" onClick={() => onOpen(r)} title={`${r.name} — 눌러서 설계 열기`} className="block max-w-full truncate text-left text-brand-800 hover:text-brand-600 hover:underline">
                   {r.name || "(이름 없음)"}
                 </button>
               </td>
@@ -382,7 +383,7 @@ function DesignTable({
                 <SemesterBadge row={r} rows={all} />
               </td>
               <td className="p-2">
-                <span className="flex items-center gap-1">
+                <span className="flex items-center justify-center gap-1">
                   <StatusBadge compact errors={r.errorCount} warnings={0} type={r.type} progress={r.progress} />
                   {r.warningCount > 0 && (
                     <button type="button" onClick={() => onWarnings(r)} className="rounded-lg border border-orange-300 bg-orange-50 px-2 py-0.5 text-xs font-semibold text-orange-700 hover:bg-orange-100">

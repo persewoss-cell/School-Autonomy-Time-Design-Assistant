@@ -44,3 +44,6 @@ export function SortTh({ label, k, sort, className = "" }: { label: string; k: s
 /** 설계 표 기본 순서: 학년도 내림차순, 같은 학년도 안에서는 마지막 저장 내림차순 (사용자 결정, 2026-10-31) */
 export const byYearThenSaved = (a: { schoolYear?: string; updatedAt: string }, b: { schoolYear?: string; updatedAt: string }) =>
   (b.schoolYear ?? "").localeCompare(a.schoolYear ?? "") || b.updatedAt.localeCompare(a.updatedAt);
+
+/** 명칭이 아닌 칸: 내용 폭만큼만 차지하고 가운데 정렬 (남는 폭은 명칭이 씀) */
+export const NARROW = "w-px text-center";

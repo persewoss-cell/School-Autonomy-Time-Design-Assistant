@@ -14,7 +14,8 @@ import { useMe } from "../useMe";
 import { Modal } from "../Modal";
 import { enterSchool } from "../ActingBanner";
 import { MultiSelect, SingleSelect } from "./MultiSelect";
-import { byYearThenSaved, SortTh, useSort } from "./sort";
+import { byYearThenSaved, NARROW, SortTh, useSort } from "./sort";
+import { OpenNewIcon } from "../icons";
 import { BulkUsers } from "./BulkUsers";
 import { SeedButton } from "./SeedButton";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -354,41 +355,40 @@ export function AdminDesigns() {
         <span className="text-sm text-gray-500">{rows.length}건</span>
       </div>
       <Card className="overflow-x-auto">
+        {/* 명칭 말고는 내용 폭만큼만(w-px), 남는 폭은 모두 명칭. 제목과 내용은 가운데 정렬(명칭만 왼쪽) */}
         <table className="w-full min-w-[980px] text-sm whitespace-nowrap">
-          <thead className="text-left text-xs text-gray-500">
+          <thead className="text-xs text-gray-500">
             <tr>
-              <SortTh label="학년도" k="year" sort={sort} />
-              <SortTh label="학교" k="school" sort={sort} />
-              <SortTh label="유형" k="type" sort={sort} />
-              <SortTh label="학년-학기" k="grade" sort={sort} />
-              <SortTh label="명칭" k="name" sort={sort} />
-              <SortTh label="상태" k="status" sort={sort} />
-              <SortTh label="마지막 저장" k="updated" sort={sort} />
-              <th className="p-2 text-center">상세보기</th>
-              <th className="p-2 text-center">삭제</th>
+              <SortTh label="학년도" k="year" sort={sort} className={NARROW} />
+              <SortTh label="학교" k="school" sort={sort} className={NARROW} />
+              <SortTh label="유형" k="type" sort={sort} className={NARROW} />
+              <SortTh label="학년-학기" k="grade" sort={sort} className={NARROW} />
+              <SortTh label="명칭" k="name" sort={sort} className="text-left" />
+              <SortTh label="상태" k="status" sort={sort} className={NARROW} />
+              <SortTh label="마지막 저장" k="updated" sort={sort} className={NARROW} />
+              <th className={`p-2 ${NARROW}`}>요약보기</th>
+              <th className={`p-2 ${NARROW}`}>상세보기</th>
+              <th className={`p-2 ${NARROW}`}>삭제</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 text-center">
             {sort.sorted.map((d) => (
               <tr key={d.id}>
-                <td className="p-2 whitespace-nowrap">{yearOf(d) || "-"}</td>
+                <td className="p-2">{yearOf(d) || "-"}</td>
                 <td className="p-2 font-semibold">{d.owner}</td>
                 <td className="p-2">
                   <TypeTag type={d.type} />
                 </td>
-                <td className="p-2 whitespace-nowrap">
+                <td className="p-2">
                   {d.grade}-{d.semester}
                 </td>
-                <td className="p-2">
-                  <span className="flex items-center gap-2">
-                    <Link href={`/admin/designs/${d.id}`} className="shrink-0 rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50">
-                      요약보기
-                    </Link>
-                    <span>{d.name || "(이름 없음)"}</span>
+                <td className="w-full max-w-0 p-2 text-left">
+                  <span className="block truncate" title={d.name}>
+                    {d.name || "(이름 없음)"}
                   </span>
                 </td>
                 <td className="p-2">
-                  <span className="flex flex-wrap items-center gap-1">
+                  <span className="flex items-center justify-center gap-1">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${d.errorCount === 0 ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>
                       {d.errorCount === 0 ? "완성" : "설계 중"}
                     </span>
@@ -411,12 +411,17 @@ export function AdminDesigns() {
                   </span>
                 </td>
                 <td className="p-2 text-xs text-gray-500">{fmtDate(d.updatedAt)}</td>
-                <td className="p-2 text-center">
+                <td className="p-2">
+                  <Link href={`/admin/designs/${d.id}`} title="요약보기" className="inline-flex rounded-lg p-1.5 text-gray-600 hover:bg-gray-100">
+                    <OpenNewIcon />
+                  </Link>
+                </td>
+                <td className="p-2">
                   <button type="button" title="그 학교가 보는 화면 그대로 열기 (고칠 수 있음)" onClick={() => void enterSchool(d.ownerId, `/designs/${d.id}`)} className="rounded-lg px-2 py-1 text-lg hover:bg-gray-100">
                     🔍
                   </button>
                 </td>
-                <td className="p-2 text-center">
+                <td className="p-2">
                   <button type="button" onClick={() => void remove(d)} className="rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-600 hover:bg-red-100">
                     삭제
                   </button>
