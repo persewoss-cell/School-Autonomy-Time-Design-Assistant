@@ -65,6 +65,6 @@ export const byYearThenSaved = (a: { schoolYear?: string; updatedAt: string }, b
 export const NARROW = "w-px text-center";
 
 /** 설계 표 공통: 진한 회색 제목 줄(흰 글자), 칸 사이 세로선, 한 줄 건너 연한 배경 */
-export const DESIGN_TABLE = "w-full text-sm whitespace-nowrap [&_td+td]:border-l [&_td]:border-gray-200 [&_th+th]:border-l [&_th]:border-gray-400";
-export const DESIGN_THEAD = "bg-gray-500 text-xs text-white";
+export const DESIGN_TABLE = "w-full text-sm whitespace-nowrap [&_td+td]:border-l [&_td]:border-gray-200 [&_th+th]:border-l [&_th]:border-white/35";
+export const DESIGN_THEAD = "bg-[#4f8a6f] text-xs text-white";
 export const DESIGN_ROW = "even:bg-gray-100/70 hover:bg-brand-50";
