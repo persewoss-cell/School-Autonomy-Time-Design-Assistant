@@ -496,6 +496,8 @@ export interface SharedDesign {
   name: string;
   schoolYear: string;
   updatedAt: Date;
+  /** 본교(로그인한 학교) 설계 */
+  mine: boolean;
 }
 
 /** 완성된 설계인지: 오류 0개 + 체크리스트 모두 ○ (시수 점검은 그 학교 일이라 보지 않음) */
@@ -510,14 +512,25 @@ async function isComplete(repo: Repo, d: DesignSummary): Promise<boolean> {
 export async function listSharedDesigns(repo: Repo, user: User): Promise<SharedDesign[]> {
   const [all, users] = await Promise.all([repo.designs.listAll(), repo.users.list()]);
   const school = new Map(users.map((u) => [u.id, u.schoolName]));
-  const others = all.filter((d) => d.ownerId !== user.id && school.has(d.ownerId));
-  const done = await Promise.all(others.map((d) => isComplete(repo, d)));
-  return others
+  // 본교 완성 설계도 함께 보여 준다 (본교 표시, 사용자 결정 2026-10-31)
+  const owned = all.filter((d) => school.has(d.ownerId));
+  const done = await Promise.all(owned.map((d) => isComplete(repo, d)));
+  return owned
     .filter((_, i) => done[i])
-    .map((d) => ({ id: d.id, school: school.get(d.ownerId)!, type: d.type, grade: d.grade, semester: d.semester, name: d.name, schoolYear: d.schoolYear, updatedAt: d.updatedAt }));
+    .map((d) => ({
+      id: d.id,
+      school: school.get(d.ownerId)!,
+      type: d.type,
+      grade: d.grade,
+      semester: d.semester,
+      name: d.name,
+      schoolYear: d.schoolYear,
+      updatedAt: d.updatedAt,
+      mine: d.ownerId === user.id,
+    }));
 }
 
-/** 다른 학교 완성 설계 하나 (보기·내려받기·가져오기용) */
+/** 완성 설계 하나 (보기·내려받기·가져오기용, 본교 설계는 미완성도 볼 수 있음) */
 export async function getSharedDesign(repo: Repo, user: User, id: string): Promise<{ doc: DesignRecord["doc"]; school: string }> {
   const d = await repo.designs.get(id);
   if (!d) throw new ServiceError(404, "설계를 찾을 수 없습니다.");

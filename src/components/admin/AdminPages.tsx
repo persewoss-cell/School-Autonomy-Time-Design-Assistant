@@ -267,10 +267,13 @@ export function AdminDesigns() {
   const [schools, setSchools] = useState<string[]>([]);
   const [type, setType] = useState("");
   const [grades, setGrades] = useState<string[]>([]);
+  const [years, setYears] = useState<string[]>([]);
   const [status, setStatus] = useState(params.get("status") ?? "");
   const [warnView, setWarnView] = useState<{ row: AdminDesignRow; issues: Issue[] } | null>(null);
   const all = data?.designs ?? [];
   const schoolOptions = [...new Set(all.map((d) => d.owner))].sort((a, b) => a.localeCompare(b, "ko")).map((v) => ({ value: v, label: v }));
+  const yearOf = (d: AdminDesignRow) => d.schoolYear || "";
+  const yearOptions = [...new Set(all.map(yearOf).filter(Boolean))].sort().reverse().map((v) => ({ value: v, label: `${v}학년도` }));
   const rows = useMemo(
     () =>
       all.filter(
@@ -278,12 +281,14 @@ export function AdminDesigns() {
           (schools.length === 0 || schools.includes(d.owner)) &&
           (!type || d.type === type) &&
           (grades.length === 0 || grades.includes(String(d.grade))) &&
+          (years.length === 0 || years.includes(yearOf(d))) &&
           (!status || (status === "complete" ? d.errorCount === 0 : d.errorCount > 0)) &&
           (!q || `${d.name} ${d.owner}`.toLowerCase().includes(q.toLowerCase())),
       ),
-    [all, schools, type, grades, status, q],
+    [all, schools, type, grades, years, status, q],
   );
   const sort = useSort(rows, {
+    year: (d) => yearOf(d),
     school: (d) => d.owner,
     type: (d) => d.type,
     grade: (d) => d.grade * 10 + d.semester,
@@ -306,6 +311,7 @@ export function AdminDesigns() {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <input className={`${inputClass} max-w-56`} placeholder="설계 이름·학교 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+        <MultiSelect allLabel="전체 학년도" options={yearOptions} selected={years} onChange={setYears} />
         <MultiSelect allLabel="전체 학교" options={schoolOptions} selected={schools} onChange={setSchools} />
         <SingleSelect allLabel="전체 유형" options={TYPE_OPTIONS} value={type} onChange={setType} />
         <MultiSelect allLabel="전체 학년" options={[3, 4, 5, 6].map((g) => ({ value: String(g), label: `${g}학년` }))} selected={grades} onChange={setGrades} />
@@ -324,9 +330,10 @@ export function AdminDesigns() {
         <span className="text-sm text-gray-500">{rows.length}건</span>
       </div>
       <Card className="overflow-x-auto">
-        <table className="w-full min-w-[920px] text-sm">
+        <table className="w-full min-w-[980px] text-sm">
           <thead className="text-left text-xs text-gray-500">
             <tr>
+              <SortTh label="학년도" k="year" sort={sort} />
               <SortTh label="학교" k="school" sort={sort} />
               <SortTh label="유형" k="type" sort={sort} />
               <SortTh label="학년-학기" k="grade" sort={sort} />
@@ -340,6 +347,7 @@ export function AdminDesigns() {
           <tbody className="divide-y divide-gray-100">
             {sort.sorted.map((d) => (
               <tr key={d.id}>
+                <td className="p-2 whitespace-nowrap">{yearOf(d) || "-"}</td>
                 <td className="p-2 font-semibold">{d.owner}</td>
                 <td className="p-2">
                   <TypeTag type={d.type} />

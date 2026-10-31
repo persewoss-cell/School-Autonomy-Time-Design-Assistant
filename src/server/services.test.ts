@@ -281,7 +281,7 @@ describe("관리자: 학교 일괄 등록", () => {
 });
 
 describe("타학교 완성 설계안", () => {
-  it("다른 학교의 완성(오류 0 + 체크리스트 모두 ○) 설계만 보이고, 미완성은 볼 수 없다", async () => {
+  it("완성(오류 0 + 체크리스트 모두 ○) 설계만 보이고(본교 것은 본교 표시), 미완성은 볼 수 없다", async () => {
     const { listSharedDesigns, getSharedDesign } = await import("./services");
     const { checklistFor } = await import("@/domain/checklist");
     const { repo, admin, t } = await setup();
@@ -291,9 +291,9 @@ describe("타학교 완성 설계안", () => {
     const b = await saveDesign(repo, t, { ...sampleSubject(), basic: { ...sampleSubject().basic, name: "미완성 과목" } });
     const mine = await saveDesign(repo, admin, done);
     const list = await listSharedDesigns(repo, admin);
-    expect(list.map((d) => d.id)).toEqual([a.record.id]);
-    expect(list[0].school).toBe("광양마동초등학교");
-    expect((await listSharedDesigns(repo, t)).map((d) => d.id)).toEqual([mine.record.id]);
+    expect(list.map((d) => [d.id, d.mine]).sort()).toEqual([[a.record.id, false], [mine.record.id, true]].sort());
+    expect(list.find((d) => d.id === a.record.id)?.school).toBe("광양마동초등학교");
+    expect((await listSharedDesigns(repo, t)).filter((d) => !d.mine).map((d) => d.id)).toEqual([mine.record.id]);
     expect((await getSharedDesign(repo, admin, a.record.id)).school).toBe("광양마동초등학교");
     await expect(getSharedDesign(repo, admin, b.record.id)).rejects.toThrow("완성된 설계만");
   });

@@ -42,7 +42,8 @@ describe("광양중동초 자료 넣기", () => {
     // 성취기준 묶음 평가·~한다 고침·체크리스트 ○로 모두 완성 → 다른 학교의 '타학교 완성 설계안'에 보임
     expect(list.map((d) => [d.name, d.errorCount, d.checklistLeft]).filter(([, e, c]) => e !== 0 || c !== 0)).toEqual([]);
     const other = await signup(repo, school("광양마동초등학교"), []);
-    expect(await listSharedDesigns(repo, other)).toHaveLength(9);
+    expect((await listSharedDesigns(repo, other)).filter((d) => !d.mine)).toHaveLength(9);
+    expect((await listSharedDesigns(repo, admin)).filter((d) => d.mine)).toHaveLength(9);
   });
 
   it("학교 계정이 없으면 알려 준다", async () => {
