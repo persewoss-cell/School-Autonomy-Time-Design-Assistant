@@ -7,7 +7,7 @@ import { Modal } from "./Modal";
 import { loadMe, useMe } from "./useMe";
 
 /** 로그인하지 않았을 때의 제한 (팝업·상단 경고에 같이 씀) */
-export const GUEST_LIMIT = "로그인하지 않으면 설계·시수 점검은 할 수 있지만, 이 브라우저에만 임시 저장되고 문서(.docx)로 내려받을 수 없어요.";
+export const GUEST_LIMIT = "로그인하지 않으면 설계·시수 점검은 할 수 있지만, 이 브라우저에만 임시 저장되고 문서로 내려받을 수 없어요.";
 
 /**
  * 새 설계·시수 점검으로 가는 링크. 로그인하지 않았으면 먼저 경고 팝업을 띄운다.
@@ -65,7 +65,7 @@ export function LoginGateLink({ href, className, children }: { href: string; cla
         >
           <p>
             로그인하지 않으면 설계·시수 점검은 할 수 있지만, <b className="text-red-600">이 브라우저에만 임시 저장</b>되고{" "}
-            <b className="text-red-600">문서(.docx)로 내려받을 수 없어요.</b>
+            <b className="text-red-600">문서로 내려받을 수 없어요.</b>
           </p>
         </Modal>
       )}
