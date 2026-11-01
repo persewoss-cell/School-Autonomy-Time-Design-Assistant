@@ -30,6 +30,17 @@ export function SearchIcon({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
+/** 저장(디스켓) 아이콘 */
+export function SaveIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M5.5 4h10.8L20 7.7v10.8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-13A1.5 1.5 0 0 1 5.5 4Z" />
+      <path d="M8 4v5h7V4" />
+      <rect x="7.5" y="13" width="9" height="7" rx="0.8" />
+    </svg>
+  );
+}
+
 /** 표 안의 아이콘 버튼 (글자색은 쓰는 곳에서): 마우스를 올리면 연한 초록 바탕·진한 초록으로 바뀌고 손가락 모양 */
 export const ICON_BTN =
   "inline-flex cursor-pointer rounded-lg p-1.5 transition-colors hover:bg-brand-100 hover:text-brand-700 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent";

@@ -9,7 +9,7 @@ import { validateDesign } from "@/validation/design";
 import { api } from "@/lib/api";
 import { DocPreview } from "../wizard/FinalSteps";
 import { Card, IssueList, inputClass, TypeTag } from "../ui";
-import { fmtDate, StatusBadge, type DesignRow } from "../account/MyDesigns";
+import { fmtDate, SaveInfoButton, SemesterBadge, semesterFill, StatusBadge, type DesignRow } from "../account/MyDesigns";
 import { useMe } from "../useMe";
 import { Modal } from "../Modal";
 import { enterSchool } from "../ActingBanner";
@@ -356,6 +356,8 @@ export function AdminDesigns() {
       ),
     [all, schools, type, grades, years, status, q],
   );
+  // 차시 편성은 같은 학교 설계끼리 학기 합계 (거르기와 상관없이 전체에서)
+  const sameSchool = (d: AdminDesignRow) => all.filter((x) => x.ownerId === d.ownerId);
   const sort = useSort(rows, {
     year: (d) => yearOf(d),
     school: (d) => d.owner,
@@ -365,6 +367,7 @@ export function AdminDesigns() {
     name: (d) => d.name,
     status: (d) => (d.errorCount === 0 ? 0 : 1),
     updated: (d) => d.updatedAt,
+    fill: (d) => semesterFill(d, sameSchool(d)).left,
   }, byYearThenSaved);
   const showWarnings = async (row: AdminDesignRow) => {
     const { design } = await api<{ design: { doc: DesignDoc } }>(`/api/admin/designs/${row.id}`);
@@ -410,8 +413,9 @@ export function AdminDesigns() {
               <SortTh label="학년" k="grade" sort={sort} dark className={NARROW} />
               <SortTh label="학기" k="semester" sort={sort} dark className={NARROW} />
               <SortTh label="과목(활동)명" k="name" sort={sort} dark className="text-center" />
+              <SortTh label="차시 편성" k="fill" sort={sort} dark className={NARROW} />
               <SortTh label="상태" k="status" sort={sort} dark className={NARROW} />
-              <SortTh label="마지막 저장" k="updated" sort={sort} dark className={NARROW} />
+              <SortTh label="저장 정보" k="updated" sort={sort} dark className={NARROW} />
               <th className={`p-2 ${NARROW}`}>요약보기</th>
               <th className={`p-2 ${NARROW}`}>상세보기</th>
               <th className={`p-2 ${NARROW}`}>삭제</th>
@@ -439,6 +443,9 @@ export function AdminDesigns() {
                   </button>
                 </td>
                 <td className="p-2">
+                  <SemesterBadge row={d} rows={sameSchool(d)} />
+                </td>
+                <td className="p-2">
                   <span className="flex items-center justify-center gap-1">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${d.errorCount === 0 ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>
                       {d.errorCount === 0 ? "완성" : "설계 중"}
@@ -461,7 +468,9 @@ export function AdminDesigns() {
                     )}
                   </span>
                 </td>
-                <td className="p-2 text-xs text-gray-500">{fmtDate(d.updatedAt)}</td>
+                <td className="p-2">
+                  <SaveInfoButton row={d} school={d.owner} />
+                </td>
                 <td className="p-2">
                   <Link href={`/admin/designs/${d.id}`} title="요약보기" className={`${ICON_BTN} text-gray-600`}>
                     <OpenNewIcon />

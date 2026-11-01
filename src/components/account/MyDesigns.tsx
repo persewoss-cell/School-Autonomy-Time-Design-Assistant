@@ -9,7 +9,7 @@ import { checklistResults, validateDesign } from "@/validation/design";
 import type { Issue } from "@/validation/types";
 import { allocationFor, FORM_NOTICE, saveDesignDocx } from "../wizard/downloadDesign";
 import { Modal } from "../Modal";
-import { DownloadIcon, ICON_BTN, SearchIcon } from "../icons";
+import { DownloadIcon, ICON_BTN, SaveIcon, SearchIcon } from "../icons";
 import { stepsFor } from "../wizard/Wizard";
 import { sameSemesterOthers, semesterHours } from "@/validation/hours";
 import { bandStatus, checkKey, isViewGrade, schoolYearOf, type Checks, type HourCheck } from "@/domain/hoursView";
@@ -37,9 +37,6 @@ export interface DesignRow {
   updatedAt: string;
   owner?: string;
 }
-
-/** 표용 짧은 날짜: 10. 31. 오전 9:18 */
-const shortDate = (s: string) => new Date(s).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 const TYPE_OPTIONS = [
   { value: "activity", label: "활동" },
@@ -282,7 +279,7 @@ export function semesterFill(row: DesignRow, rows: DesignRow[]) {
   return { max, sum, left: max - sum, count: same.length };
 }
 
-function SemesterBadge({ row, rows }: { row: DesignRow; rows: DesignRow[] }) {
+export function SemesterBadge({ row, rows }: { row: DesignRow; rows: DesignRow[] }) {
   const { max, sum, left, count } = semesterFill(row, rows);
   // 칸에는 '32/32차시'만, 무엇이 문제인지는 마우스를 올리면 (사용자 결정, 2026-11-01)
   const problem =
@@ -298,6 +295,49 @@ function SemesterBadge({ row, rows }: { row: DesignRow; rows: DesignRow[] }) {
 }
 
 const yearOrder = (r: DesignRow) => ({ schoolYear: yearOf(r), updatedAt: r.updatedAt });
+
+/**
+ * '저장 정보' 칸: 디스켓 아이콘. 마우스를 올리면 마지막 저장 날짜·시간, 누르면 팝업으로 자세히.
+ * 설계 현황·관리자 전체 설계가 같이 쓴다.
+ */
+export function SaveInfoButton({ row, school }: { row: DesignRow; school?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" title={`마지막 저장 ${fmtDate(row.updatedAt)}`} onClick={() => setOpen(true)} className={`${ICON_BTN} text-gray-600`}>
+        <SaveIcon />
+      </button>
+      {open && (
+        <Modal
+          tone="brand"
+          title="저장 정보"
+          onClose={() => setOpen(false)}
+          actions={
+            <button type="button" onClick={() => setOpen(false)} className="rounded-lg border border-gray-300 px-4 py-2 font-semibold text-gray-700 hover:bg-gray-50">
+              닫기
+            </button>
+          }
+        >
+          <p className="font-semibold">{school ? `${school} ` : ""}「{row.name || "이름 없음"}」</p>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+            <dt className="text-gray-500">마지막 저장</dt>
+            <dd>{fmtFull(row.updatedAt)}</dd>
+            {row.createdAt && (
+              <>
+                <dt className="text-gray-500">처음 만든 날</dt>
+                <dd>{fmtFull(row.createdAt)}</dd>
+              </>
+            )}
+          </dl>
+        </Modal>
+      )}
+    </>
+  );
+}
+
+/** 팝업용 긴 날짜: 2026년 11월 1일 (일) 오전 12:08 */
+const fmtFull = (s: string) =>
+  new Date(s).toLocaleString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "short", hour: "numeric", minute: "2-digit" });
 
 /**
  * 설계 현황 표: 관리자 '전체 설계'와 같은 열 순서 (학교 열 없음) + 학교 화면에만 있는 칸(차시 편성·설계·문서·복제).
@@ -354,7 +394,7 @@ function DesignTable({
             <SortTh label="과목(활동)명" k="name" sort={sort} dark className="text-center" />
             <SortTh label="차시 편성" k="fill" sort={sort} dark className={NARROW} />
             <SortTh label="상태" k="status" sort={sort} dark className={NARROW} />
-            <SortTh label="마지막 저장" k="updated" sort={sort} dark className={NARROW} />
+            <SortTh label="저장 정보" k="updated" sort={sort} dark className={NARROW} />
             <th className={`p-2 ${NARROW}`}>설계</th>
             <th className={`p-2 ${NARROW}`}>문서</th>
             <th className={`p-2 ${NARROW}`}>복제</th>
@@ -395,7 +435,9 @@ function DesignTable({
                   )}
                 </span>
               </td>
-              <td className="p-2 text-xs text-gray-500">{shortDate(r.updatedAt)}</td>
+              <td className="p-2">
+                <SaveInfoButton row={r} />
+              </td>
               <td className="p-2 text-center">
                 <button type="button" title="설계 열기 (고칠 수 있음)" onClick={() => onOpen(r)} className={`${ICON_BTN} text-gray-600`}>
                   <SearchIcon />
