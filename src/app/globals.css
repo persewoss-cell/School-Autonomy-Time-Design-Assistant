@@ -9,6 +9,14 @@
   --font-sans: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
 }
 
+/* 누를 수 있는 것에 마우스를 올리면 손가락 모양 */
+button:not(:disabled),
+[role="button"],
+select,
+summary {
+  cursor: pointer;
+}
+
 body {
   background: #f7f8f6;
   color: #1f2a24;

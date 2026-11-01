@@ -9,7 +9,7 @@ import { checklistResults, validateDesign } from "@/validation/design";
 import type { Issue } from "@/validation/types";
 import { allocationFor, FORM_NOTICE, saveDesignDocx } from "../wizard/downloadDesign";
 import { Modal } from "../Modal";
-import { DownloadIcon } from "../icons";
+import { DownloadIcon, ICON_BTN, SearchIcon } from "../icons";
 import { stepsFor } from "../wizard/Wizard";
 import { sameSemesterOthers, semesterHours } from "@/validation/hours";
 import { bandStatus, checkKey, isViewGrade, schoolYearOf, type Checks, type HourCheck } from "@/domain/hoursView";
@@ -360,6 +360,7 @@ function DesignTable({
             <SortTh label="학기 편성" k="fill" sort={sort} dark className={NARROW} />
             <SortTh label="상태" k="status" sort={sort} dark className={NARROW} />
             <SortTh label="마지막 저장" k="updated" sort={sort} dark className={NARROW} />
+            <th className={`p-2 ${NARROW}`}>설계</th>
             <th className={`p-2 ${NARROW}`}>문서</th>
             <th className={`p-2 ${NARROW}`}>복제</th>
             <th className={`p-2 ${NARROW}`}>삭제</th>
@@ -402,12 +403,17 @@ function DesignTable({
               </td>
               <td className="p-2 text-xs text-gray-500">{shortDate(r.updatedAt)}</td>
               <td className="p-2 text-center">
+                <button type="button" title="설계 열기 (고칠 수 있음)" onClick={() => onOpen(r)} className={`${ICON_BTN} text-gray-600`}>
+                  <SearchIcon />
+                </button>
+              </td>
+              <td className="p-2 text-center">
                 <button
                   type="button"
                   disabled={!docReady(r) || busyId === r.id}
                   title={docReady(r) ? "문서(.docx) 내려받기" : "설계를 완성하면(오류 0개, 체크리스트 모두 확인) 내려받을 수 있어요"}
                   onClick={() => onDownload(r)}
-                  className="inline-flex rounded-lg p-1.5 text-brand-700 hover:bg-brand-50 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent"
+                  className={`${ICON_BTN} text-brand-700`}
                 >
                   {busyId === r.id ? "…" : <DownloadIcon />}
                 </button>

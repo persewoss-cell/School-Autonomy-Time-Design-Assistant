@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { DesignDoc } from "@/domain/types";
 import { api } from "@/lib/api";
 import { Modal } from "./Modal";
-import { DownloadIcon, OpenNewIcon } from "./icons";
+import { DownloadIcon, ICON_BTN, OpenNewIcon } from "./icons";
 import { TypeTag, inputClass } from "./ui";
 import { loadMe } from "./useMe";
 import { MultiSelect, SingleSelect } from "./admin/MultiSelect";
@@ -259,12 +259,12 @@ function SharedTable({ rows }: { rows: Shared[] }) {
                   </button>
                 </td>
                 <td className="p-2">
-                  <button type="button" onClick={() => setPreview(d)} title="요약보기" className="inline-flex rounded-lg p-1.5 text-gray-600 hover:bg-gray-100">
+                  <button type="button" onClick={() => setPreview(d)} title="요약보기" className={`${ICON_BTN} text-gray-600`}>
                     <OpenNewIcon />
                   </button>
                 </td>
                 <td className="p-2">
-                  <button type="button" disabled={!!busy} onClick={() => setNotice(d)} title="문서(.docx) 내려받기 (받은 문서를 새 창에서도 열어요)" className="inline-flex rounded-lg p-1.5 text-brand-700 hover:bg-brand-50 disabled:opacity-50">
+                  <button type="button" disabled={!!busy} onClick={() => setNotice(d)} title="문서(.docx) 내려받기 (받은 문서를 새 창에서도 열어요)" className={`${ICON_BTN} text-brand-700`}>
                     {busy === d.id ? "…" : <DownloadIcon />}
                   </button>
                 </td>

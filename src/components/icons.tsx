@@ -19,3 +19,17 @@ export function OpenNewIcon({ className = "h-4 w-4" }: { className?: string }) {
     </svg>
   );
 }
+
+/** 돋보기 아이콘: 설계 열어 보기 */
+export function SearchIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="m15.5 15.5 5 5" />
+    </svg>
+  );
+}
+
+/** 표 안의 아이콘 버튼 (글자색은 쓰는 곳에서): 마우스를 올리면 연한 초록 바탕·진한 초록으로 바뀌고 손가락 모양 */
+export const ICON_BTN =
+  "inline-flex cursor-pointer rounded-lg p-1.5 transition-colors hover:bg-brand-100 hover:text-brand-700 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent";

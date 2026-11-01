@@ -15,7 +15,7 @@ import { Modal } from "../Modal";
 import { enterSchool } from "../ActingBanner";
 import { MultiSelect, SingleSelect } from "./MultiSelect";
 import { byYearThenSaved, DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, NARROW, SortTh, useSort } from "./sort";
-import { OpenNewIcon } from "../icons";
+import { ICON_BTN, OpenNewIcon, SearchIcon } from "../icons";
 import { BulkUsers } from "./BulkUsers";
 import { SeedButton } from "./SeedButton";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -428,9 +428,15 @@ export function AdminDesigns() {
                 <td className="p-2">{d.grade}학년</td>
                 <td className="p-2">{d.semester}학기</td>
                 <td className="w-full max-w-0 p-2 text-left">
-                  <span className="block truncate" title={d.name}>
+                  {/* 누르면 그 학교가 보는 설계 화면으로 (상세보기와 같음) */}
+                  <button
+                    type="button"
+                    onClick={() => void enterSchool(d.ownerId, `/designs/${d.id}`)}
+                    title={`${d.name} — 눌러서 설계 열기`}
+                    className="block max-w-full truncate text-left hover:text-brand-700 hover:underline"
+                  >
                     {d.name || "(이름 없음)"}
-                  </span>
+                  </button>
                 </td>
                 <td className="p-2">
                   <span className="flex items-center justify-center gap-1">
@@ -457,13 +463,13 @@ export function AdminDesigns() {
                 </td>
                 <td className="p-2 text-xs text-gray-500">{fmtDate(d.updatedAt)}</td>
                 <td className="p-2">
-                  <Link href={`/admin/designs/${d.id}`} title="요약보기" className="inline-flex rounded-lg p-1.5 text-gray-600 hover:bg-gray-100">
+                  <Link href={`/admin/designs/${d.id}`} title="요약보기" className={`${ICON_BTN} text-gray-600`}>
                     <OpenNewIcon />
                   </Link>
                 </td>
                 <td className="p-2">
-                  <button type="button" title="그 학교가 보는 화면 그대로 열기 (고칠 수 있음)" onClick={() => void enterSchool(d.ownerId, `/designs/${d.id}`)} className="rounded-lg px-2 py-1 text-lg hover:bg-gray-100">
-                    🔍
+                  <button type="button" title="그 학교가 보는 화면 그대로 열기 (고칠 수 있음)" onClick={() => void enterSchool(d.ownerId, `/designs/${d.id}`)} className={`${ICON_BTN} text-gray-600`}>
+                    <SearchIcon />
                   </button>
                 </td>
                 <td className="p-2">
