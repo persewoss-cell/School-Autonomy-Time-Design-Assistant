@@ -9,7 +9,7 @@ import { Modal } from "./Modal";
 import { DownloadIcon, ICON_BTN, OpenNewIcon } from "./icons";
 import { TypeTag, inputClass } from "./ui";
 import { loadMe } from "./useMe";
-import { MultiSelect, SingleSelect } from "./admin/MultiSelect";
+import { MultiSelect, SEMESTER_OPTIONS, SingleSelect } from "./admin/MultiSelect";
 import { byYearThenSaved, DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, SortTh, useSort } from "./admin/sort";
 import { saveDesignDocx } from "./wizard/downloadDesign";
 import { ExamplesButton } from "./Examples";
@@ -125,6 +125,7 @@ function SharedTable({ rows }: { rows: Shared[] }) {
   const [schools, setSchools] = useState<string[]>([]);
   const [type, setType] = useState("");
   const [grades, setGrades] = useState<string[]>([]);
+  const [semesters, setSemesters] = useState<string[]>([]);
   const [years, setYears] = useState<string[]>([]);
   const [busy, setBusy] = useState("");
   /** 보기·내려받기 전 양식 안내 */
@@ -139,10 +140,11 @@ function SharedTable({ rows }: { rows: Shared[] }) {
           (schools.length === 0 || schools.includes(d.school)) &&
           (!type || d.type === type) &&
           (grades.length === 0 || grades.includes(String(d.grade))) &&
+          (semesters.length === 0 || semesters.includes(String(d.semester))) &&
           (years.length === 0 || years.includes(d.schoolYear)) &&
           (!q || `${d.name} ${d.school}`.toLowerCase().includes(q.toLowerCase())),
       ),
-    [rows, schools, type, grades, years, q],
+    [rows, schools, type, grades, semesters, years, q],
   );
   const sort = useSort(shown, {
     year: (d) => d.schoolYear,
@@ -212,6 +214,7 @@ function SharedTable({ rows }: { rows: Shared[] }) {
           value={type}
           onChange={setType}
         />
+        <MultiSelect allLabel="전체 학기" options={SEMESTER_OPTIONS} selected={semesters} onChange={setSemesters} />
         <MultiSelect allLabel="전체 학년" options={[3, 4, 5, 6].map((g) => ({ value: String(g), label: `${g}학년` }))} selected={grades} onChange={setGrades} />
         <span className="text-sm text-gray-500">{shown.length}건</span>
       </div>

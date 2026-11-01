@@ -15,7 +15,7 @@ import { sameSemesterOthers, semesterHours } from "@/validation/hours";
 import { bandStatus, checkKey, isViewGrade, schoolYearOf, type Checks, type HourCheck } from "@/domain/hoursView";
 import type { Grade } from "@/domain/types";
 import { Card, TypeTag } from "../ui";
-import { MultiSelect, SingleSelect } from "../admin/MultiSelect";
+import { MultiSelect, SEMESTER_OPTIONS, SingleSelect } from "../admin/MultiSelect";
 import { byYearThenSaved, DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, NARROW, SortTh, useSort } from "../admin/sort";
 import { useMe } from "../useMe";
 
@@ -93,6 +93,7 @@ export function MyDesigns() {
   const [years, setYears] = useState<string[]>([]);
   const [type, setType] = useState("");
   const [grades, setGrades] = useState<string[]>([]);
+  const [semesters, setSemesters] = useState<string[]>([]);
   const [status, setStatus] = useState("");
   const load = useCallback(() => {
     api<{ designs: DesignRow[] }>("/api/designs")
@@ -189,6 +190,7 @@ export function MyDesigns() {
       (years.length === 0 || years.includes(yearOf(r))) &&
       (!type || r.type === type) &&
       (grades.length === 0 || grades.includes(String(r.grade))) &&
+      (semesters.length === 0 || semesters.includes(String(r.semester))) &&
       (!status || (status === "complete" ? r.errorCount === 0 : r.errorCount > 0)),
   );
   return (
@@ -212,6 +214,7 @@ export function MyDesigns() {
           <div className="flex flex-wrap items-center gap-2">
             <MultiSelect allLabel="전체 학년도" options={yearOptions} selected={years} onChange={setYears} />
             <SingleSelect allLabel="전체 유형" options={TYPE_OPTIONS} value={type} onChange={setType} />
+            <MultiSelect allLabel="전체 학기" options={SEMESTER_OPTIONS} selected={semesters} onChange={setSemesters} />
             <MultiSelect allLabel="전체 학년" options={[3, 4, 5, 6].map((g) => ({ value: String(g), label: `${g}학년` }))} selected={grades} onChange={setGrades} />
             <SingleSelect allLabel="전체 상태" options={STATUS_OPTIONS} value={status} onChange={setStatus} />
             <span className="text-sm text-gray-500">{shown.length}건</span>

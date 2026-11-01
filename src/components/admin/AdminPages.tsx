@@ -13,7 +13,7 @@ import { fmtDate, SaveInfoButton, SemesterBadge, semesterFill, StatusBadge, type
 import { useMe } from "../useMe";
 import { Modal } from "../Modal";
 import { enterSchool } from "../ActingBanner";
-import { MultiSelect, SingleSelect } from "./MultiSelect";
+import { MultiSelect, SEMESTER_OPTIONS, SingleSelect } from "./MultiSelect";
 import { byYearThenSaved, DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, NARROW, SortTh, useSort } from "./sort";
 import { CheckCircleIcon, ICON_BTN, OpenNewIcon, SearchIcon } from "../icons";
 import { BulkUsers } from "./BulkUsers";
@@ -339,6 +339,7 @@ export function AdminDesigns() {
   const [schools, setSchools] = useState<string[]>([]);
   const [type, setType] = useState("");
   const [grades, setGrades] = useState<string[]>([]);
+  const [semesters, setSemesters] = useState<string[]>([]);
   const [years, setYears] = useState<string[]>([]);
   const [status, setStatus] = useState(params.get("status") ?? "");
   const [warnView, setWarnView] = useState<{ row: AdminDesignRow; issues: Issue[] } | null>(null);
@@ -353,11 +354,12 @@ export function AdminDesigns() {
           (schools.length === 0 || schools.includes(d.owner)) &&
           (!type || d.type === type) &&
           (grades.length === 0 || grades.includes(String(d.grade))) &&
+          (semesters.length === 0 || semesters.includes(String(d.semester))) &&
           (years.length === 0 || years.includes(yearOf(d))) &&
           (!status || (status === "complete" ? d.errorCount === 0 : d.errorCount > 0)) &&
           (!q || `${d.name} ${d.owner}`.toLowerCase().includes(q.toLowerCase())),
       ),
-    [all, schools, type, grades, years, status, q],
+    [all, schools, type, grades, semesters, years, status, q],
   );
   // 차시 편성은 같은 학교 설계끼리 학기 합계 (거르기와 상관없이 전체에서)
   const sameSchool = (d: AdminDesignRow) => all.filter((x) => x.ownerId === d.ownerId);
@@ -390,6 +392,7 @@ export function AdminDesigns() {
         <MultiSelect allLabel="전체 학년도" options={yearOptions} selected={years} onChange={setYears} />
         <MultiSelect allLabel="전체 학교" options={schoolOptions} selected={schools} onChange={setSchools} />
         <SingleSelect allLabel="전체 유형" options={TYPE_OPTIONS} value={type} onChange={setType} />
+        <MultiSelect allLabel="전체 학기" options={SEMESTER_OPTIONS} selected={semesters} onChange={setSemesters} />
         <MultiSelect allLabel="전체 학년" options={[3, 4, 5, 6].map((g) => ({ value: String(g), label: `${g}학년` }))} selected={grades} onChange={setGrades} />
         <SingleSelect
           allLabel="전체 상태"

@@ -125,3 +125,9 @@ export function SingleSelect({
     </div>
   );
 }
+
+/** 학기 거르기 (설계 표들이 같이 씀) */
+export const SEMESTER_OPTIONS = [
+  { value: "1", label: "1학기" },
+  { value: "2", label: "2학기" },
+];
