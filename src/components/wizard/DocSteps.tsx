@@ -10,6 +10,7 @@ import { checkContentSystem, checkCoreIdeas, checkIntro, checkStandards, checkTe
 import { manualAreas, manualCoreIdeas, manualStandards, manualTeaching } from "@/domain/manual";
 import { AiAssist } from "./AiAssist";
 import { Card, Chips, Field, ListEditor, NavButtons, StepHeader, StepIssues, inputClass, toggle } from "../ui";
+import { CurriculumStandardsButton } from "../CurriculumStandards";
 
 export interface StepProps {
   doc: DesignDoc;
@@ -227,6 +228,7 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
     <div className="space-y-4">
       <StepHeader
         title="성취기준 작성"
+        action={<CurriculumStandardsButton grade={doc.basic.grade} subjectGroup={doc.basic.subjectGroup} />}
         tips={[
           "성취기준: 학습을 통해 학생에게 궁극적으로 기대하는 결과 혹은 도달점",
           "영역별로 2가지 이상 개발",

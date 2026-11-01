@@ -64,10 +64,13 @@ export function NavButtons({
 }
 
 /** 단계 제목과 작성 요령 */
-export function StepHeader({ title, tips, children }: { title: string; tips?: string[]; children?: React.ReactNode }) {
+export function StepHeader({ title, tips, action, children }: { title: string; tips?: string[]; action?: React.ReactNode; children?: React.ReactNode }) {
   return (
     <Card className="space-y-2">
-      <h1 className="text-xl font-bold">{title}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-bold">{title}</h1>
+        {action}
+      </div>
       {tips && (
         <ul className="list-disc space-y-0.5 pl-5 text-sm text-gray-600">
           {tips.map((t) => (
