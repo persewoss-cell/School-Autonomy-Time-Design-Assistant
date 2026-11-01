@@ -599,6 +599,7 @@ export function AdminLogs() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [kind, setKind] = useState("");
+  const [q, setQ] = useState("");
   const load = useCallback(async (skip: number, limit: number | "all") => {
     setBusy(true);
     try {
@@ -615,7 +616,9 @@ export function AdminLogs() {
     void load(0, LOG_PAGE);
   }, [load]);
   const all = logs ?? [];
-  const filtered = all.filter((l) => !kind || l.kind === kind);
+  const filtered = all.filter(
+    (l) => (!kind || l.kind === kind) && (!q || `${l.school ?? ""} ${l.detail ?? ""} ${KIND_LABEL[l.kind] ?? l.kind}`.toLowerCase().includes(q.toLowerCase())),
+  );
   const sort = useSort(
     filtered,
     { time: (l) => l.createdAt, kind: (l) => KIND_LABEL[l.kind] ?? l.kind, school: (l) => l.school ?? "", detail: (l) => l.detail ?? "" },
@@ -632,7 +635,10 @@ export function AdminLogs() {
             <option key={k} value={k}>{v}</option>
           ))}
         </select>
+        {/* 불러온 기록 안에서 학교·내용으로 찾기 (다 찾으려면 '전체 목록 조회' 먼저) */}
+        <SearchBox value={q} onSearch={setQ} placeholder="학교·내용 검색" />
         <span className="text-sm text-gray-500">
+          {q || kind ? `${filtered.length}건 찾음 · ` : ""}
           {all.length} / {total}건 보는 중 · 1년 지난 기록은 자동으로 지워져요
         </span>
         {all.length < total && (
