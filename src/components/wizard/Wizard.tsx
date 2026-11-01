@@ -335,7 +335,8 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
     await saveDesignDocx(doc, allocationFor(doc, designId ?? "current", hc.checks, hc.designs).attachment);
     onDownloaded?.(doc);
   };
-  const barBtn = "rounded-lg border border-gray-300 bg-white px-2.5 py-1 font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-white";
+  // 위 줄 버튼은 테두리 없이 한 가족 색으로: 회색(되돌리기·다시 실행), 연한 초록(문서), 초록(저장), 연한 빨강(삭제)
+  const barBtn = "rounded-lg bg-gray-100 px-3 py-1 font-semibold text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-300";
 
   const props: StepProps = {
     doc,
@@ -377,16 +378,16 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
             type="button"
             onClick={() => void downloadFromBar()}
             title={docReady.ok ? "문서(.docx) 내려받기" : docReady.reason}
-            className={`flex items-center gap-1 rounded-lg border px-3 py-1 font-semibold ${docReady.ok ? "border-sky-600 bg-sky-600 text-white hover:bg-sky-700" : "border-sky-200 bg-sky-50 text-sky-400"}`}
+            className={`flex items-center gap-1 rounded-lg px-3 py-1 font-semibold ${docReady.ok ? "bg-brand-100 text-brand-700 hover:bg-brand-50" : "bg-gray-50 text-gray-300"}`}
           >
             문서 <DownloadIcon />
           </button>
           {save && (
-            <button type="button" onClick={save} className="rounded-lg border border-brand-600 bg-brand-600 px-3 py-1 font-semibold text-white hover:bg-brand-700">
+            <button type="button" onClick={save} className="rounded-lg bg-brand-600 px-3 py-1 font-semibold text-white hover:bg-brand-700">
               💾 저장
             </button>
           )}
-          <button type="button" onClick={() => void remove()} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1 font-semibold text-red-600 hover:bg-red-100">
+          <button type="button" onClick={() => void remove()} className="rounded-lg bg-red-50 px-3 py-1 font-semibold text-red-600 hover:bg-red-100">
             삭제하기
           </button>
         </div>
