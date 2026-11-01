@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Modal } from "./Modal";
-import { inputClass } from "./ui";
+import { SearchBox } from "./SearchBox";
 import { MultiSelect } from "./admin/MultiSelect";
 import { DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, NARROW, SortTh, useSort } from "./admin/sort";
 
@@ -90,7 +90,7 @@ function StandardsTable({ rows, grade, subjectGroup }: { rows: Row[]; grade: num
         학교자율시간 성취기준을 만들 때 참고하세요. 활동은 기존 교과 성취기준을 재구조화할 수 있지만 그대로 옮겨 쓰면 안 되고, 과목은 새로 개발해요.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <input className={`${inputClass} max-w-56 !py-2 text-sm`} placeholder="코드·내용 검색 (예: 토의, 4국01)" value={q} onChange={(e) => setQ(e.target.value)} />
+        <SearchBox value={q} onSearch={setQ} placeholder="코드·내용 검색 (예: 토의, 4국01)" className="w-64" />
         <MultiSelect allLabel="전체 학년군" options={["3~4학년군", "5~6학년군"].map((v) => ({ value: v, label: v }))} selected={bands} onChange={setBands} />
         <MultiSelect
           allLabel="전체 교과"

@@ -18,6 +18,7 @@ import { Card, TypeTag } from "../ui";
 import { MultiSelect, SEMESTER_OPTIONS, SingleSelect } from "../admin/MultiSelect";
 import { byYearThenSaved, DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, NARROW, SortTh, useSort } from "../admin/sort";
 import { useMe } from "../useMe";
+import { SearchBox } from "../SearchBox";
 
 export interface DesignRow {
   id: string;
@@ -94,6 +95,7 @@ export function MyDesigns() {
   const [type, setType] = useState("");
   const [grades, setGrades] = useState<string[]>([]);
   const [semesters, setSemesters] = useState<string[]>([]);
+  const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
   const load = useCallback(() => {
     api<{ designs: DesignRow[] }>("/api/designs")
@@ -191,7 +193,8 @@ export function MyDesigns() {
       (!type || r.type === type) &&
       (grades.length === 0 || grades.includes(String(r.grade))) &&
       (semesters.length === 0 || semesters.includes(String(r.semester))) &&
-      (!status || (status === "complete" ? r.errorCount === 0 : r.errorCount > 0)),
+      (!status || (status === "complete" ? r.errorCount === 0 : r.errorCount > 0)) &&
+      (!q || r.name.toLowerCase().includes(q.toLowerCase())),
   );
   return (
     <div className="space-y-4">
@@ -213,9 +216,10 @@ export function MyDesigns() {
           {/* 관리자 '전체 설계'와 같은 모양 (학교·검색 빼고) */}
           <div className="flex flex-wrap items-center gap-2">
             <MultiSelect allLabel="전체 학년도" options={yearOptions} selected={years} onChange={setYears} />
+            <SearchBox value={q} onSearch={setQ} placeholder="과목(활동)명 검색" />
             <SingleSelect allLabel="전체 유형" options={TYPE_OPTIONS} value={type} onChange={setType} />
-            <MultiSelect allLabel="전체 학기" options={SEMESTER_OPTIONS} selected={semesters} onChange={setSemesters} />
             <MultiSelect allLabel="전체 학년" options={[3, 4, 5, 6].map((g) => ({ value: String(g), label: `${g}학년` }))} selected={grades} onChange={setGrades} />
+            <MultiSelect allLabel="전체 학기" options={SEMESTER_OPTIONS} selected={semesters} onChange={setSemesters} />
             <SingleSelect allLabel="전체 상태" options={STATUS_OPTIONS} value={status} onChange={setStatus} />
             <span className="text-sm text-gray-500">{shown.length}건</span>
           </div>

@@ -17,6 +17,7 @@ import { MultiSelect, SEMESTER_OPTIONS, SingleSelect } from "./MultiSelect";
 import { byYearThenSaved, DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, NARROW, SortTh, useSort } from "./sort";
 import { CheckCircleIcon, ICON_BTN, OpenNewIcon, SearchIcon } from "../icons";
 import { BulkUsers } from "./BulkUsers";
+import { SearchBox } from "../SearchBox";
 import { SeedButton } from "./SeedButton";
 import { useSearchParams, useRouter } from "next/navigation";
 import type { Issue } from "@/validation/types";
@@ -388,12 +389,12 @@ export function AdminDesigns() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <input className={`${inputClass} max-w-56`} placeholder="설계 이름·학교 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+        <SearchBox value={q} onSearch={setQ} placeholder="설계 이름·학교 검색" />
         <MultiSelect allLabel="전체 학년도" options={yearOptions} selected={years} onChange={setYears} />
         <MultiSelect allLabel="전체 학교" options={schoolOptions} selected={schools} onChange={setSchools} />
         <SingleSelect allLabel="전체 유형" options={TYPE_OPTIONS} value={type} onChange={setType} />
-        <MultiSelect allLabel="전체 학기" options={SEMESTER_OPTIONS} selected={semesters} onChange={setSemesters} />
         <MultiSelect allLabel="전체 학년" options={[3, 4, 5, 6].map((g) => ({ value: String(g), label: `${g}학년` }))} selected={grades} onChange={setGrades} />
+        <MultiSelect allLabel="전체 학기" options={SEMESTER_OPTIONS} selected={semesters} onChange={setSemesters} />
         <SingleSelect
           allLabel="전체 상태"
           options={[

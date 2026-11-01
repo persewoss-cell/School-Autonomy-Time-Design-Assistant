@@ -13,6 +13,7 @@ import { MultiSelect, SEMESTER_OPTIONS, SingleSelect } from "./admin/MultiSelect
 import { byYearThenSaved, DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, SortTh, useSort } from "./admin/sort";
 import { saveDesignDocx } from "./wizard/downloadDesign";
 import { ExamplesButton } from "./Examples";
+import { SearchBox } from "./SearchBox";
 import { SharedDesignView } from "./SharedDesignView";
 
 interface Shared {
@@ -202,7 +203,7 @@ function SharedTable({ rows }: { rows: Shared[] }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <input className={`${inputClass} max-w-48 !py-2 text-sm`} placeholder="이름·학교 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+        <SearchBox value={q} onSearch={setQ} placeholder="이름·학교 검색" className="w-52" />
         <MultiSelect allLabel="전체 학년도" options={yearOptions} selected={years} onChange={setYears} />
         <MultiSelect allLabel="전체 학교" options={schoolOptions} selected={schools} onChange={setSchools} />
         <SingleSelect
@@ -214,8 +215,8 @@ function SharedTable({ rows }: { rows: Shared[] }) {
           value={type}
           onChange={setType}
         />
-        <MultiSelect allLabel="전체 학기" options={SEMESTER_OPTIONS} selected={semesters} onChange={setSemesters} />
         <MultiSelect allLabel="전체 학년" options={[3, 4, 5, 6].map((g) => ({ value: String(g), label: `${g}학년` }))} selected={grades} onChange={setGrades} />
+        <MultiSelect allLabel="전체 학기" options={SEMESTER_OPTIONS} selected={semesters} onChange={setSemesters} />
         <span className="text-sm text-gray-500">{shown.length}건</span>
       </div>
       <div className="overflow-x-auto">
