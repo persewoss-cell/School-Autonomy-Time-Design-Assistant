@@ -14,22 +14,25 @@ const steps = [
 export default function Home() {
   return (
     <div className="space-y-10">
-      <section className="rounded-2xl bg-white p-8 shadow-sm">
-        <p className="text-lg font-bold text-brand-600">학교자율시간</p>
-        <h1 className="mt-2 text-3xl font-bold">과목·활동 설계, 단계별로 함께 해요</h1>
-        <p className="mt-3 text-gray-600">
-          내 AI에 붙여 넣을 프롬프트를 만들고, AI 답을 지침대로 점검해 한글 문서로 완성해요.
-        </p>
-        <div className="mt-6 flex flex-wrap gap-2">
-          <LoginGateLink href="/designs/new" className="rounded-lg bg-brand-600 px-5 py-3 font-semibold text-white hover:bg-brand-700">
-            새 설계 시작하기
-          </LoginGateLink>
-          <LoginGateLink href="/hours" className="rounded-lg bg-amber-500 px-5 py-3 font-semibold text-white hover:bg-amber-600">
-            시수 편성 점검하기
-          </LoginGateLink>
-          <SharedDesignsButton className="rounded-lg bg-sky-600 px-5 py-3 font-semibold text-white hover:bg-sky-700" />
+      <section className="flex items-center gap-6 rounded-2xl bg-white p-8 shadow-sm">
+        <div className="min-w-0 flex-1">
+          <p className="text-lg font-bold text-brand-600">학교자율시간</p>
+          <h1 className="mt-2 text-3xl font-bold">과목·활동 설계, 단계별로 함께 해요</h1>
+          <p className="mt-3 text-gray-600">내 AI에 붙여 넣을 프롬프트를 만들고, AI 답을 지침대로 점검해 한글 문서로 완성해요.</p>
+          <div className="mt-6 flex flex-wrap gap-2">
+            <LoginGateLink href="/designs/new" className="rounded-lg bg-brand-600 px-5 py-3 font-semibold text-white hover:bg-brand-700">
+              새 설계 시작하기
+            </LoginGateLink>
+            <LoginGateLink href="/hours" className="rounded-lg bg-amber-500 px-5 py-3 font-semibold text-white hover:bg-amber-600">
+              시수 편성 점검하기
+            </LoginGateLink>
+            <SharedDesignsButton className="rounded-lg bg-sky-600 px-5 py-3 font-semibold text-white hover:bg-sky-700" />
+          </div>
+          <ExamplesButton />
         </div>
-        <ExamplesButton />
+        {/* 오른쪽 여백 그림 (칠판·시계·연필). 좁은 화면에서는 숨김 */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/hero.webp" alt="" width={1104} height={652} className="hidden w-[38%] max-w-md shrink-0 md:block" />
       </section>
 
       <section>
@@ -57,11 +60,31 @@ export default function Home() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              <tr><td className="p-3 font-medium">의미</td><td className="p-3">기존 과목과 다른 교육 내용의 묶음 (내용의 체계성)</td><td className="p-3">학습 경험을 위해 구성한 다양한 활동</td></tr>
-              <tr><td className="p-3 font-medium">승인</td><td className="p-3">교육감</td><td className="p-3">학교장 (학교운영위원회 심의)</td></tr>
-              <tr><td className="p-3 font-medium">문서 구성</td><td className="p-3">성격, 목표, 내용 체계, 성취기준, 교수·학습 방법 및 평가, 지도의 실제</td><td className="p-3">필요성 및 목표, 내용 체계, 성취기준, 지도의 실제</td></tr>
-              <tr><td className="p-3 font-medium">성취기준</td><td className="p-3">새로 개발</td><td className="p-3">새로 개발 또는 기존 성취기준 재구조화</td></tr>
-              <tr><td className="p-3 font-medium">이름 중복</td><td className="p-3">전국 과목명과 중복 불가</td><td className="p-3">같은 학교·같은 해에 같은 활동명 불가</td></tr>
+              <tr>
+                <td className="p-3 font-medium">의미</td>
+                <td className="p-3">기존 과목과 다른 교육 내용의 묶음 (내용의 체계성)</td>
+                <td className="p-3">학습 경험을 위해 구성한 다양한 활동</td>
+              </tr>
+              <tr>
+                <td className="p-3 font-medium">승인</td>
+                <td className="p-3">교육감</td>
+                <td className="p-3">학교장 (학교운영위원회 심의)</td>
+              </tr>
+              <tr>
+                <td className="p-3 font-medium">문서 구성</td>
+                <td className="p-3">성격, 목표, 내용 체계, 성취기준, 교수·학습 방법 및 평가, 지도의 실제</td>
+                <td className="p-3">필요성 및 목표, 내용 체계, 성취기준, 지도의 실제</td>
+              </tr>
+              <tr>
+                <td className="p-3 font-medium">성취기준</td>
+                <td className="p-3">새로 개발</td>
+                <td className="p-3">새로 개발 또는 기존 성취기준 재구조화</td>
+              </tr>
+              <tr>
+                <td className="p-3 font-medium">이름 중복</td>
+                <td className="p-3">전국 과목명과 중복 불가</td>
+                <td className="p-3">같은 학교·같은 해에 같은 활동명 불가</td>
+              </tr>
             </tbody>
           </table>
         </div>
