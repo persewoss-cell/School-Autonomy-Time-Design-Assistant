@@ -210,7 +210,9 @@ function UsersTable({
   issueTemp: (u: UserRow) => Promise<void>;
   reload: () => void;
 }) {
-  const sort = useSort(users, {
+  const [q, setQ] = useState("");
+  const shownUsers = q ? users.filter((u) => `${u.schoolName} ${u.region}`.toLowerCase().includes(q.toLowerCase())) : users;
+  const sort = useSort(shownUsers, {
     region: (u) => u.region,
     school: (u) => u.schoolName,
     status: (u) => u.status,
@@ -253,7 +255,7 @@ function UsersTable({
           ))}
         </Card>
       )}
-      <BulkUsers onDone={reload} />
+      <BulkUsers onDone={reload} before={<SearchBox value={q} onSearch={setQ} placeholder="학교명·지역 검색" />} />
       <Card className="overflow-x-auto">
         <table className={`${DESIGN_TABLE} [&_td]:px-4 [&_th]:px-4`}>
           <thead className={DESIGN_THEAD}>
@@ -389,7 +391,6 @@ export function AdminDesigns() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <SearchBox value={q} onSearch={setQ} placeholder="설계 이름·학교 검색" />
         <MultiSelect allLabel="전체 학년도" options={yearOptions} selected={years} onChange={setYears} />
         <MultiSelect allLabel="전체 학교" options={schoolOptions} selected={schools} onChange={setSchools} />
         <SingleSelect allLabel="전체 유형" options={TYPE_OPTIONS} value={type} onChange={setType} />
@@ -408,6 +409,8 @@ export function AdminDesigns() {
           }}
         />
         <span className="text-sm text-gray-500">{rows.length}건</span>
+        {/* 거르기는 왼쪽, 검색창은 같은 줄 오른쪽 끝 */}
+        <SearchBox value={q} onSearch={setQ} placeholder="설계 이름·학교 검색" className="ml-auto w-56" />
       </div>
       <Card className="overflow-x-auto">
         {/* 과목(활동)명 말고는 내용 폭만큼만(w-px), 남는 폭은 모두 과목(활동)명. 제목은 모두 가운데, 내용은 과목(활동)명만 왼쪽 */}

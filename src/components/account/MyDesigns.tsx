@@ -215,13 +215,14 @@ export function MyDesigns() {
         <div className="space-y-3">
           {/* 관리자 '전체 설계'와 같은 모양 (학교·검색 빼고) */}
           <div className="flex flex-wrap items-center gap-2">
-            <SearchBox value={q} onSearch={setQ} placeholder="과목(활동)명 검색" />
             <MultiSelect allLabel="전체 학년도" options={yearOptions} selected={years} onChange={setYears} />
             <SingleSelect allLabel="전체 유형" options={TYPE_OPTIONS} value={type} onChange={setType} />
             <MultiSelect allLabel="전체 학년" options={[3, 4, 5, 6].map((g) => ({ value: String(g), label: `${g}학년` }))} selected={grades} onChange={setGrades} />
             <MultiSelect allLabel="전체 학기" options={SEMESTER_OPTIONS} selected={semesters} onChange={setSemesters} />
             <SingleSelect allLabel="전체 상태" options={STATUS_OPTIONS} value={status} onChange={setStatus} />
             <span className="text-sm text-gray-500">{shown.length}건</span>
+            {/* 거르기는 왼쪽, 검색창은 같은 줄 오른쪽 끝 */}
+            <SearchBox value={q} onSearch={setQ} placeholder="과목(활동)명 검색" className="ml-auto w-56" />
           </div>
           <DesignTable
             rows={shown}

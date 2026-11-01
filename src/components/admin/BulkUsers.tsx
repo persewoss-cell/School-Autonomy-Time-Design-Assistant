@@ -108,7 +108,8 @@ async function readRows(file: File): Promise<Row[]> {
 }
 
 /** 관리자: 학교 개별 추가 + 엑셀 일괄 등록 */
-export function BulkUsers({ onDone }: { onDone: () => void }) {
+/** before: 같은 줄 버튼 왼쪽에 둘 것 (예: 사용학교 검색창) */
+export function BulkUsers({ onDone, before }: { onDone: () => void; before?: React.ReactNode }) {
   const [one, setOne] = useState<Row>({
     region: "",
     schoolName: "",
@@ -211,7 +212,8 @@ export function BulkUsers({ onDone }: { onDone: () => void }) {
   return (
     <>
       {/* 목록 위 오른쪽: 개별 등록 / 일괄 등록 (팝업) */}
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {before}
         <button type="button" onClick={() => setMode("one")} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
           + 개별 등록
         </button>

@@ -90,7 +90,6 @@ function StandardsTable({ rows, grade, subjectGroup }: { rows: Row[]; grade: num
         학교자율시간 성취기준을 만들 때 참고하세요. 활동은 기존 교과 성취기준을 재구조화할 수 있지만 그대로 옮겨 쓰면 안 되고, 과목은 새로 개발해요.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <SearchBox value={q} onSearch={setQ} placeholder="코드·내용 검색 (예: 토의, 4국01)" className="w-64" />
         <MultiSelect allLabel="전체 학년군" options={["3~4학년군", "5~6학년군"].map((v) => ({ value: v, label: v }))} selected={bands} onChange={setBands} />
         <MultiSelect
           allLabel="전체 교과"
@@ -103,6 +102,8 @@ function StandardsTable({ rows, grade, subjectGroup }: { rows: Row[]; grade: num
         />
         <MultiSelect allLabel="전체 영역" options={areaOptions} selected={areas} onChange={setAreas} />
         <span className="text-sm text-gray-500">{shown.length}개</span>
+        {/* 거르기는 왼쪽, 검색창은 같은 줄 오른쪽 끝 */}
+        <SearchBox value={q} onSearch={setQ} placeholder="코드·내용 검색 (예: 토의, 4국01)" className="ml-auto w-64" />
       </div>
       <div className="overflow-x-auto rounded-lg bg-white">
         <table className={`${DESIGN_TABLE} [&_td]:px-2.5 [&_th]:px-2.5`}>

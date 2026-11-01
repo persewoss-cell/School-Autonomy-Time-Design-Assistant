@@ -203,7 +203,6 @@ function SharedTable({ rows }: { rows: Shared[] }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <SearchBox value={q} onSearch={setQ} placeholder="이름·학교 검색" className="w-52" />
         <MultiSelect allLabel="전체 학년도" options={yearOptions} selected={years} onChange={setYears} />
         <MultiSelect allLabel="전체 학교" options={schoolOptions} selected={schools} onChange={setSchools} />
         <SingleSelect
@@ -218,6 +217,8 @@ function SharedTable({ rows }: { rows: Shared[] }) {
         <MultiSelect allLabel="전체 학년" options={[3, 4, 5, 6].map((g) => ({ value: String(g), label: `${g}학년` }))} selected={grades} onChange={setGrades} />
         <MultiSelect allLabel="전체 학기" options={SEMESTER_OPTIONS} selected={semesters} onChange={setSemesters} />
         <span className="text-sm text-gray-500">{shown.length}건</span>
+        {/* 거르기는 왼쪽, 검색창은 같은 줄 오른쪽 끝 */}
+        <SearchBox value={q} onSearch={setQ} placeholder="이름·학교 검색" className="ml-auto w-52" />
       </div>
       <div className="overflow-x-auto">
         <table className={`${DESIGN_TABLE} [&_td]:px-[23px] [&_th]:px-[23px]`}>
