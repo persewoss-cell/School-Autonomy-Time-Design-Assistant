@@ -41,6 +41,16 @@ export function SaveIcon({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
+/** 완료 표시: 초록 동그라미 안 흰 체크 (시수점검 완료 등) */
+export function CheckCircleIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="11" fill="#16a34a" />
+      <path d="M7 12.5l3.2 3.2L17 9" stroke="#fff" strokeWidth={2.6} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** 표 안의 아이콘 버튼 (글자색은 쓰는 곳에서): 마우스를 올리면 연한 초록 바탕·진한 초록으로 바뀌고 손가락 모양 */
 export const ICON_BTN =
   "inline-flex cursor-pointer rounded-lg p-1.5 transition-colors hover:bg-brand-100 hover:text-brand-700 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent";

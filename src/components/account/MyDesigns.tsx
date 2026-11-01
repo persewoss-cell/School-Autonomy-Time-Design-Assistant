@@ -9,7 +9,7 @@ import { checklistResults, validateDesign } from "@/validation/design";
 import type { Issue } from "@/validation/types";
 import { allocationFor, FORM_NOTICE, saveDesignDocx } from "../wizard/downloadDesign";
 import { Modal } from "../Modal";
-import { DownloadIcon, ICON_BTN, SaveIcon, SearchIcon } from "../icons";
+import { CheckCircleIcon, DownloadIcon, ICON_BTN, SaveIcon, SearchIcon } from "../icons";
 import { stepsFor } from "../wizard/Wizard";
 import { sameSemesterOthers, semesterHours } from "@/validation/hours";
 import { bandStatus, checkKey, isViewGrade, schoolYearOf, type Checks, type HourCheck } from "@/domain/hoursView";
@@ -279,7 +279,8 @@ export function semesterFill(row: DesignRow, rows: DesignRow[]) {
   return { max, sum, left: max - sum, count: same.length };
 }
 
-export function SemesterBadge({ row, rows }: { row: DesignRow; rows: DesignRow[] }) {
+/** short: 관리자 표처럼 칸이 좁을 때 '32/32'만 */
+export function SemesterBadge({ row, rows, short }: { row: DesignRow; rows: DesignRow[]; short?: boolean }) {
   const { max, sum, left, count } = semesterFill(row, rows);
   // 칸에는 '32/32차시'만, 무엇이 문제인지는 마우스를 올리면 (사용자 결정, 2026-11-01)
   const problem =
@@ -289,7 +290,8 @@ export function SemesterBadge({ row, rows }: { row: DesignRow; rows: DesignRow[]
   return (
     <span title={detail} className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${cls}`}>
       {left === 0 ? "✓ " : ""}
-      {sum}/{max}차시
+      {sum}/{max}
+      {short ? "" : "차시"}
     </span>
   );
 }
@@ -427,7 +429,10 @@ function DesignTable({
                     </button>
                   )}
                   {bandStatus(r.grade, Number(yearOf(r)), checks, all).complete ? (
-                    <span className="rounded-lg border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">✓ 시수점검 완료</span>
+                    <span title="시수점검 완료" className="inline-flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">
+                      <CheckCircleIcon />
+                      시수점검
+                    </span>
                   ) : (
                     <button type="button" onClick={() => onHours(r)} className="rounded-lg border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600 hover:bg-red-100">
                       ⚠ 시수점검

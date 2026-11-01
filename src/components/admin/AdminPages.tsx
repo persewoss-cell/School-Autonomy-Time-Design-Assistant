@@ -15,7 +15,7 @@ import { Modal } from "../Modal";
 import { enterSchool } from "../ActingBanner";
 import { MultiSelect, SingleSelect } from "./MultiSelect";
 import { byYearThenSaved, DESIGN_ROW, DESIGN_TABLE, DESIGN_THEAD, NARROW, SortTh, useSort } from "./sort";
-import { ICON_BTN, OpenNewIcon, SearchIcon } from "../icons";
+import { CheckCircleIcon, ICON_BTN, OpenNewIcon, SearchIcon } from "../icons";
 import { BulkUsers } from "./BulkUsers";
 import { SeedButton } from "./SeedButton";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -325,6 +325,9 @@ const TYPE_OPTIONS = [
   { value: "subject", label: "과목" },
 ];
 
+/** 관리자 전체 설계 표용 짧은 학교명: 광양중동초등학교 → 광양중동초 */
+const shortSchool = (name: string) => name.replace(/초등학교$/, "초");
+
 type AdminDesignRow = DesignRow & { owner: string; ownerId: string; hoursComplete: boolean; schoolYear?: string };
 
 /** 관리자: 전체 설계 — 학교·유형·학년 고르기, 제목 세모로 정렬, 상세보기(그 학교로 들어가 보기), 삭제 */
@@ -425,7 +428,10 @@ export function AdminDesigns() {
             {sort.sorted.map((d) => (
               <tr key={d.id} className={DESIGN_ROW}>
                 <td className="p-2">{yearOf(d) || "-"}</td>
-                <td className="p-2 font-semibold">{d.owner}</td>
+                {/* 칸을 줄이려고 '○○초등학교' → '○○초' (마우스를 올리면 전체 이름) */}
+                <td className="p-2 font-semibold" title={d.owner}>
+                  {shortSchool(d.owner)}
+                </td>
                 <td className="p-2">
                   <TypeTag type={d.type} />
                 </td>
@@ -443,7 +449,7 @@ export function AdminDesigns() {
                   </button>
                 </td>
                 <td className="p-2">
-                  <SemesterBadge row={d} rows={sameSchool(d)} />
+                  <SemesterBadge short row={d} rows={sameSchool(d)} />
                 </td>
                 <td className="p-2">
                   <span className="flex items-center justify-center gap-1">
@@ -456,7 +462,10 @@ export function AdminDesigns() {
                       </button>
                     )}
                     {d.hoursComplete ? (
-                      <span className="rounded-lg border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">✓ 시수점검 완료</span>
+                      <span title="시수점검 완료" className="inline-flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">
+                      <CheckCircleIcon />
+                      시수점검
+                    </span>
                     ) : (
                       <button
                         type="button"

@@ -236,7 +236,7 @@ export function HoursChecker() {
       <div className={`space-y-2 rounded-xl p-4 text-sm ${viewOk && missing.length === 0 ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-900"}`}>
         <p className="font-semibold">
           {viewOk
-            ? `✓ ${halvesLabel} 시수 점검 완료 — 이 두 학년의 설계는 설계 현황에 '시수점검 완료'로 표시돼요.`
+            ? `✓ ${halvesLabel} 시수 점검 완료 — 이 두 학년의 설계는 설계 현황에 초록 동그라미 체크 '시수점검'으로 표시돼요.`
             : `${halvesLabel} 시수 점검 완료까지 할 일 (이 화면이 이상없음이면 완료)`}
         </p>
         {(!viewOk || missing.length > 0) && (
