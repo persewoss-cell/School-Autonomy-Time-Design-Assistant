@@ -24,9 +24,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3">
             <Link href="/" className="flex items-center gap-2 text-lg font-bold text-brand-700">
-              {/* 앱 아이콘: 시계(7시) + 펼친 책 = 학교자율시간. 브라우저 탭 아이콘은 src/app/icon.svg */}
+              {/* 앱 아이콘: 시계(7시) + 펼친 책 = 학교자율시간 (사용자가 준 그림). 브라우저 탭 아이콘은 src/app/icon.png */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.svg" alt="" width={28} height={28} className="h-7 w-7" />
+              <img src="/logo.png" alt="" width={28} height={28} className="h-7 w-7" />
               학교자율시간 설계 도우미 앱
             </Link>
             <AuthNav />
