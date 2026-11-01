@@ -284,18 +284,15 @@ export function semesterFill(row: DesignRow, rows: DesignRow[]) {
 
 function SemesterBadge({ row, rows }: { row: DesignRow; rows: DesignRow[] }) {
   const { max, sum, left, count } = semesterFill(row, rows);
-  const detail = `${row.grade}학년 ${row.semester}학기 설계 ${count}개 합계 ${sum} / ${max}차시`;
-  const [cls, text] =
-    left === 0
-      ? ["bg-green-100 text-green-700", `✓ ${sum}/${max}차시 편성`]
-      : left < 0
-        ? ["bg-red-100 text-red-700", `${-left}차시 초과`]
-        : left < 10
-          ? ["bg-red-100 text-red-700", `${left}차시 남음 — 기존 설계 조정 필요`]
-          : ["bg-red-100 text-red-700", `${left}차시 추가 편성 필요`];
+  // 칸에는 '32/32차시'만, 무엇이 문제인지는 마우스를 올리면 (사용자 결정, 2026-11-01)
+  const problem =
+    left === 0 ? "모두 편성" : left < 0 ? `${-left}차시 초과` : left < 10 ? `${left}차시 남음 — 기존 설계 조정 필요` : `${left}차시 추가 편성 필요`;
+  const detail = `${row.grade}학년 ${row.semester}학기 설계 ${count}개 합계 ${sum} / ${max}차시 · ${problem}`;
+  const cls = left === 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700";
   return (
     <span title={detail} className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${cls}`}>
-      {text}
+      {left === 0 ? "✓ " : ""}
+      {sum}/{max}차시
     </span>
   );
 }
@@ -303,7 +300,7 @@ function SemesterBadge({ row, rows }: { row: DesignRow; rows: DesignRow[] }) {
 const yearOrder = (r: DesignRow) => ({ schoolYear: yearOf(r), updatedAt: r.updatedAt });
 
 /**
- * 설계 현황 표: 관리자 '전체 설계'와 같은 열 순서 (학교 열 없음) + 학교 화면에만 있는 칸(차시·학기 편성·문서·복제).
+ * 설계 현황 표: 관리자 '전체 설계'와 같은 열 순서 (학교 열 없음) + 학교 화면에만 있는 칸(차시 편성·설계·문서·복제).
  * 기본 순서는 학년도 내림차순 → 마지막 저장 내림차순, 제목 세모로 정렬.
  */
 function DesignTable({
@@ -336,7 +333,6 @@ function DesignTable({
       type: (r) => r.type,
       grade: (r) => r.grade * 10 + r.semester,
     semester: (r) => r.semester * 10 + r.grade,
-      hours: (r) => r.hours ?? 0,
       name: (r) => r.name,
       fill: (r) => semesterFill(r, all).left,
       status: (r) => (r.errorCount === 0 ? 0 : 1),
@@ -355,9 +351,8 @@ function DesignTable({
             <SortTh label="유형" k="type" sort={sort} dark className={NARROW} />
             <SortTh label="학년" k="grade" sort={sort} dark className={NARROW} />
             <SortTh label="학기" k="semester" sort={sort} dark className={NARROW} />
-            <SortTh label="차시" k="hours" sort={sort} dark className={NARROW} />
             <SortTh label="과목(활동)명" k="name" sort={sort} dark className="text-center" />
-            <SortTh label="학기 편성" k="fill" sort={sort} dark className={NARROW} />
+            <SortTh label="차시 편성" k="fill" sort={sort} dark className={NARROW} />
             <SortTh label="상태" k="status" sort={sort} dark className={NARROW} />
             <SortTh label="마지막 저장" k="updated" sort={sort} dark className={NARROW} />
             <th className={`p-2 ${NARROW}`}>설계</th>
@@ -375,7 +370,6 @@ function DesignTable({
               </td>
               <td className="p-2">{r.grade}학년</td>
               <td className="p-2">{r.semester}학기</td>
-              <td className="p-2">{typeof r.hours === "number" ? `${r.hours}차시` : "-"}</td>
               <td className="w-full max-w-0 text-left font-semibold">
                 <button type="button" onClick={() => onOpen(r)} title={`${r.name} — 눌러서 설계 열기`} className="block max-w-full truncate text-left text-brand-800 hover:text-brand-600 hover:underline">
                   {r.name || "(이름 없음)"}
