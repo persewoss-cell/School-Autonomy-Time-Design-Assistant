@@ -137,7 +137,7 @@ interface UserRow {
 const STATUS_LABEL = { pending: "승인 대기", active: "사용 중", blocked: "중지" } as const;
 
 /**
- * 사용학교 '비밀번호 관리' 팝업: 지금 비밀번호는 암호화돼 있어 보여 줄 수 없음을 알리고, 새 비밀번호로 바꾼다.
+ * 사용학교 '비밀번호 관리' 팝업: 새 비밀번호·확인만 입력해 바꾼다 (지금 비밀번호는 암호화돼 있어 보여 주지 않음).
  * 닫기를 누르면 바꾸지 않고 닫힌다. (사용자 요청, 2026-11-03)
  */
 function PasswordManageButton({ u, onDone }: { u: UserRow; onDone: () => void }) {
@@ -191,12 +191,6 @@ function PasswordManageButton({ u, onDone }: { u: UserRow; onDone: () => void })
           }
         >
           <p className="font-semibold">{u.schoolName}</p>
-          <div className="space-y-1 rounded-lg bg-gray-50 p-3 text-sm">
-            <p>
-              <span className="text-gray-500">현재 비밀번호</span> <b className="ml-2 tracking-widest">••••••••</b>
-            </p>
-            <p className="text-xs text-gray-500">비밀번호는 안전을 위해 암호화해 저장하므로 관리자도 지금 비밀번호를 볼 수 없어요. 학교가 잊었다면 아래에서 새 비밀번호로 바꿔 알려 주세요.</p>
-          </div>
           <form id={`pw-${u.id}`} onSubmit={submit} className="space-y-2">
             <label className="block space-y-1 text-sm">
               <span className="block font-semibold">새 비밀번호 (8자 이상)</span>
