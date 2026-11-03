@@ -137,7 +137,7 @@ interface UserRow {
 const STATUS_LABEL = { pending: "승인 대기", active: "사용 중", blocked: "중지" } as const;
 
 /**
- * 사용학교 '비밀번호 관리' 팝업: 새 비밀번호·확인만 입력해 바꾼다 (지금 비밀번호는 암호화돼 있어 보여 주지 않음).
+ * 사용학교 '비밀번호 변경' 팝업: 새 비밀번호·확인만 입력해 바꾼다 (지금 비밀번호는 암호화돼 있어 보여 주지 않음).
  * 닫기를 누르면 바꾸지 않고 닫힌다. (사용자 요청, 2026-11-03)
  */
 function PasswordManageButton({ u, onDone }: { u: UserRow; onDone: () => void }) {
@@ -172,12 +172,12 @@ function PasswordManageButton({ u, onDone }: { u: UserRow; onDone: () => void })
   return (
     <>
       <button type="button" className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-sky-700 hover:bg-sky-100" onClick={() => setOpen(true)}>
-        비밀번호 관리
+        비밀번호 변경
       </button>
       {open && (
         <Modal
           tone="brand"
-          title="비밀번호 관리"
+          title="비밀번호 변경"
           onClose={close}
           actions={
             <>
