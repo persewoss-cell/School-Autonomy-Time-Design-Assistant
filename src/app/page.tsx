@@ -30,9 +30,19 @@ export default function Home() {
           </div>
           <ExamplesButton />
         </div>
-        {/* 오른쪽 여백 그림 (칠판·시계·연필). 좁은 화면에서는 숨김 */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/hero.webp" alt="" width={1104} height={652} className="hidden w-[38%] max-w-md shrink-0 md:block" />
+        {/* 오른쪽 여백 동영상 (칠판·시계·연필). 소리 없이 자동으로 한 번 재생하고 마지막 장면에서 멈춤. 좁은 화면에서는 숨김 */}
+        <video
+          src="/hero.mp4"
+          poster="/hero-poster.webp"
+          width={1104}
+          height={652}
+          autoPlay
+          muted
+          playsInline
+          preload="auto"
+          aria-hidden="true"
+          className="hidden h-auto w-[38%] max-w-md shrink-0 md:block"
+        />
       </section>
 
       <section>
