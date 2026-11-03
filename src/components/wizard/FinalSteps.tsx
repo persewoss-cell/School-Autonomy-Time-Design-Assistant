@@ -197,6 +197,11 @@ export function FinalStep({
             </li>
           ))}
         </ul>
+        {unchecked.length > 0 && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <p className="font-semibold">⚠ 체크리스트 내용을 모두 점검하고 체크해야 문서가 만들어집니다. (남은 항목 {unchecked.length}개)</p>
+          </div>
+        )}
       </Card>
 
       <Card className="space-y-3">
@@ -212,17 +217,7 @@ export function FinalStep({
             <p className="font-semibold">✓ 시수 점검 완료 — {doc.basic.grade}학년 시수 점검표가 문서 끝에 함께 들어가요.</p>
           ) : (
             <>
-              <p className="font-semibold">⚠ 시수 점검을 마쳐야 문서가 완성됩니다.</p>
-              <p>지금 내려받으면 붙임(편성표) 자리에 &lsquo;시수 점검을 마쳐야 표시됩니다&rsquo;라는 빨간 안내가 들어가요.</p>
-              <p>
-                {year}학년도 {doc.basic.grade}학년 시수 점검 화면({hours.halves.map((h) => `${h.grade}학년(${h.year})`).join("·")})이{" "}
-                {hours.views[0].saved ? "아직 이상없음이 아니에요." : "아직 저장되지 않았어요."}
-              </p>
-              {hours.halvesWithoutDesign.length > 0 && (
-                <p>
-                  {hours.halvesWithoutDesign.map((h) => `${h.grade}학년(${h.year}학년도)`).join("·")}은 설계가 없어 시수 점검 화면에서 학교자율시간을 직접 입력해야 해요.
-                </p>
-              )}
+              <p className="font-semibold">⚠ 시수 점검을 하지 않았습니다.</p>
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={() => void goHours(doc.basic.grade)} className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-700">
                   ⚠ {doc.basic.grade}학년 시수 점검하기
@@ -258,11 +253,6 @@ export function FinalStep({
             </button>
           )}
         </div>
-        {unchecked.length > 0 && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            <p className="font-semibold">⚠ 체크리스트 내용을 모두 점검하고 체크해야 문서가 만들어집니다. (남은 항목 {unchecked.length}개)</p>
-          </div>
-        )}
       </Card>
 
       <DocPreview doc={doc} />
