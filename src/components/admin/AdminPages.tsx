@@ -136,6 +136,91 @@ interface UserRow {
 }
 const STATUS_LABEL = { pending: "승인 대기", active: "사용 중", blocked: "중지" } as const;
 
+/**
+ * 사용학교 '비밀번호 관리' 팝업: 지금 비밀번호는 암호화돼 있어 보여 줄 수 없음을 알리고, 새 비밀번호로 바꾼다.
+ * 닫기를 누르면 바꾸지 않고 닫힌다. (사용자 요청, 2026-11-03)
+ */
+function PasswordManageButton({ u, onDone }: { u: UserRow; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const close = () => {
+    setOpen(false);
+    setPw("");
+    setPw2("");
+    setMsg(null);
+  };
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pw.length < 8) return setMsg({ ok: false, text: "새 비밀번호는 8자 이상이어야 해요." });
+    if (pw !== pw2) return setMsg({ ok: false, text: "새 비밀번호와 비밀번호 확인이 서로 달라요." });
+    setBusy(true);
+    try {
+      await api(`/api/admin/users/${u.id}/password`, { method: "POST", body: { password: pw, passwordConfirm: pw2 } });
+      setMsg({ ok: true, text: `${u.schoolName}의 비밀번호를 바꿨어요. 학교에 새 비밀번호를 알려 주세요.` });
+      setPw("");
+      setPw2("");
+      onDone();
+    } catch (err) {
+      setMsg({ ok: false, text: err instanceof Error ? err.message : "바꾸지 못했어요." });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <button type="button" className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-sky-700 hover:bg-sky-100" onClick={() => setOpen(true)}>
+        비밀번호 관리
+      </button>
+      {open && (
+        <Modal
+          tone="brand"
+          title="비밀번호 관리"
+          onClose={close}
+          actions={
+            <>
+              <button type="button" onClick={close} className="rounded-lg border border-gray-300 px-4 py-2 font-semibold text-gray-700 hover:bg-gray-50">
+                닫기
+              </button>
+              <button type="submit" form={`pw-${u.id}`} disabled={busy} className="rounded-lg bg-brand-600 px-4 py-2 font-semibold text-white hover:bg-brand-700 disabled:bg-gray-300">
+                {busy ? "바꾸는 중…" : "확인"}
+              </button>
+            </>
+          }
+        >
+          <p className="font-semibold">{u.schoolName}</p>
+          <div className="space-y-1 rounded-lg bg-gray-50 p-3 text-sm">
+            <p>
+              <span className="text-gray-500">현재 비밀번호</span> <b className="ml-2 tracking-widest">••••••••</b>
+            </p>
+            <p className="text-xs text-gray-500">비밀번호는 안전을 위해 암호화해 저장하므로 관리자도 지금 비밀번호를 볼 수 없어요. 학교가 잊었다면 아래에서 새 비밀번호로 바꿔 알려 주세요.</p>
+          </div>
+          <form id={`pw-${u.id}`} onSubmit={submit} className="space-y-2">
+            <label className="block space-y-1 text-sm">
+              <span className="block font-semibold">새 비밀번호 (8자 이상)</span>
+              <input type="password" autoComplete="new-password" className={inputClass} value={pw} onChange={(e) => setPw(e.target.value)} />
+            </label>
+            <label className="block space-y-1 text-sm">
+              <span className="block font-semibold">새 비밀번호 확인</span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                className={`${inputClass} ${pw2 && pw2 !== pw ? "border-red-400" : ""}`}
+                value={pw2}
+                onChange={(e) => setPw2(e.target.value)}
+              />
+              {pw2 && pw2 !== pw && <span className="block text-xs text-red-600">비밀번호가 서로 달라요.</span>}
+            </label>
+          </form>
+          {msg && <p className={`rounded-lg p-2 text-sm ${msg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{msg.text}</p>}
+        </Modal>
+      )}
+    </>
+  );
+}
+
 /** 날짜만: 26. 10. 31. */
 const fmtDay = (s: string) => new Date(s).toLocaleDateString("ko-KR", { year: "2-digit", month: "numeric", day: "numeric" });
 
@@ -298,9 +383,7 @@ function UsersTable({
                   ) : (
                     <span className="flex items-center justify-center gap-1 font-semibold">
                       <StatusCycleButton u={u} onChange={(status) => update(u, { status })} />
-                      <button type="button" className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-sky-700 hover:bg-sky-100" onClick={() => issueTemp(u)}>
-                        임시 비밀번호
-                      </button>
+                      <PasswordManageButton u={u} onDone={reload} />
                       <button
                         type="button"
                         className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-0.5 text-violet-700 hover:bg-violet-100"
@@ -585,7 +668,7 @@ const KIND_LABEL: Record<string, string> = {
   download: "내려받기",
   parse_fail: "AI 답 읽기 실패",
   reset_request: "비밀번호 재설정 신청",
-  password_reset: "임시 비밀번호 발급",
+  password_reset: "비밀번호 재설정(관리자)",
   password_change: "비밀번호 변경",
   admin: "관리자 작업",
 };

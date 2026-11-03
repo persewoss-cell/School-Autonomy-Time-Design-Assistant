@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
 
-/** 화면 가운데 뜨는 알림 창. 오른쪽 위 ✕ 또는 Esc로 닫는다. */
+/** 화면 가운데 뜨는 알림 창. 바깥을 눌러도 닫히지 않고, 닫기 버튼이나 오른쪽 위 ×로만 닫는다 (사용자 결정, 2026-11-03). */
 export function Modal({
   title,
   tone = "red",
@@ -22,14 +21,9 @@ export function Modal({
   children: React.ReactNode;
   actions: React.ReactNode;
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
   const head = tone === "red" ? "bg-red-600" : tone === "amber" ? "bg-amber-500" : "bg-brand-600";
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div role="alertdialog" aria-modal="true" aria-label={title} className={`w-full ${xl ? "max-w-6xl" : wide ? "max-w-3xl" : "max-w-md"} overflow-hidden rounded-2xl bg-white shadow-2xl`} onClick={(e) => e.stopPropagation()}>
         <div className={`flex items-center justify-between gap-2 px-5 py-3 text-white ${head}`}>
           <p className="text-lg font-bold">{tone === "brand" ? "" : "⚠ "}{title}</p>

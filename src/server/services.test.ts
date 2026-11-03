@@ -315,3 +315,17 @@ describe("DB 용량", () => {
     expect(stats.storage!.used).toBeGreaterThan(0);
   });
 });
+
+describe("관리자 비밀번호 관리", () => {
+  it("새 비밀번호로 바꾸면 그 비밀번호로 로그인되고, 확인이 다르거나 짧으면 막는다", async () => {
+    const { setPasswordByAdmin } = await import("./services");
+    const { repo, admin, t } = await setup();
+    await expect(setPasswordByAdmin(repo, admin, t.id, { password: "newpass12", passwordConfirm: "newpass13" })).rejects.toThrow("서로 다릅니다");
+    await expect(setPasswordByAdmin(repo, admin, t.id, { password: "short", passwordConfirm: "short" })).rejects.toThrow("8자 이상");
+    await updateUserByAdmin(repo, admin, t.id, { status: "active" });
+    await setPasswordByAdmin(repo, admin, t.id, { password: "newpass12", passwordConfirm: "newpass12" });
+    expect((await login(repo, "광양마동초등학교", "newpass12")).id).toBe(t.id);
+    await expect(login(repo, "광양마동초등학교", "password1")).rejects.toThrow();
+    await expect(setPasswordByAdmin(repo, t, admin.id, { password: "newpass12", passwordConfirm: "newpass12" })).rejects.toThrow("관리자만");
+  });
+});

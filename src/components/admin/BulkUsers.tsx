@@ -141,10 +141,16 @@ export function BulkUsers({ onDone, before }: { onDone: () => void; before?: Rea
       setBusy(false);
     }
   };
+  const [confirmPw, setConfirmPw] = useState("");
   const addOne = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (one.password !== confirmPw) return setError("비밀번호와 비밀번호 확인이 서로 달라요. 다시 확인해 주세요.");
+    setError("");
     const r = await send([one]);
-    if (r?.[0]?.ok) setOne({ region: one.region, schoolName: "", password: "" });
+    if (r?.[0]?.ok) {
+      setOne({ region: one.region, schoolName: "", password: "" });
+      setConfirmPw("");
+    }
   };
   const load = async (file: File | undefined) => {
     if (!file) return;
@@ -248,6 +254,18 @@ export function BulkUsers({ onDone, before }: { onDone: () => void; before?: Rea
             <label className="block space-y-1 text-sm">
               <span className="block font-semibold">비밀번호 (8자 이상)</span>
               <input required minLength={8} className={`${inputClass} w-full`} value={one.password} onChange={(e) => setOne({ ...one, password: e.target.value })} />
+            </label>
+            <label className="block space-y-1 text-sm">
+              <span className="block font-semibold">비밀번호 확인</span>
+              <input
+                required
+                minLength={8}
+                className={`${inputClass} w-full ${confirmPw && confirmPw !== one.password ? "border-red-400" : ""}`}
+                placeholder="한 번 더 입력"
+                value={confirmPw}
+                onChange={(e) => setConfirmPw(e.target.value)}
+              />
+              {confirmPw && confirmPw !== one.password && <span className="block text-xs text-red-600">비밀번호가 서로 달라요.</span>}
             </label>
             <button type="submit" disabled={busy} className="w-full rounded-lg bg-brand-600 px-4 py-2 font-semibold text-white hover:bg-brand-700 disabled:bg-gray-300">
               등록하기

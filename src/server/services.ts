@@ -119,6 +119,20 @@ export async function resetPasswordByAdmin(repo: Repo, admin: User, targetId: st
   return temp;
 }
 
+/** 관리자: 학교 비밀번호를 새로 정해 주기 (지금 비밀번호는 암호화돼 있어 볼 수 없으므로 새로 정함) */
+export async function setPasswordByAdmin(repo: Repo, admin: User, targetId: string, raw: unknown): Promise<void> {
+  if (admin.role !== "admin") throw new ServiceError(403, "관리자만 할 수 있습니다.");
+  const r = z
+    .object({ password: passwordSchema, passwordConfirm: z.string() })
+    .refine((v) => v.password === v.passwordConfirm, { message: "새 비밀번호와 비밀번호 확인이 서로 다릅니다." })
+    .safeParse(raw);
+  if (!r.success) throw new ServiceError(400, r.error.issues[0].message);
+  const target = await repo.users.findById(targetId);
+  if (!target) throw new ServiceError(404, "계정을 찾을 수 없습니다.");
+  await repo.users.update(targetId, { passwordHash: await bcrypt.hash(r.data.password, 10), mustChangePassword: false, resetRequest: null });
+  await repo.logs.add({ kind: "password_reset", userId: targetId, school: target.schoolName, detail: `관리자(${admin.schoolName})가 비밀번호 변경` });
+}
+
 /** 로그인한 학교가 비밀번호 바꾸기 */
 export async function changePassword(repo: Repo, user: User, raw: unknown): Promise<void> {
   const r = z
