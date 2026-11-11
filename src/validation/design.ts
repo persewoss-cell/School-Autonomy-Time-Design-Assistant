@@ -372,6 +372,17 @@ export function checkUnitPlan(doc: Pick<DesignDoc, "basic" | "abbrev" | "standar
           fix: "묶음에서 빼고, 그 성취기준을 다루는 단원의 차시에 따로 평가를 두어 주세요.",
         });
       }
+      // 지침: '두 개의 성취기준을 합하여 평가 가능' → 3개 이상은 확인 필요 (사용자 결정, 2026-11-11)
+      const bundle = assessedIds(l).filter((id) => codes.has(id));
+      if (bundle.length > 2) {
+        issues.push({
+          level: "warning",
+          field: f,
+          target: `lesson.${ui}.${li}.assess`,
+          message: `성취기준 ${bundle.length}개(${bundle.map((id) => codes.get(id)).join(", ")})를 한 평가로 묶었습니다. 지침에는 '두 개의 성취기준을 합하여 평가 가능'으로 되어 있습니다.`,
+          fix: "2개까지만 묶고, 나머지는 다른 차시에서 따로 평가하는 것을 권장합니다.",
+        });
+      }
       if (target && !u.standardIds.includes(target)) {
         issues.push({
           level: "error",
@@ -427,6 +438,27 @@ export function checkAssessments(doc: Pick<DesignDoc, "basic" | "abbrev" | "stan
     const f = `평가 계획 ${i + 1}`;
     if (a.standardIds.filter((id) => codes.has(id)).length === 0) {
       issues.push({ level: "error", field: f, target: `assess.${i}.standards`, message: "평가할 성취기준을 고르지 않았습니다.", fix: "성취기준을 1개 이상(최대 2개 묶음 가능) 골라 주세요." });
+    }
+    // 묶어 평가: 같은 영역끼리만(오류), 3개 이상은 확인 필요 (사용자 결정, 2026-11-11)
+    const picked = a.standardIds.filter((id) => codes.has(id));
+    const areasOf = new Set(picked.map((id) => doc.standards.find((s) => s.id === id)?.areaIndex));
+    if (areasOf.size > 1) {
+      issues.push({
+        level: "error",
+        field: f,
+        target: `assess.${i}.standards`,
+        message: `서로 다른 영역의 성취기준(${picked.map((id) => codes.get(id)).join(", ")})을 한 평가로 묶었습니다. 성취기준을 묶어 평가할 때는 같은 영역(단원)의 성취기준끼리만 묶습니다.`,
+        fix: "다른 영역의 성취기준은 빼고, 따로 평가 줄을 만들어 주세요.",
+      });
+    }
+    if (picked.length > 2) {
+      issues.push({
+        level: "warning",
+        field: f,
+        target: `assess.${i}.standards`,
+        message: `성취기준 ${picked.length}개를 한 평가로 묶었습니다. 지침에는 '두 개의 성취기준을 합하여 평가 가능'으로 되어 있습니다.`,
+        fix: "2개까지만 묶고, 나머지는 따로 평가 줄을 만드는 것을 권장합니다.",
+      });
     }
     // 시기 = 평가 계획 양식의 열 (PPT 52쪽) → 오류 (사용자 결정, 2026-11-11)
     if (!a.month.trim()) issues.push({ level: "error", field: f, target: `assess.${i}.month`, message: "평가 시기가 비어 있습니다.", fix: "평가 내용에 알맞은 월을 적어 주세요." });

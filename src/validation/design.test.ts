@@ -179,6 +179,21 @@ describe("단원 지도계획·평가 계획", () => {
     expect(issues.some((i) => i.level === "warning" && i.field === "전단계 활동" && i.message.includes("'문화 존중 역할극'"))).toBe(true);
     expect(errors(issues).some((i) => i.field === "전단계 활동")).toBe(false);
   });
+  it("묶어 평가: 다른 영역끼리는 오류, 3개 이상은 확인 필요 (평가 계획·단원 지도계획)", () => {
+    const doc = sampleSubject();
+    doc.assessments[0].standardIds = ["s1", "s3"];
+    expect(errors(checkAssessments(doc)).some((i) => i.message.includes("서로 다른 영역"))).toBe(true);
+    doc.standards.push({ id: "s9", areaIndex: 0, text: "세 번째 성취기준을 탐구한다.", elements: [] });
+    doc.assessments[0].standardIds = ["s1", "s2", "s9"];
+    const a = checkAssessments(doc);
+    expect(a.some((i) => i.level === "warning" && i.message.includes("두 개의 성취기준을 합하여"))).toBe(true);
+    expect(errors(a).some((i) => i.message.includes("서로 다른 영역"))).toBe(false);
+    const u = doc.plan.selected!.units[0];
+    u.standardIds = ["s1", "s2", "s9"];
+    const l = u.lessons.find((x) => x.assessFor)!;
+    l.assessWith = u.standardIds.filter((id) => id !== l.assessFor);
+    expect(checkUnitPlan(doc).some((i) => i.level === "warning" && i.message.includes("두 개의 성취기준을 합하여"))).toBe(true);
+  });
   it("과정중심평가는 성취기준마다 정확히 1개", () => {
     const doc = sampleSubject();
     const lessons = doc.plan.selected!.units[0].lessons;
