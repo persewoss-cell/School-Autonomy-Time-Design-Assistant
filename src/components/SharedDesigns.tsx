@@ -15,6 +15,7 @@ import { saveDesignDocx } from "./wizard/downloadDesign";
 import { ExamplesButton } from "./Examples";
 import { SearchBox } from "./SearchBox";
 import { SharedDesignView } from "./SharedDesignView";
+import { DocumentImport } from "./DocumentImport";
 
 interface Shared {
   id: string;
@@ -72,50 +73,80 @@ function LoginNeeded({ onClose }: { onClose: () => void }) {
 }
 
 /**
- * '타학교 완성 설계안' 화면: 완성한 설계(오류 0 + 체크리스트 모두 ○)를 보고·내려받고·우리 학교로 가져온다.
- * 본교 설계도 '본교' 표시로 함께 보인다. 시수 점검은 학교마다 하는 일이라 보지 않는다.
+ * '설계안 가져오기' 화면 (탭 2개)
+ * - 타학교 완성 설계안: 완성한 설계(오류 0 + 체크리스트 모두 ○)를 보고·내려받고·우리 학교로 가져온다. 본교 설계도 '본교' 표시로 함께 보인다.
+ * - 우리 학교 기존 문서: 예전에 만든 문서(PDF·hwpx)를 AI 프롬프트로 옮겨 새 설계로 가져온다.
  */
 export function SharedDesignsPage() {
   const [rows, setRows] = useState<Shared[] | null>(null);
   const [error, setError] = useState("");
   const [login, setLogin] = useState(false);
+  const [school, setSchool] = useState("");
+  const [tab, setTab] = useState<"shared" | "file">("shared");
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "file") setTab("file");
     void loadMe().then((me) => {
       if (!me.user) return setLogin(true);
+      setSchool(me.user.schoolName);
       api<{ designs: Shared[] }>("/api/shared/designs")
         .then((r) => setRows(r.designs))
         .catch((e) => setError(e instanceof Error ? e.message : "불러오지 못했어요."));
     });
   }, []);
+  const choose = (t: "shared" | "file") => {
+    setTab(t);
+    window.history.replaceState(null, "", t === "file" ? "/shared?tab=file" : "/shared");
+  };
+  const tabBtn = (t: "shared" | "file") =>
+    `rounded-t-lg px-4 py-2 text-sm font-semibold ${tab === t ? "bg-white text-brand-700 shadow-sm" : "text-gray-500 hover:bg-white/60 hover:text-gray-700"}`;
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">타학교 완성 설계안</h1>
-        <div className="mt-1 space-y-0.5 text-sm text-gray-600">
-          <p>학교들이 완성한 설계예요. 보기·내려받기를 하거나, 복제해 우리 학교 설계로 가져와 고쳐 쓸 수 있어요.</p>
-          <p>
-            이 문서는 앱이 만든 <b>docx 양식</b>이에요. 제출할 때는 내용을 <b>한글(hwp) 양식에 복사해 붙여</b> 양식을 맞춰 주세요.
-          </p>
-          <p>
-            양식 예시는 광양중동초등학교 예시안을 참고하세요. <ExamplesButton className="inline" />
-          </p>
-        </div>
-      </div>
-      <div className="rounded-2xl bg-white p-4 shadow-sm">
-        {login ? (
-          <p className="text-gray-600">
-            로그인한 학교만 볼 수 있어요.{" "}
-            <Link href="/login?next=%2Fshared" className="font-semibold text-brand-700 underline">
-              로그인
-            </Link>
-          </p>
-        ) : error ? (
-          <p className="text-red-700">{error}</p>
-        ) : rows === null ? (
-          <p className="text-gray-500">불러오는 중…</p>
+        <h1 className="text-2xl font-bold">설계안 가져오기</h1>
+        {tab === "shared" ? (
+          <div className="mt-1 space-y-0.5 text-sm text-gray-600">
+            <p>학교들이 완성한 설계예요. 보기·내려받기를 하거나, 복제해 우리 학교 설계로 가져와 고쳐 쓸 수 있어요.</p>
+            <p>
+              이 문서는 앱이 만든 <b>docx 양식</b>이에요. 제출할 때는 내용을 <b>한글(hwp) 양식에 복사해 붙여</b> 양식을 맞춰 주세요.
+            </p>
+            <p>
+              양식 예시는 광양중동초등학교 예시안을 참고하세요. <ExamplesButton className="inline" />
+            </p>
+          </div>
         ) : (
-          <SharedTable rows={rows} />
+          <div className="mt-1 space-y-0.5 text-sm text-gray-600">
+            <p>예전에 만든 학교자율시간 설계 문서(PDF·한글)를 올리면, AI의 도움으로 내용을 그대로 옮겨 우리 학교 설계 현황에 넣어요.</p>
+            <p>가져온 설계는 단계마다 고치고, 점검하고, 새 양식으로 내려받을 수 있어요.</p>
+          </div>
         )}
+      </div>
+      <div>
+        <div className="flex gap-1" role="tablist">
+          <button type="button" role="tab" aria-selected={tab === "shared"} onClick={() => choose("shared")} className={tabBtn("shared")}>
+            타학교 완성 설계안
+          </button>
+          <button type="button" role="tab" aria-selected={tab === "file"} onClick={() => choose("file")} className={tabBtn("file")}>
+            우리 학교 기존 문서
+          </button>
+        </div>
+        <div className={`rounded-2xl bg-white p-4 shadow-sm ${tab === "shared" ? "rounded-tl-none" : ""}`}>
+          {login ? (
+            <p className="text-gray-600">
+              로그인한 학교만 볼 수 있어요.{" "}
+              <Link href="/login?next=%2Fshared" className="font-semibold text-brand-700 underline">
+                로그인
+              </Link>
+            </p>
+          ) : tab === "file" ? (
+            <DocumentImport schoolName={school} />
+          ) : error ? (
+            <p className="text-red-700">{error}</p>
+          ) : rows === null ? (
+            <p className="text-gray-500">불러오는 중…</p>
+          ) : (
+            <SharedTable rows={rows} />
+          )}
+        </div>
       </div>
     </div>
   );
