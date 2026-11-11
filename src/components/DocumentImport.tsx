@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { buildFixPrompt } from "@/prompts/common";
 import { buildImportPrompt, CODE_NOTE_START, codeDiffNote, IMPORT_PART2_PROMPT, parseImport, uniqueName, type MissingField } from "@/prompts/importDoc";
 import { DESIGN_TYPES, GRADES, OPENING_TYPES, OPERATION_MODES, SUBJECT_GROUPS, type DesignDoc } from "@/domain/types";
-import { looksScanned, readDocument, type ReadResult } from "@/import/readDocument";
+import { readDocument, type ReadResult } from "@/import/readDocument";
 import { Modal } from "./Modal";
 import { CopyBox, inputClass } from "./ui";
 
@@ -21,8 +21,10 @@ const FIX_REMINDER = `- 1부는 "part": 1, 2부는 "part": 2 를 넣습니다.
 
 /**
  * '설계안 가져오기 → 우리 학교 기존 문서' 탭.
- * 파일(PDF·hwpx)의 글자를 브라우저에서 뽑아 프롬프트에 넣고, 교사가 AI에 보내 받은 1부·2부 답을 읽어 새 설계로 저장한다.
+ * 한글(hwpx) 파일의 글자를 브라우저에서 뽑아 프롬프트에 넣고, 교사가 AI에 보내 받은 1부·2부 답을 읽어 새 설계로 저장한다.
+ * (PDF는 표가 섞여 읽혀 받지 않음 — 사용자 결정, 2026-11-11)
  * 파일은 서버로 보내지 않는다. 문서 내용은 고치지 않고 그대로 넣고, 지침에 안 맞는 곳은 설계 화면에서 빨간색으로 보인다.
+ * 앱이 자동으로 고친 것·문서에 없는 필수 정보는 저장하기 전에 팝업으로 꼭 보여 주고 확인받는다.
  */
 export function DocumentImport({ schoolName }: { schoolName: string }) {
   const thisYear = nextSchoolYear();
@@ -30,8 +32,6 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
   const [file, setFile] = useState<{ name: string; result: ReadResult } | null>(null);
   const [reading, setReading] = useState(false);
   const [readError, setReadError] = useState("");
-  /** 글자 대신 원본 파일을 AI에 직접 첨부하는 방식 */
-  const [attach, setAttach] = useState(false);
   const [answer1, setAnswer1] = useState("");
   const [answer2, setAnswer2] = useState("");
   /** '답변 초기화' 확인 팝업: 몇 부 답을 지울지 */
@@ -39,12 +39,10 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
   const [error, setError] = useState("");
   const [multiple, setMultiple] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<{ id: string; name: string; notes: string[] } | null>(null);
+  const [done, setDone] = useState<{ id: string; name: string; notes: string[]; fixes: string[] } | null>(null);
   const [drag, setDrag] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
-  const scanned = !!file && looksScanned(file.result);
-  const useAttach = attach || scanned;
 
   const pick = async (f: File | undefined) => {
     if (!f) return;
@@ -64,11 +62,11 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
     }
   };
 
-  /** 문서에서 찾지 못한 기본 정보를 고르는 팝업 */
-  const [ask, setAsk] = useState<{ doc: DesignDoc; notes: string[]; missing: MissingField[]; originalCodes: Record<string, string> } | null>(null);
+  /** 가져오기 전 확인 팝업: 고를 칸 + 자동으로 고친 것 + 알림 */
+  const [ask, setAsk] = useState<{ doc: DesignDoc; notes: string[]; fixes: string[]; missing: MissingField[]; originalCodes: Record<string, string> } | null>(null);
 
   const importNow = () => {
-    const r = parseImport(answer1, answer2, { schoolYear: year, schoolName, sourceText: useAttach ? undefined : file?.result.text });
+    const r = parseImport(answer1, answer2, { schoolYear: year, schoolName, sourceText: file?.result.text });
     if (!r.ok) {
       if (r.multiple) {
         setMultiple(r.multiple);
@@ -77,11 +75,12 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
       return;
     }
     setError("");
-    if (r.missing.length) setAsk(r);
-    else void save(r.doc, r.notes);
+    // 고를 칸·자동으로 고친 것·알림이 하나라도 있으면 저장 전에 꼭 확인받는다
+    if (r.missing.length || r.fixes.length || r.notes.length) setAsk(r);
+    else void save(r.doc, [], []);
   };
 
-  const save = async (doc: DesignDoc, baseNotes: string[]) => {
+  const save = async (doc: DesignDoc, baseNotes: string[], fixes: string[]) => {
     setBusy(true);
     try {
       // 같은 학년도에 같은 이름이 있으면 '이름 (2)'로
@@ -91,7 +90,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
       const notes = [...baseNotes];
       if (before && doc.basic.name !== before) notes.unshift(`${year}학년도에 같은 이름의 설계가 있어 「${doc.basic.name}」(으)로 넣었어요.`);
       const saved = await api<{ record: { id: string } }>("/api/designs", { method: "POST", body: { doc } });
-      setDone({ id: saved.record.id, name: doc.basic.name, notes });
+      setDone({ id: saved.record.id, name: doc.basic.name, notes, fixes });
       setFile(null);
       setAnswer1("");
       setAnswer2("");
@@ -143,18 +142,22 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
           className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-6 text-center text-sm ${drag ? "border-brand-500 bg-brand-50" : "border-gray-300 bg-gray-50"}`}
         >
           <p className="text-gray-600">
-            PDF(.pdf) 또는 한글(.hwpx) 파일을 여기에 끌어다 놓거나{" "}
+            한글(.hwpx) 파일을 여기에 끌어다 놓거나{" "}
             <button type="button" onClick={() => input.current?.click()} className="font-semibold text-brand-700 underline">
               파일 고르기
             </button>
           </p>
-          <p className="text-xs text-gray-500">예전 한글 파일(.hwp)은 한글에서 .hwpx 또는 PDF로 저장해 올려 주세요. 파일은 서버로 보내지 않고 이 컴퓨터에서만 읽어요.</p>
-          <input ref={input} type="file" accept=".pdf,.hwpx" className="hidden" onChange={(e) => void pick(e.target.files?.[0])} />
+          <p className="text-xs text-gray-500">
+            한글(hwpx) 파일만 올릴 수 있어요. 예전 한글 파일(.hwp)은 한글에서 <b>[파일] → [다른 이름으로 저장] → 파일 형식 'HWPX'</b>로 저장해 올려 주세요. (PDF는 표가 섞여 읽혀서 받지 않아요)
+            <br />
+            파일은 서버로 보내지 않고 이 컴퓨터에서만 읽어요.
+          </p>
+          <input ref={input} type="file" accept=".hwpx" className="hidden" onChange={(e) => void pick(e.target.files?.[0])} />
           {reading && <p className="font-semibold text-gray-700">파일을 읽는 중…</p>}
           {readError && <p className="font-semibold text-red-600">{readError}</p>}
           {file && (
             <p className="font-semibold text-brand-700">
-              ✓ {file.name} — {file.result.kind === "pdf" ? `${file.result.pages}쪽, ` : ""}글자 {file.result.text.length.toLocaleString()}자를 읽었어요
+              ✓ {file.name} — 글자 {file.result.text.length.toLocaleString()}자를 읽었어요
             </p>
           )}
         </div>
@@ -167,19 +170,9 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
             <p className={stepTitle}>
               <span className={num}>2</span> 프롬프트를 복사해 AI에 보내고, 답(1부)을 붙여 넣으세요
             </p>
-            {scanned ? (
-              <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">
-                이 파일은 글자를 거의 읽지 못했어요 (스캔한 그림 문서일 수 있어요). 아래 프롬프트를 복사하고, AI 대화창에 <b>원본 파일을 함께 첨부</b>해 보내세요.
-              </p>
-            ) : (
-              <label className="flex items-center gap-2 text-sm text-gray-600">
-                <input type="checkbox" checked={attach} onChange={(e) => setAttach(e.target.checked)} />
-                표가 많이 깨져 보이면: 글자 대신 <b>원본 파일을 AI에 직접 첨부</b>하기 (파일 첨부가 되는 AI만)
-              </label>
-            )}
             <p className="text-xs text-amber-700">문서에 학생 이름 등 개인정보가 있으면 지우고 보내세요.</p>
             <CopyBox
-              text={buildImportPrompt(useAttach ? "" : file.result.text)}
+              text={buildImportPrompt(file.result.text)}
               label="프롬프트 복사"
               rows={5}
               extra={
@@ -280,16 +273,19 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
         </Modal>
       )}
       {ask && (
-        <MissingModal
+        <ConfirmImportModal
           missing={ask.missing}
+          fixes={ask.fixes}
+          notes={ask.notes}
           doc={ask.doc}
           onClose={() => setAsk(null)}
           onConfirm={(doc) => {
             // 편성 교과·학년이 바뀌면 성취기준 코드 알림도 다시 계산
             const code = codeDiffNote(doc, ask.originalCodes);
             const notes = [...ask.notes.filter((n) => !n.startsWith(CODE_NOTE_START)), ...(code ? [code] : [])];
+            const fixes = ask.fixes;
             setAsk(null);
-            void save(doc, notes);
+            void save(doc, notes, fixes);
           }}
         />
       )}
@@ -305,7 +301,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
         >
           <p className="font-semibold">이 파일에는 설계가 {multiple}개 들어 있어요.</p>
           <p className="text-sm">
-            한글이나 PDF 프로그램에서 <b>설계마다 파일을 나눠 저장</b>한 뒤, 하나씩 올려 주세요. (예: 3학년 문서만 따로 PDF로 저장)
+            한글에서 <b>설계마다 파일을 나눠 저장</b>한 뒤(hwpx), 하나씩 올려 주세요. (예: 3학년 부분만 남기고 다른 이름으로 저장)
           </p>
         </Modal>
       )}
@@ -313,7 +309,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
         <Modal
           title="설계 현황에 반영되었어요"
           tone="brand"
-          wide={done.notes.length > 0}
+          wide={done.notes.length + done.fixes.length > 0}
           onClose={() => setDone(null)}
           actions={
             <>
@@ -333,15 +329,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
             「<b>{done.name}</b>」을(를) {year}학년도 설계로 가져왔어요.
           </p>
           <p className="text-sm text-gray-600">설계를 열면 단계마다 내용이 들어가 있어요. 지침에 맞지 않는 곳이 있는 단계는 번호가 빨간색으로 보여요.</p>
-          {done.notes.length > 0 && (
-            <ul className="space-y-1">
-              {done.notes.map((n) => (
-                <li key={n} className="rounded-lg bg-blue-50 p-2 text-sm text-blue-800">
-                  ℹ️ {n}
-                </li>
-              ))}
-            </ul>
-          )}
+          <NoteLists fixes={done.fixes} notes={done.notes} />
         </Modal>
       )}
     </div>
@@ -357,16 +345,68 @@ const FIELD_LABEL: Record<MissingField["key"], string> = {
   subjectGroup: "편성 교과",
   openingType: "개설 형태",
   operationMode: "운영 방식",
+  abbrev: "성취기준 코드의 과목명 약어 (2~3자)",
 };
 
-/** 문서에서 찾지 못한 기본 정보만 골라·적어 넣는 팝업. 모두 채워야 가져오기를 끝낸다. */
-function MissingModal({ missing, doc, onClose, onConfirm }: { missing: MissingField[]; doc: DesignDoc; onClose: () => void; onConfirm: (doc: DesignDoc) => void }) {
+/** 앱이 자동으로 고친 것(주황) + 알림(파랑) 목록 */
+function NoteLists({ fixes, notes }: { fixes: string[]; notes: string[] }) {
+  return (
+    <>
+      {fixes.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-sm font-bold text-amber-800">앱이 자동으로 고친 것 ({fixes.length}가지)</p>
+          <ul className="space-y-1">
+            {fixes.map((n) => (
+              <li key={n} className="rounded-lg bg-amber-50 p-2 text-sm text-amber-900">
+                🔧 {n}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {notes.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-sm font-bold text-blue-800">알림 ({notes.length}가지)</p>
+          <ul className="space-y-1">
+            {notes.map((n) => (
+              <li key={n} className="rounded-lg bg-blue-50 p-2 text-sm text-blue-800">
+                ℹ️ {n}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * 가져오기 전 확인 팝업 (사용자 결정, 2026-11-11)
+ * - 문서에서 알 수 없는 필수 정보: 고르거나 입력해야 가져오기가 눌림
+ * - 앱이 자동으로 고친 것과 알림: 모두 보여 주고 확인받음
+ */
+function ConfirmImportModal({
+  missing,
+  fixes,
+  notes,
+  doc,
+  onClose,
+  onConfirm,
+}: {
+  missing: MissingField[];
+  fixes: string[];
+  notes: string[];
+  doc: DesignDoc;
+  onClose: () => void;
+  onConfirm: (doc: DesignDoc) => void;
+}) {
   const [v, setV] = useState<Record<string, string>>({});
   const set = (k: string, val: string) => setV((o) => ({ ...o, [k]: val }));
   const filled = (k: MissingField["key"]) => {
     const x = (v[k] ?? "").trim();
     if (k === "hours") return Number(x) >= 1 && Number(x) <= 40;
     if (k === "name") return x.length > 0 && x.length <= 40;
+    if (k === "abbrev") return /^[가-힣A-Za-z]{2,3}$/.test(x);
     return x.length > 0;
   };
   const ready = missing.every((m) => filled(m.key));
@@ -381,6 +421,7 @@ function MissingModal({ missing, doc, onClose, onConfirm }: { missing: MissingFi
       else if (key === "hours") next.basic.hours = Number(x);
       else if (key === "subjectGroup") next.basic.subjectGroup = x;
       else if (key === "openingType") next.basic.openingType = x as DesignDoc["basic"]["openingType"];
+      else if (key === "abbrev") next.abbrev = x;
       else next.basic.operationMode = x as DesignDoc["basic"]["operationMode"];
     }
     onConfirm(next);
@@ -398,8 +439,9 @@ function MissingModal({ missing, doc, onClose, onConfirm }: { missing: MissingFi
   const plain = (list: readonly (string | number)[], suffix = "") => list.map((x) => ({ value: String(x), label: `${x}${suffix}` }));
   return (
     <Modal
-      title="문서에서 찾지 못한 정보를 골라 주세요"
+      title={missing.length ? "문서에서 찾지 못한 정보를 골라 주세요" : "가져오기 전에 확인해 주세요"}
       tone="amber"
+      wide
       onClose={onClose}
       actions={
         <>
@@ -407,14 +449,16 @@ function MissingModal({ missing, doc, onClose, onConfirm }: { missing: MissingFi
             닫기
           </button>
           <button type="button" onClick={confirm} disabled={!ready} className="rounded-lg bg-brand-600 px-5 py-2 font-bold text-white hover:bg-brand-700 disabled:bg-gray-300">
-            가져오기
+            확인하고 가져오기
           </button>
         </>
       }
     >
-      <p className="text-sm text-gray-600">
-        「{doc.basic.name || "이름 없음"}」의 아래 칸은 문서에 없거나 앱의 선택지와 달라요. 골라 주시면 가져올게요. (나중에 기본 정보 단계에서도 고칠 수 있어요)
-      </p>
+      {missing.length > 0 && (
+        <p className="text-sm text-gray-600">
+          「{doc.basic.name || "이름 없음"}」의 아래 칸은 문서에 없거나 앱의 선택지와 달라요. <b>꼭 필요한 정보</b>라 골라 주셔야 가져올 수 있어요. (나중에 기본 정보 단계에서도 고칠 수 있어요)
+        </p>
+      )}
       <div className="space-y-3">
         {missing.map(({ key, raw }) => (
           <label key={key} className="block space-y-1">
@@ -429,9 +473,11 @@ function MissingModal({ missing, doc, onClose, onConfirm }: { missing: MissingFi
             {key === "subjectGroup" && select(key, plain(SUBJECT_GROUPS))}
             {key === "openingType" && select(key, plain(OPENING_TYPES))}
             {key === "operationMode" && select(key, plain(OPERATION_MODES))}
+            {key === "abbrev" && <input className={inputClass} maxLength={3} value={v.abbrev ?? ""} onChange={(e) => set("abbrev", e.target.value.trim())} placeholder="예: 지구, 디탐" />}
           </label>
         ))}
       </div>
+      <NoteLists fixes={fixes} notes={notes} />
     </Modal>
   );
 }

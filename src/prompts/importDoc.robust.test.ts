@@ -108,13 +108,55 @@ describe("AI 답의 흔한 실수 (가상 시뮬레이션 회귀)", () => {
     if (!r.ok) return;
     expect(r.doc.basic.name).toBe(seed.basic.name);
     expect(r.doc.intro.rationale).not.toContain("개괄적으로");
-    expect(r.notes.join()).toContain("작성 안내문");
+    expect(r.fixes.join()).toContain("작성 안내문");
+    expect(r.fixes.join()).toContain("조각을 이어 붙여");
+    expect(r.fixes.join()).toContain("형식 오류");
     // 문장 중간에서 끊긴 뒤 이어 붙이기 (줄바꿈 없이), 8자 이상 되풀이한 부분은 한 번만
     expect(joinFragments('{"a": "세계와 연결된\n', ' 나의 삶"}')).toBe('{"a": "세계와 연결된 나의 삶"}');
     expect(joinFragments('{"a": "세계와 연결된 나의 삶을 이해하고\n', '나의 삶을 이해하고 탐구한다"}')).toBe('{"a": "세계와 연결된 나의 삶을 이해하고 탐구한다"}');
     expect(stripJsonComments('{"u": "http://x", // 설명\n "b": 1 /* 끝 */}')).toBe('{"u": "http://x", \n "b": 1 }');
     expect(isGuideLine("2. 총괄 목표와 세부 목표로 구분하여 제시한다.")).toBe(true);
     expect(isGuideLine("(1) 놀이 방법을 창의적으로 바꾸어 제시한다.")).toBe(false);
+  });
+
+  it("자동으로 고친 것은 하나도 빠짐없이 fixes로 알린다 (가져오기 전 팝업)", () => {
+    const [a, b] = answers();
+    a.standards[0].elements = a.standards[0].elements.join(", ");
+    a.detailGoals = a.detailGoals.map((g: string, i: number) => `(${i + 1}) ${g}`);
+    a.openingType = a.openingType.replace(/ /g, "");
+    delete a.abbrev;
+    a.standards.forEach((x: J) => delete x.area);
+    let n = 1;
+    for (const l of lessons(b)) {
+      if (l.goal) { l.activities = ["·" + l.goal, ...l.activities.map((x: string) => "- " + x)]; l.goal = ""; }
+      l.lesson = `${n}/29`;
+      n += l.hours;
+      delete l.hours;
+    }
+    b.units[0].unitName = "1단원 " + b.units[0].unitName;
+    const L = b.assessments[0].levels;
+    b.assessments[0].levels = { "◎": L.A, "○": L.B, "△": L.C };
+    b.assessments[0].methods = b.assessments[0].methods.join(", ");
+    b.assessments[0].standards = b.assessments[0].standards.join(", ");
+    const r = read(fence(a), fence(b));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const f = r.fixes.join("\n");
+    for (const want of ["내용 요소를 하나씩", "세부 목표 앞의 번호", "띄어쓰기를 앱 선택지에", "약어가 답에 없어", "영역 번호가 없어", "기호(·, -)를 뗐어요", "학습 목표로 옮겼어요", "차시 칸", "단원명 앞의 번호", "◎·○·△ → A·B·C", "평가 방법을 하나씩", "성취기준 코드를 하나씩"]) {
+      expect(f, want).toContain(want);
+    }
+    // 정상 답은 고친 것이 없다
+    const [a2, b2] = answers();
+    const ok = read(fence(a2), fence(b2));
+    expect(ok.ok && ok.fixes).toEqual([]);
+  });
+
+  it("코드에서도 약어를 알 수 없으면 필수 정보로 묻는다", () => {
+    const [a, b] = answers();
+    delete a.abbrev;
+    a.standards.forEach((x: J) => (x.code = ""));
+    const r = read(fence(a), fence(b));
+    expect(r.ok && r.missing.map((m) => m.key)).toContain("abbrev");
   });
 
   it("막아야 하는 답: 끊긴 답(이어서 없음), 과목(활동) 섞임은 묻기, 내용 바꿔 쓰기", () => {

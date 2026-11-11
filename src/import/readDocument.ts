@@ -1,38 +1,21 @@
 "use client";
 
-import { pdfPageText, hwpxSectionText, sortSections } from "./textLayout";
+import { hwpxSectionText, sortSections } from "./textLayout";
 
 export interface ReadResult {
   text: string;
+  /** hwpx 본문(section) 수 */
   pages: number;
-  kind: "pdf" | "hwpx";
 }
 
-/** 브라우저에서 PDF·hwpx 파일의 글자를 뽑는다. 파일은 서버로 보내지 않는다. */
+/** 브라우저에서 한글(hwpx) 파일의 글자를 뽑는다. 파일은 서버로 보내지 않는다. */
 export async function readDocument(file: File): Promise<ReadResult> {
+  // 한글(hwpx)만 받는다 (사용자 결정, 2026-11-11): PDF는 표 칸이 줄마다 섞여 읽혀 AI가 잘못 옮기기 쉬움
   const name = file.name.toLowerCase();
-  if (name.endsWith(".pdf")) return readPdf(file);
   if (name.endsWith(".hwpx")) return readHwpx(file);
-  if (name.endsWith(".hwp")) throw new Error("예전 한글 파일(.hwp)은 읽을 수 없어요. 한글에서 '다른 이름으로 저장 → .hwpx' 또는 PDF로 저장해 올려 주세요.");
-  throw new Error("PDF(.pdf) 또는 한글(.hwpx) 파일만 올릴 수 있어요.");
-}
-
-async function readPdf(file: File): Promise<ReadResult> {
-  const pdfjs = await import("pdfjs-dist");
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
-  const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
-  const pages: string[] = [];
-  for (let p = 1; p <= pdf.numPages; p++) {
-    const page = await pdf.getPage(p);
-    const content = await page.getTextContent();
-    const items = content.items.flatMap((it) =>
-      "str" in it ? [{ str: it.str, x: it.transform[4], y: it.transform[5], width: it.width, height: it.height || Math.abs(it.transform[3]) }] : [],
-    );
-    const { width, height } = page.getViewport({ scale: 1 });
-    pages.push(pdfPageText(items, { width, height }));
-  }
-  await pdf.destroy();
-  return { text: pages.map((t, i) => `[${i + 1}쪽]\n${t}`).join("\n\n"), pages: pages.length, kind: "pdf" };
+  if (name.endsWith(".hwp")) throw new Error("예전 한글 파일(.hwp)은 읽을 수 없어요. 한글에서 [파일] → [다른 이름으로 저장] → 파일 형식 'HWPX'로 저장해 올려 주세요.");
+  if (name.endsWith(".pdf")) throw new Error("PDF는 표가 섞여 읽혀서 받지 않아요. 원본 한글 파일을 [다른 이름으로 저장] → 'HWPX'로 저장해 올려 주세요.");
+  throw new Error("한글(.hwpx) 파일만 올릴 수 있어요.");
 }
 
 async function readHwpx(file: File): Promise<ReadResult> {
@@ -42,8 +25,7 @@ async function readHwpx(file: File): Promise<ReadResult> {
   if (sections.length === 0) throw new Error("한글(hwpx) 파일의 본문을 찾지 못했어요. 파일이 손상되지 않았는지 확인해 주세요.");
   const texts: string[] = [];
   for (const s of sections) texts.push(hwpxSectionText(await zip.files[s].async("string")));
-  return { text: texts.join("\n\n"), pages: sections.length, kind: "hwpx" };
+  const text = texts.join("\n\n");
+  if (!text.trim()) throw new Error("한글 파일에서 글자를 찾지 못했어요. 그림으로만 된 문서인지 확인해 주세요.");
+  return { text, pages: sections.length };
 }
-
-/** 뽑은 글자가 거의 없으면 스캔(그림) 문서로 본다 */
-export const looksScanned = (r: ReadResult) => r.text.replace(/\[\d+쪽\]|\s/g, "").length < 50 * Math.max(1, r.kind === "pdf" ? r.pages : 1);

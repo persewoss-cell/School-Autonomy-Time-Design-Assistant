@@ -86,7 +86,7 @@ const PLACEHOLDER_RULE = "괄호 ( ) 안의 말은 자리 표시입니다. 그�
 /** 1부 프롬프트. text가 비면(스캔 문서) 원본 파일을 AI에 직접 첨부하도록 안내한다. */
 export function buildImportPrompt(text: string): string {
   const source = text.trim()
-    ? `## 문서 내용 (PDF·한글 파일에서 뽑은 글자)
+    ? `## 문서 내용 (한글 파일에서 뽑은 글자)
 표는 칸이 ' | '로 나뉘어 있고, 한 칸 안의 줄바꿈은 ' / '로 표시되어 있습니다. 줄바꿈·순서가 조금 섞였을 수 있으니 문맥으로 바르게 맞춰 읽으세요.
 좁은 칸이라 낱말 중간에서 줄이 바뀐 곳(예: '작가 / 님과 / 함께')은 원래 낱말로 붙여 씁니다('작가님과 함께').
 
@@ -192,13 +192,24 @@ function cleanStrings(v: unknown): unknown {
   return v;
 }
 
+/** 바로 앞 tryParse가 형식 정리(주석·둥근 따옴표·끝 쉼표·보이지 않는 글자)를 했는지 */
+let lastCleaned = false;
 function tryParse(body: string): unknown | undefined {
   const start = body.indexOf("{");
   const end = body.lastIndexOf("}");
   if (start === -1 || end <= start) return undefined;
-  const t = stripJsonComments(body.slice(start, end + 1).replace(/[“”]/g, '"')).replace(/,\s*([}\]])/g, "$1");
+  const raw = body.slice(start, end + 1);
+  const t = stripJsonComments(raw.replace(/[“”]/g, '"')).replace(/,\s*([}\]])/g, "$1");
   try {
-    return cleanStrings(JSON.parse(t));
+    const v = JSON.parse(t);
+    let plain = true;
+    try {
+      JSON.parse(raw);
+    } catch {
+      plain = false;
+    }
+    lastCleaned = !plain || /[\u200b-\u200d\u2060\ufeff]/.test(raw);
+    return cleanStrings(v);
   } catch {
     return undefined;
   }
@@ -222,34 +233,39 @@ export function joinFragments(a: string, b: string): string {
  * 답이 끊겨 '이어서'로 받은 조각들은 앞 조각과 이어 붙여 다시 읽어 본다.
  * broken: 읽지 못한 조각이 남았는지 (답이 중간에 끊겼을 가능성)
  */
-export function extractJsonBlocks(text: string): { objects: unknown[]; broken: boolean } {
+export function extractJsonBlocks(text: string): { objects: unknown[]; broken: boolean; joined: number; cleaned: boolean } {
   // 블록 안의 공백은 그대로 둔다 (끊긴 조각을 이어 붙일 때 문장 속 띄어쓰기가 사라지지 않게)
   const fences = [...text.matchAll(/```(?:json|JSON)?[ \t]*\r?\n?([\s\S]*?)(?:```|$)/g)].map((m) => m[1]).filter((b) => b.trim());
   const bodies = fences.length ? fences : [text];
   const objects: unknown[] = [];
   let broken = false;
+  let joined = 0;
+  let cleaned = false;
   for (let i = 0; i < bodies.length; i++) {
     const one = tryParse(bodies[i]);
     if (one !== undefined) {
+      cleaned ||= lastCleaned;
       objects.push(one);
       continue;
     }
     if (!bodies[i].includes("{")) continue;
     // 끊긴 조각: 뒤 조각들을 하나씩 이어 붙여 읽히는지 본다
-    let joined = bodies[i];
+    let piece = bodies[i];
     let done = false;
     for (let j = i + 1; j < bodies.length && !done; j++) {
-      joined = joinFragments(joined, bodies[j]);
-      const merged = tryParse(joined);
+      piece = joinFragments(piece, bodies[j]);
+      const merged = tryParse(piece);
       if (merged !== undefined) {
+        cleaned ||= lastCleaned;
         objects.push(merged);
+        joined += j - i;
         i = j;
         done = true;
       }
     }
     if (!done) broken = true;
   }
-  return { objects, broken };
+  return { objects, broken, joined, cleaned };
 }
 
 type Obj = Record<string, unknown>;
@@ -292,7 +308,7 @@ const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const codeKey = (c: string) => c.replace(/\s/g, "").replace(/^\[?/, "[").replace(/\]?$/, "]");
 
 /** 문서에서 찾지 못해 가져오기 전에 선생님이 고르거나 입력할 기본 정보 칸 */
-export type MissingKey = "type" | "name" | "grade" | "semester" | "hours" | "subjectGroup" | "openingType" | "operationMode";
+export type MissingKey = "type" | "name" | "grade" | "semester" | "hours" | "subjectGroup" | "openingType" | "operationMode" | "abbrev";
 export interface MissingField {
   key: MissingKey;
   /** AI 답에 적힌 값 (없으면 "") */
@@ -300,7 +316,17 @@ export interface MissingField {
 }
 
 export type ImportParse =
-  | { ok: true; doc: DesignDoc; notes: string[]; missing: MissingField[]; /** 성취기준 id → 문서의 원래 코드 */ originalCodes: Record<string, string> }
+  | {
+      ok: true;
+      doc: DesignDoc;
+      /** 알림 (학년도 다름, 코드 규칙 다름, 연결 못 한 코드 등) */
+      notes: string[];
+      /** 앱이 자동으로 고친 것 — 가져오기 전 팝업에서 꼭 보여 준다 (사용자 결정, 2026-11-11) */
+      fixes: string[];
+      missing: MissingField[];
+      /** 성취기준 id → 문서의 원래 코드 */
+      originalCodes: Record<string, string>;
+    }
   | { ok: false; error: string; multiple?: number };
 
 /**
@@ -344,6 +370,18 @@ export function parseImport(
   const notes: string[] = [];
   const missing: MissingField[] = [];
   const doc = emptyDesign();
+  // 자동으로 고친 것: 종류별로 몇 번, 예시 2개까지
+  const fixLog = new Map<string, { n: number; ex: string[] }>();
+  const fix = (kind: string, example?: string, n = 1) => {
+    const f = fixLog.get(kind) ?? { n: 0, ex: [] };
+    f.n += n;
+    if (example && f.ex.length < 2 && !f.ex.includes(example)) f.ex.push(example);
+    fixLog.set(kind, f);
+  };
+  if (b1.cleaned || b2.cleaned) fix("AI 답의 형식 오류(설명 주석, 둥근 따옴표, 끝 쉼표, 보이지 않는 글자)를 정리해서 읽었어요.");
+  if (b1.joined + b2.joined) fix("끊겨서 나눠 받은 답 조각을 이어 붙여 읽었어요.", undefined, b1.joined + b2.joined);
+  if (all.filter((o) => num(o.part) === 1 || "standards" in o).length > 1 || all.filter((o) => num(o.part) === 2 || "units" in o).length > 1)
+    fix("같은 칸에 답이 여러 개 있어 마지막(새) 답을 썼어요.");
 
   // ① 기본 정보: 앱 선택지에 없는 값은 기본값으로 바꾸고 알림
   const typeRaw = str(p1.type);
@@ -367,7 +405,10 @@ export function parseImport(
   else missing.push({ key: "semester", raw: str(p1.semester) });
   const pick = <T extends string>(key: MissingKey, raw: string, list: readonly T[], fallback: T): T => {
     const hit = list.find((x) => x.replace(/\s/g, "") === raw.replace(/\s/g, ""));
-    if (hit) return hit;
+    if (hit) {
+      if (hit !== raw) fix("선택지 이름의 띄어쓰기를 앱 선택지에 맞췄어요.", `'${raw}' → '${hit}'`);
+      return hit;
+    }
     missing.push({ key, raw });
     return fallback;
   };
@@ -387,7 +428,7 @@ export function parseImport(
   doc.coreIdeas = toList(p1.coreIdeas);
   doc.input = {
     ...doc.input,
-    topic: str(p1.topic) || doc.areas.map((a) => a.name).filter(Boolean).join(" · "),
+    topic: str(p1.topic) || (fix("문서에 주제가 따로 없어 영역 이름을 이어 주제로 넣었어요."), doc.areas.map((a) => a.name).filter(Boolean).join(" · ")),
     areaCount: doc.areas.length ? Math.min(5, doc.areas.length) : null,
     areaNames: doc.areas.map((a) => a.name).filter(Boolean).slice(0, 5),
   };
@@ -397,7 +438,11 @@ export function parseImport(
   const elementsOf = (v: unknown): string[] =>
     toList(v).flatMap((e) => {
       const parts = e.split(/[,，]/).map((x) => x.trim()).filter(Boolean);
-      return parts.length > 1 && parts.every((x) => allElements.has(x)) ? parts : [e];
+      if (parts.length > 1 && parts.every((x) => allElements.has(x))) {
+        fix("쉼표로 이어 쓴 내용 요소를 하나씩 나눴어요.", e);
+        return parts;
+      }
+      return [e];
     });
 
   // ⑤ 성취기준: 코드는 앱이 위치로 계산하므로, 원본 코드는 id 연결에만 쓴다
@@ -412,13 +457,24 @@ export function parseImport(
         idByCode.set(codeKey(code), id);
         originalCode.set(id, code);
       }
-      const area = num(s.area) ?? Number(code.match(/(\d{2})-\d{2}\]?$/)?.[1] ?? 1);
+      let area = num(s.area);
+      if (area === null || area < 1) {
+        area = Number(code.match(/(\d{2})-\d{2}\]?$/)?.[1] ?? 1);
+        fix("성취기준의 영역 번호가 없어 코드(…01-01의 01)로 영역을 정했어요.", code || undefined);
+      }
       const elements = elementsOf(s.elements);
       return { id, areaIndex: Math.max(0, area - 1), text: str(s.text), elements, textFor: elements };
     });
   // 같은 영역끼리 순서대로 모아 둔다 (코드 순번은 영역 안 순서로 계산됨)
+  const order = doc.standards.map((s) => s.id).join();
   doc.standards.sort((a, b) => a.areaIndex - b.areaIndex);
-  doc.abbrev = str(p1.abbrev) || guessAbbrev([...originalCode.values()][0] ?? "", doc.basic.subjectGroup);
+  if (doc.standards.map((s) => s.id).join() !== order) fix("성취기준을 영역 순서대로 다시 늘어놓았어요.");
+  doc.abbrev = str(p1.abbrev);
+  if (!doc.abbrev) {
+    doc.abbrev = guessAbbrev([...originalCode.values()][0] ?? "", doc.basic.subjectGroup);
+    if (doc.abbrev) fix("성취기준 약어가 답에 없어 코드에서 짐작했어요.", `'${doc.abbrev}'`);
+    else missing.push({ key: "abbrev", raw: "" });
+  }
 
   const originalCodes = Object.fromEntries(originalCode);
   const codeNote = codeDiffNote(doc, originalCodes);
@@ -438,7 +494,12 @@ export function parseImport(
       .trim();
 
   // ⑥ 필요성(성격)·목표
-  const goals = toList(p1.detailGoals).map((g) => g.replace(/^\(?\d\)\s*/, ""));
+  const goals = toList(p1.detailGoals).map((g) => {
+    const t = g.replace(/^\(?\d\)\s*/, "");
+    if (t !== g) fix("세부 목표 앞의 번호((1)(2)(3))를 뗐어요. (문서에서 앱이 다시 붙임)");
+    return t;
+  });
+  if (goals.length > 3) fix(`세부 목표가 ${goals.length}개라 4번째부터는 3번째 칸에 이어 붙였어요. 필요성·목표 단계에서 확인해 주세요.`);
   doc.intro = { rationale: dropGuide(str(p1.rationale)), overallGoal: dropGuide(str(p1.overallGoal)), detailGoals: [goals[0] ?? "", goals[1] ?? "", goals.slice(2).join(" ")] };
 
   // (과목) 교수·학습 및 평가
@@ -453,7 +514,11 @@ export function parseImport(
   // 계획서·신청서
   const ap = isObj(p1.application) ? p1.application : {};
   const plans = toList(ap.teacherPlans)
-    .map((p) => TEACHER_PLANS.find((x) => p.includes(x.slice(0, 4)) || x.includes(p)) ?? null)
+    .map((p) => {
+      const hit = TEACHER_PLANS.find((x) => p.includes(x.slice(0, 4)) || x.includes(p)) ?? null;
+      if (hit && hit !== p) fix("지도교사 확보 방안을 앱 선택지 문구로 맞췄어요.", `'${p}' → '${hit}'`);
+      return hit;
+    })
     .filter((x): x is (typeof TEACHER_PLANS)[number] => !!x);
   doc.application = {
     ...doc.application,
@@ -470,29 +535,53 @@ export function parseImport(
 
   // ⑦ 단원 지도계획 (고른 안으로 바로 넣음)
   const unknownCodes = new Set<string>();
-  const idsOf = (codes: unknown): string[] =>
-    codesOf(codes).flatMap((c) => {
+  const idsOf = (codes: unknown): string[] => {
+    const list = codesOf(codes);
+    if (typeof codes === "string" && list.length > 1) fix("한 칸에 이어 쓴 성취기준 코드를 하나씩 나눴어요.", codes);
+    return list.flatMap((c) => {
       const id = idByCode.get(codeKey(c));
       if (!id) unknownCodes.add(c);
       return id ? [id] : [];
     });
+  };
   const units: Unit[] = arr(p2.units)
     .filter(isObj)
     .map((u, ui) => ({
       // '1단원 먼저 읽어요' → '먼저 읽어요' (번호는 앱이 붙임)
-      unitName: stripUnitNo(str(u.unitName)),
+      unitName: (() => {
+        const raw = str(u.unitName);
+        const t = stripUnitNo(raw);
+        if (t !== raw) fix("단원명 앞의 번호를 뗐어요. (문서에서 앱이 'N단원'을 붙임)", `'${raw}' → '${t}'`);
+        return t;
+      })(),
       standardIds: doc.standards.filter((s) => s.areaIndex === ui).map((s) => s.id),
       lessons: arr(u.lessons)
         .filter(isObj)
         .map((l): Lesson => {
           const assessed = idsOf(l.assessStandards);
           // 원본의 '·~해 봅시다.' 첫 줄을 AI가 활동에 넣었으면 학습 목표로 옮김
-          let goal = unbullet(str(l.goal));
+          const rawGoal = str(l.goal);
+          let goal = unbullet(rawGoal);
           const activities = toList(l.activities).map(unbullet).filter(Boolean);
-          if (!goal && activities.length > 1 && /(시다|봅시다|합시다)\.?$/.test(activities[0])) goal = activities.shift()!;
+          // toList도 앞 기호를 떼므로, 답에 적힌 그대로의 글자로 기호가 있었는지 본다
+          const BULLET = /^\s*[·⋅•∙▫*\-–]/;
+          const rawLines = Array.isArray(l.activities) ? l.activities.map(String) : String(l.activities ?? "").split("\n");
+          if (BULLET.test(rawGoal) || rawLines.some((x) => BULLET.test(x))) fix("학습 목표·학습 내용 앞의 기호(·, -)를 뗐어요. (문서에서 앱이 다시 붙임)");
+          // 첫 줄만 '·'로 시작하고 나머지는 '-'이면(원본의 '·학습 목표 / -활동' 모양) 문장 끝과 상관없이 첫 줄이 학습 목표
+          const dotFirst = rawLines.length > 1 && /^\s*[·⋅•∙]/.test(rawLines[0]) && rawLines.slice(1).every((x) => /^\s*[-–]/.test(x));
+          if (!goal && activities.length > 1 && (dotFirst || /(시다|봅시다|합시다)\.?$/.test(activities[0]))) {
+            goal = activities.shift()!;
+            fix("학습 내용 첫 줄의 '~해 봅시다.' 문장을 학습 목표로 옮겼어요.", goal);
+          }
+          let h = num(l.hours);
+          if (h === null) {
+            h = hoursFromLabel(l.lesson ?? l.label ?? l.no ?? l.period);
+            if (h !== null) fix("차시 수가 없어 차시 칸('2~3/29' 등)으로 셌어요.");
+          }
+          if (h !== null && h > 32) fix(`한 줄의 차시 수(${h})가 너무 커서 32로 줄였어요.`);
           return {
             // hours가 없으면 '2~3/29' 같은 차시 칸으로 묶인 차시 수를 셈
-            hours: Math.max(1, Math.min(32, num(l.hours) ?? hoursFromLabel(l.lesson ?? l.label ?? l.no ?? l.period) ?? 1)),
+            hours: Math.max(1, Math.min(32, h ?? 1)),
             topic: str(l.topic),
             goal,
             activities,
@@ -514,27 +603,31 @@ export function parseImport(
   if (!hours || hours !== doc.basic.hours) missing.push({ key: "hours", raw: hours ? `${hours}시간 (앱 범위 1~40 밖)` : "" });
   else if (!num(p1.hours) && lessonSum) notes.push(`문서에서 운영 시수를 찾지 못해 차시 합계(${lessonSum}시간)로 넣었어요.`);
 
-  if (guideLines) notes.push(`양식의 작성 안내문으로 보이는 줄 ${guideLines}개는 빼고 가져왔어요.`);
+  if (guideLines) fix(`양식의 작성 안내문으로 보이는 줄 ${guideLines}개는 빼고 가져왔어요.`);
 
   // ⑧ 평가 계획 (A·B·C가 여러 줄로 나뉘어 왔으면 mergeLevelRows가 하나로 묶음)
-  doc.assessments = mergeLevelRows(arr(p2.assessments)
+  const rawRows = arr(p2.assessments)
     .filter(isObj)
     .map((a): AssessmentRow => {
-      return {
-        month: str(a.month),
-        standardIds: idsOf(a.standards),
-        focus: str(a.focus),
-        levels: levelsOf(a.levels),
-        methods: listOf(a.methods, /[,，/·、]/),
-      };
-    }));
+      const methods = listOf(a.methods, /[,，/·、]/);
+      if (typeof a.methods === "string" && methods.length > 1) fix("한 칸에 이어 쓴 평가 방법을 하나씩 나눴어요.", a.methods);
+      if (Array.isArray(a.levels)) fix("성취수준 목록을 순서대로 A·B·C에 넣었어요.");
+      else if (isObj(a.levels)) {
+        const odd = Object.keys(a.levels).map((k) => k.trim()).filter((k) => !["A", "B", "C"].includes(k));
+        if (odd.length) fix("성취수준 기호를 A·B·C로 바꿨어요.", `${odd.join("·")} → A·B·C`);
+      }
+      return { month: str(a.month), standardIds: idsOf(a.standards), focus: str(a.focus), levels: levelsOf(a.levels), methods };
+    });
+  doc.assessments = mergeLevelRows(rawRows);
+  if (doc.assessments.length < rawRows.length) fix("여러 줄로 나뉜 A·B·C 성취수준을 평가 계획 하나로 묶었어요.", `${rawRows.length}줄 → ${doc.assessments.length}개`);
   if (unknownCodes.size) notes.push(`성취기준 목록에 없는 코드가 단원 지도계획·평가 계획에 있어 연결하지 못했어요: ${[...unknownCodes].join(", ")}`);
 
   if (opts.sourceText?.trim()) {
     const mismatch = checkAgainstSource(doc, opts.sourceText);
     if (mismatch) return { ok: false, error: mismatch };
   } else notes.push("원본 파일을 AI에 첨부한 방식이라, 답이 문서 내용과 같은지 앱이 확인하지 못했어요. 단계마다 꼭 확인해 주세요.");
-  return { ok: true, doc, notes, missing, originalCodes };
+  const fixes = [...fixLog].map(([kind, f]) => `${kind}${f.n > 1 ? ` (${f.n}곳)` : ""}${f.ex.length ? ` 예: ${f.ex.join(", ")}` : ""}`);
+  return { ok: true, doc, notes, fixes, missing, originalCodes };
 }
 
 /** 단원명 앞의 번호('1단원', '1.', '(1)', 'Ⅰ.')를 뗀다 */

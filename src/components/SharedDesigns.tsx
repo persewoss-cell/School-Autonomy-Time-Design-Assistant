@@ -119,7 +119,7 @@ export function SharedDesignsPage() {
           </div>
         ) : (
           <div className="mt-1 space-y-0.5 text-sm text-gray-600">
-            <p>예전에 만든 학교자율시간 설계 문서(PDF·한글)를 올리면, AI의 도움으로 내용을 그대로 옮겨 우리 학교 설계 현황에 넣어요.</p>
+            <p>예전에 만든 학교자율시간 설계 문서(한글 hwpx 파일)를 올리면, AI의 도움으로 내용을 그대로 옮겨 우리 학교 설계 현황에 넣어요.</p>
             <p>가져온 설계는 단계마다 고치고, 점검하고, 새 양식으로 내려받을 수 있어요.</p>
           </div>
         )}

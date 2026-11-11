@@ -68,7 +68,7 @@
 | `src/domain/` | 설계 문서 타입(`types.ts`), 성취기준 코드 계산(`codes.ts`), 체크리스트(`checklist.ts`), 예시(`sample.ts`) |
 | `src/validation/` | 검증 규칙: 시수(`hours.ts`, `allocation.ts` = 시수 점검 엑셀), 단계별 점검(`design.ts`) |
 | `src/prompts/` | 단계별 복사용 프롬프트 + 붙여 넣은 답 읽기(`steps.ts`, `common.ts`), 기존 문서 가져오기(`importDoc.ts`), 차시별 활동지(`worksheet.ts`) |
-| `src/import/` | 기존 문서(PDF·hwpx)에서 글자 뽑기 (브라우저에서만, 서버로 보내지 않음) |
+| `src/import/` | 기존 문서(한글 hwpx만)에서 글자 뽑기 (브라우저에서만, 서버로 보내지 않음, 한글 메모는 뺌) |
 | `src/export/` | .docx 만들기 (서식1·2·3·4·6·7, 편성표, 차시별 활동지 `worksheetDocx.ts`) |
 | `src/server/` | 저장소(MongoDB/메모리), 로그인·저장·권한 서비스, 세션 |
 | `src/components/wizard/` | 설계 단계 화면 (PPT 순서) |
