@@ -16,9 +16,18 @@ export interface PdfItem {
  * - 높이(y)가 거의 같은 조각은 한 줄, 위에서 아래로
  * - 한 줄 안에서 간격이 넓으면 표의 다른 칸으로 보고 ' | '로 나눈다
  */
-export function pdfPageText(items: PdfItem[]): string {
+export function pdfPageText(items: PdfItem[], page?: { width: number; height: number }): string {
   const parts = items.filter((i) => i.str.trim());
   if (parts.length === 0) return "";
+  // 가로 종이에 두 쪽을 나란히 인쇄한 PDF(2쪽 모아 찍기): 가운데를 가로지르는 글자가 없으면 왼쪽 쪽 → 오른쪽 쪽 순서로 읽는다
+  if (page && page.width > page.height) {
+    const mid = page.width / 2;
+    const gap = page.width * 0.02;
+    const crosses = parts.some((i) => i.x < mid - gap && i.x + i.width > mid + gap);
+    const left = parts.filter((i) => i.x + i.width <= mid + gap);
+    const right = parts.filter((i) => i.x >= mid - gap && !left.includes(i));
+    if (!crosses && left.length >= 5 && right.length >= 5) return [pdfPageText(left), pdfPageText(right)].filter(Boolean).join("\n\n");
+  }
   const lines: PdfItem[][] = [];
   for (const it of [...parts].sort((a, b) => b.y - a.y || a.x - b.x)) {
     const tol = Math.max(2, (it.height || 10) * 0.4);
@@ -66,6 +75,8 @@ export function hwpxSectionText(xml: string): string {
   const tables: { row: string[] | null; cell: string[] | null }[] = [];
   let para = "";
   let inText = false;
+  // 한글 메모(검토 의견)는 본문이 아니므로 건너뛴다: <hp:fieldBegin type="MEMO"> … </hp:fieldBegin>
+  let memoDepth = 0;
   const flushPara = () => {
     const t = para.replace(/\s+/g, " ").trim();
     para = "";
@@ -78,12 +89,18 @@ export function hwpxSectionText(xml: string): string {
   let m: RegExpExecArray | null;
   while ((m = re.exec(xml))) {
     if (m[6] !== undefined) {
-      if (inText) para += decode(m[6]);
+      if (inText && memoDepth === 0) para += decode(m[6]);
       continue;
     }
     const closing = m[1] === "/";
     const name = m[3];
     const selfClose = m[5] === "/";
+    if (name === "fieldBegin") {
+      if (!closing && !selfClose && (memoDepth > 0 || /type="MEMO"/.test(m[4]))) memoDepth++;
+      else if (closing && memoDepth > 0) memoDepth--;
+      continue;
+    }
+    if (memoDepth > 0) continue;
     if (name === "t") {
       inText = !closing && !selfClose;
     } else if (name === "tab" && !closing) {

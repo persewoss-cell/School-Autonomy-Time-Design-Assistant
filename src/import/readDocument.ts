@@ -28,7 +28,8 @@ async function readPdf(file: File): Promise<ReadResult> {
     const items = content.items.flatMap((it) =>
       "str" in it ? [{ str: it.str, x: it.transform[4], y: it.transform[5], width: it.width, height: it.height || Math.abs(it.transform[3]) }] : [],
     );
-    pages.push(pdfPageText(items));
+    const { width, height } = page.getViewport({ scale: 1 });
+    pages.push(pdfPageText(items, { width, height }));
   }
   await pdf.destroy();
   return { text: pages.map((t, i) => `[${i + 1}쪽]\n${t}`).join("\n\n"), pages: pages.length, kind: "pdf" };

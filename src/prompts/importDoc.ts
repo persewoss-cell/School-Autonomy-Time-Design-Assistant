@@ -142,7 +142,7 @@ export const IMPORT_PART2_PROMPT = `이제 같은 문서의 **2부**를 답해 �
 - assessment: 그 차시의 [과정중심평가] 내용 (없으면 "")
 - unitName: 단원 이름만 (앞의 '1단원', '1.' 같은 번호는 빼고)
 - assessStandards: 그 차시에서 평가하는 성취기준 코드 (없으면 [])
-- assessments: 평가 계획 하나(성취기준 하나 또는 함께 평가하는 성취기준 묶음)마다 하나. 표에서 A·B·C 성취수준이 여러 줄로 나뉘어 있어도 하나로 묶습니다. focus는 '평가내용'(또는 '수업·평가 방법') 칸 전체를 그대로 — 끝의 (지식·이해)·(과정·기능)·(가치·태도) 같은 범주 표시도 줄을 바꿔 포함합니다. levels는 성취수준 A(상)·B(중)·C(하) 문장, methods는 평가 방법 낱말
+- assessments: 평가 계획 하나(성취기준 하나 또는 함께 평가하는 성취기준 묶음)마다 하나. 표에서 A·B·C 성취수준이 여러 줄로 나뉘어 있어도 하나로 묶습니다. focus는 '평가내용'(또는 '수업·평가 방법') 칸 전체를 그대로 — 끝의 (지식·이해)·(과정·기능)·(가치·태도) 같은 범주 표시도 줄을 바꿔 포함합니다. levels는 성취수준 A(상)·B(중)·C(하) 문장 (문서가 ◎·○·△, 잘함·보통·노력 요함 같은 다른 기호를 써도 높은 수준부터 A·B·C에 넣습니다), methods는 평가 방법 낱말
 
 ## 답하는 형식
 설명 없이 아래 모양의 JSON 코드 블록 하나만 답하세요. 답이 중간에 끊기면 제가 '이어서'라고 요청하겠습니다.
@@ -275,7 +275,12 @@ function levelsOf(v: unknown): { A: string; B: string; C: string } {
   }
   const o = isObj(v) ? v : {};
   const pick = (...keys: string[]) => str(Object.entries(o).find(([k]) => keys.includes(k.trim().replace(/[()\s]/g, "")))?.[1]);
-  return { A: pick("A", "a", "상", "상A", "A상"), B: pick("B", "b", "중", "중B", "B중"), C: pick("C", "c", "하", "하C", "C하") };
+  // 학교마다 성취수준 기호가 다름: A·B·C / 상·중·하 / ◎·○·△ / 잘함·보통·노력 요함
+  return {
+    A: pick("A", "a", "상", "상A", "A상", "◎", "잘함", "매우잘함"),
+    B: pick("B", "b", "중", "중B", "B중", "○", "〇", "보통"),
+    C: pick("C", "c", "하", "하C", "C하", "△", "노력요함", "노력"),
+  };
 }
 const num = (v: unknown): number | null => {
   if (typeof v === "number" && Number.isFinite(v)) return v;

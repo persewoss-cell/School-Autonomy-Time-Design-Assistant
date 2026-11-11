@@ -64,6 +64,7 @@ describe("AI 답의 흔한 실수 (가상 시뮬레이션 회귀)", () => {
     b.assessments[0].levels = [b.assessments[0].levels.A, b.assessments[0].levels.B, b.assessments[0].levels.C];
     const L = b.assessments[1].levels;
     b.assessments[1].levels = { 상: L.A, 중: L.B, 하: L.C };
+    if (b.assessments[2]) b.assessments[2].levels = { "◎": L.A, "○": L.B, "△": L.C };
     const r = read(fence(a), fence(b));
     expect(r.ok && r.doc.assessments.every((x) => x.levels.A && x.levels.B && x.levels.C)).toBe(true);
     expect(mergeLevelRows([
