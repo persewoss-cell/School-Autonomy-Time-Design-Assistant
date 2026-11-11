@@ -42,6 +42,8 @@ export function ExcelInput({
   const [plan, setPlan] = useState<{ file: string; plan: ApplyPlan } | null>(null);
   const [busy, setBusy] = useState(false);
   const [applied, setApplied] = useState("");
+  /** 기본은 접어 둠 (사용자 요청, 2026-11-11) */
+  const [open, setOpen] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
   const r = checkAllocation(a, years);
@@ -96,29 +98,38 @@ export function ExcelInput({
   const btn = "rounded-lg border-2 px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400";
   return (
     <Card className="space-y-3">
-      <h2 className="font-bold">엑셀로 편성표 입력하기 (선택)</h2>
-      <ol className="list-decimal space-y-0.5 pl-5 text-sm text-gray-600">
-        <li>
-          위 <b>① 학교자율시간 과목·활동</b>을 먼저 맞춘 뒤 <b>입력 양식</b>을 받으세요. 양식에는 지금 ①이 그대로 들어가요.
-        </li>
-        <li>
-          엑셀에서 <b className="bg-[#fff2cc] px-1">노란 칸</b>(교과·창체 학기별 편성 시수)만 입력하고 저장하세요. 증감·합계·판정은 엑셀에서도 바로 계산돼요.
-        </li>
-        <li>
-          <b>입력한 엑셀 올리기</b>를 누르면, 확인 팝업 뒤에 아래 ② 편성표에 반영돼요.
-        </li>
-      </ol>
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="button" disabled={guest} title={guest ? GUEST_LIMIT : undefined} onClick={() => setAskDownload(true)} className={`${btn} border-brand-600 text-brand-700 hover:bg-brand-50`}>
-          📥 입력 양식 받기 (.xlsx)
-        </button>
-        <button type="button" disabled={guest || busy} title={guest ? GUEST_LIMIT : undefined} onClick={() => input.current?.click()} className={`${btn} border-sky-600 text-sky-700 hover:bg-sky-50`}>
-          {busy ? "읽는 중…" : "📤 입력한 엑셀 올리기"}
-        </button>
-        <input ref={input} type="file" accept=".xlsx" className="hidden" onChange={(e) => void upload(e.target.files?.[0])} />
-        {guest && <span className="text-xs font-semibold text-red-600">로그인해야 쓸 수 있어요.</span>}
-      </div>
-      {applied && <p className="rounded-lg bg-green-50 p-2 text-sm font-semibold text-green-800">✓ {applied}</p>}
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center justify-between gap-2 text-left">
+        <h2 className="font-bold">📊 엑셀로 편성표 시수 일괄 입력하기 (선택사항)</h2>
+        <span className="shrink-0 text-sm text-gray-400">{open ? "접기 ▲" : "펼치기 ▼"}</span>
+      </button>
+      {/* 반영한 뒤 알림은 접혀 있어도 보이게 */}
+      {!open && applied && <p className="rounded-lg bg-green-50 p-2 text-sm font-semibold text-green-800">✓ {applied}</p>}
+      {open && (
+        <>
+          <ol className="list-decimal space-y-0.5 pl-5 text-sm text-gray-600">
+            <li>
+              위 <b>① 학교자율시간 과목·활동</b>을 먼저 맞춘 뒤 <b>입력 양식</b>을 받으세요. 양식에는 지금 ①이 그대로 들어가요.
+            </li>
+            <li>
+              엑셀에서 <b className="bg-[#fff2cc] px-1">노란 칸</b>(교과·창체 학기별 편성 시수)만 입력하고 저장하세요. 증감·합계·판정은 엑셀에서도 바로 계산돼요.
+            </li>
+            <li>
+              <b>입력한 엑셀 올리기</b>를 누르면, 확인 팝업 뒤에 아래 ② 편성표에 반영돼요.
+            </li>
+          </ol>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" disabled={guest} title={guest ? GUEST_LIMIT : undefined} onClick={() => setAskDownload(true)} className={`${btn} border-brand-600 text-brand-700 hover:bg-brand-50`}>
+              📥 입력 양식 받기 (.xlsx)
+            </button>
+            <button type="button" disabled={guest || busy} title={guest ? GUEST_LIMIT : undefined} onClick={() => input.current?.click()} className={`${btn} border-sky-600 text-sky-700 hover:bg-sky-50`}>
+              {busy ? "읽는 중…" : "📤 입력한 엑셀 올리기"}
+            </button>
+            <input ref={input} type="file" accept=".xlsx" className="hidden" onChange={(e) => void upload(e.target.files?.[0])} />
+            {guest && <span className="text-xs font-semibold text-red-600">로그인해야 쓸 수 있어요.</span>}
+          </div>
+          {applied && <p className="rounded-lg bg-green-50 p-2 text-sm font-semibold text-green-800">✓ {applied}</p>}
+        </>
+      )}
 
       {askDownload && (
         <Modal
