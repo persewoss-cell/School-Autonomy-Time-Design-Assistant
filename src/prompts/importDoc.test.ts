@@ -178,6 +178,17 @@ describe("기존 문서 가져오기", () => {
     expect(["2. 작가님과 함께 해요", "(3) 그림책", "Ⅱ. 만들기", "단원 없음"].map(stripUnitNo)).toEqual(["작가님과 함께 해요", "그림책", "만들기", "단원 없음"]);
   });
 
+  it("AI가 형식 예시의 자리 표시를 베끼면 그 이유로 막고, 같은 칸에 고친 답을 이어 붙이면 마지막 답을 쓴다", () => {
+    const [a1, a2] = asAnswers(seed);
+    const copiedExample = '```json\n{"part":1,"designCount":1,"type":"(과목 또는 활동)","name":"(문서에 적힌 과목명·활동명)","standards":[]}\n```';
+    const r = parseImport(copiedExample, a2, { schoolYear: "2026", schoolName: "", sourceText: PDF_TEXT });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("자리 표시를 그대로 썼어요 (예: (과목 또는 활동))");
+    // 예전 답 + 수정 요청 뒤 새 답을 한 칸에 → 새 답으로 읽음
+    const r2 = parseImport(`${copiedExample}\n\n${a1}`, a2, { schoolYear: "2026", schoolName: "", sourceText: PDF_TEXT });
+    expect(r2.ok).toBe(true);
+  });
+
   it("JSON이 없으면 오류", () => {
     expect(parseImport("죄송합니다", "", { schoolYear: "2026", schoolName: "" }).ok).toBe(false);
     expect(extractAllJson("```json\n{\"a\":1,}\n```\n```json\n{\"b\":2}\n```")).toEqual([{ a: 1 }, { b: 2 }]);

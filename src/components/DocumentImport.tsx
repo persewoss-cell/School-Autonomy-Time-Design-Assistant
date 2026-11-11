@@ -34,6 +34,8 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
   const [attach, setAttach] = useState(false);
   const [answer1, setAnswer1] = useState("");
   const [answer2, setAnswer2] = useState("");
+  /** '답변 초기화' 확인 팝업: 몇 부 답을 지울지 */
+  const [clearPart, setClearPart] = useState<1 | 2 | null>(null);
   const [error, setError] = useState("");
   const [multiple, setMultiple] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -176,7 +178,21 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
               </label>
             )}
             <p className="text-xs text-amber-700">문서에 학생 이름 등 개인정보가 있으면 지우고 보내세요.</p>
-            <CopyBox text={buildImportPrompt(useAttach ? "" : file.result.text)} label="프롬프트 복사" rows={5} />
+            <CopyBox
+              text={buildImportPrompt(useAttach ? "" : file.result.text)}
+              label="프롬프트 복사"
+              rows={5}
+              extra={
+                <button
+                  type="button"
+                  onClick={() => setClearPart(1)}
+                  disabled={!answer1.trim()}
+                  className="rounded-lg border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 disabled:border-gray-100 disabled:bg-gray-50 disabled:text-gray-300"
+                >
+                  답변 초기화
+                </button>
+              }
+            />
             <textarea
               rows={5}
               className={`${inputClass} font-mono text-xs`}
@@ -191,7 +207,21 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
             <p className={stepTitle}>
               <span className={num}>3</span> 같은 AI 대화창에 2부 요청을 보내고, 답(2부)을 붙여 넣으세요
             </p>
-            <CopyBox text={IMPORT_PART2_PROMPT} label="2부 요청 복사" rows={3} />
+            <CopyBox
+              text={IMPORT_PART2_PROMPT}
+              label="2부 요청 복사"
+              rows={3}
+              extra={
+                <button
+                  type="button"
+                  onClick={() => setClearPart(2)}
+                  disabled={!answer2.trim()}
+                  className="rounded-lg border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 disabled:border-gray-100 disabled:bg-gray-50 disabled:text-gray-300"
+                >
+                  답변 초기화
+                </button>
+              }
+            />
             <textarea
               rows={5}
               className={`${inputClass} font-mono text-xs`}
@@ -221,6 +251,34 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
         </>
       )}
 
+      {clearPart && (
+        <Modal
+          title="답변 초기화"
+          onClose={() => setClearPart(null)}
+          actions={
+            <>
+              <button type="button" onClick={() => setClearPart(null)} className="rounded-lg border border-gray-300 px-4 py-2 font-semibold text-gray-700 hover:bg-gray-50">
+                닫기
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (clearPart === 1) setAnswer1("");
+                  else setAnswer2("");
+                  setError("");
+                  setClearPart(null);
+                }}
+                className="rounded-lg bg-red-600 px-5 py-2 font-bold text-white hover:bg-red-700"
+              >
+                초기화
+              </button>
+            </>
+          }
+        >
+          <p className="font-semibold">붙여 넣은 {clearPart}부 답을 모두 지울까요?</p>
+          <p className="text-sm text-gray-600">지운 뒤 AI의 새 답을 다시 붙여 넣으면 돼요.</p>
+        </Modal>
+      )}
       {ask && (
         <MissingModal
           missing={ask.missing}

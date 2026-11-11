@@ -215,7 +215,7 @@ export function ListEditor({
 }
 
 /** 복사 상자 */
-export function CopyBox({ text, label, rows = 8 }: { text: string; label: string; rows?: number }) {
+export function CopyBox({ text, label, rows = 8, extra }: { text: string; label: string; rows?: number; /** 복사 버튼 오른쪽에 둘 버튼 */ extra?: React.ReactNode }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -235,9 +235,12 @@ export function CopyBox({ text, label, rows = 8 }: { text: string; label: string
         value={text}
         onFocus={(e) => e.currentTarget.select()}
       />
-      <button type="button" onClick={copy} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
-        {copied ? "✓ 복사했어요" : label}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={copy} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
+          {copied ? "✓ 복사했어요" : label}
+        </button>
+        {extra}
+      </div>
     </div>
   );
 }

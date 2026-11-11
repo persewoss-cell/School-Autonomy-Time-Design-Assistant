@@ -211,9 +211,20 @@ export function parseImport(
   if (count > 1) return { ok: false, error: `이 파일에는 설계가 ${count}개 들어 있어요.`, multiple: count };
 
   // part 번호가 없으면 들어 있는 칸으로 판단
-  const p1 = all.find((o) => num(o.part) === 1) ?? all.find((o) => "standards" in o || "areas" in o || "name" in o);
-  const p2 = all.find((o) => num(o.part) === 2) ?? all.find((o) => "units" in o);
+  // 같은 칸에 예전 답과 고친 답을 함께 붙여 넣었으면 마지막(새) 답을 쓴다. part 번호가 없으면 들어 있는 칸으로 판단
+  const last = [...all].reverse();
+  const p1 = last.find((o) => num(o.part) === 1) ?? last.find((o) => "standards" in o || "areas" in o || "name" in o);
+  const p2 = last.find((o) => num(o.part) === 2) ?? last.find((o) => "units" in o);
   if (!p1) return { ok: false, error: "1부(기본 정보·내용 체계·성취기준) JSON이 없습니다." };
+  // AI가 형식 예시의 자리 표시 '(…)'를 그대로 베꼈으면 바로 알려 줌
+  const copied = placeholdersIn(p1).concat(p2 ? placeholdersIn(p2) : []);
+  if (copied.length) {
+    return {
+      ok: false,
+      error: `AI가 형식 예시의 자리 표시를 그대로 썼어요 (예: ${copied[0]}). 문서 내용으로 채우지 않은 답이에요. 아래 수정 요청을 보내거나, 답변 초기화 후 프롬프트를 처음부터 다시 보내 주세요.`,
+    };
+  }
+
   if (!p2) return { ok: false, error: "2부(단원 지도계획·평가 계획) JSON이 없습니다. 2부 요청을 AI에 보내고 그 답을 2부 칸에 붙여 넣어 주세요." };
 
   const notes: string[] = [];
@@ -388,6 +399,17 @@ export function parseImport(
 
 /** 단원명 앞의 번호('1단원', '1.', '(1)', 'Ⅰ.')를 뗀다 */
 export const stripUnitNo = (name: string) => name.replace(/^\s*(\d+\s*단원|\(?\d+[).]|[ⅠⅡⅢⅣⅤⅥ]+\.)\s*/, "").trim() || name.trim();
+
+/** 형식 예시에 쓴 자리 표시 문구 '(…)' */
+const PLACEHOLDERS = new Set([...`${PART1_EXAMPLE}${PART2_EXAMPLE}`.matchAll(/"(\([^"]+\))"/g)].map((m) => m[1]));
+
+/** 답 안에서 형식 예시의 자리 표시를 그대로 쓴 값들 */
+function placeholdersIn(v: unknown): string[] {
+  if (typeof v === "string") return PLACEHOLDERS.has(v.trim()) ? [v.trim()] : [];
+  if (Array.isArray(v)) return v.flatMap(placeholdersIn);
+  if (v && typeof v === "object") return Object.values(v).flatMap(placeholdersIn);
+  return [];
+}
 
 export const CODE_NOTE_START = "성취기준 코드 ";
 
