@@ -75,7 +75,7 @@ function LoginNeeded({ onClose }: { onClose: () => void }) {
 /**
  * '설계안 가져오기' 화면 (탭 2개)
  * - 타학교 완성 설계안: 완성한 설계(오류 0 + 체크리스트 모두 ○)를 보고·내려받고·우리 학교로 가져온다. 본교 설계도 '본교' 표시로 함께 보인다.
- * - 우리 학교 기존 문서 가져오기: 예전에 만든 문서(PDF·hwpx)를 AI 프롬프트로 옮겨 새 설계로 가져온다.
+ * - 우리 학교 기존 문서(hwpx, pdf) 등록하기: 예전에 만든 문서(PDF·hwpx)를 AI 프롬프트로 옮겨 새 설계로 가져온다.
  */
 export function SharedDesignsPage() {
   const [rows, setRows] = useState<Shared[] | null>(null);
@@ -97,9 +97,12 @@ export function SharedDesignsPage() {
     setTab(t);
     window.history.replaceState(null, "", t === "file" ? "/shared?tab=file" : "/shared");
   };
-  // 탭 버튼은 연한 초록 (사용자 요청, 2026-11-11). 고른 탭은 조금 더 진하게 + 테두리
-  const tabBtn = (t: "shared" | "file") =>
-    `rounded-lg px-4 py-2 text-sm transition ${tab === t ? "bg-brand-100 font-bold text-brand-700 ring-1 ring-brand-500/40" : "bg-brand-50 font-semibold text-brand-600 hover:bg-brand-100"}`;
+  // 탭 버튼은 탭마다 다른 연한 색 (사용자 요청, 2026-11-11): 타학교 = 하늘, 우리 학교 = 살구. 고른 탭은 조금 더 진하게 + 테두리
+  const TAB_COLORS = {
+    shared: { on: "bg-sky-200 text-sky-900 ring-1 ring-sky-500/50", off: "bg-sky-100 text-sky-800 hover:bg-sky-200" },
+    file: { on: "bg-orange-200 text-orange-900 ring-1 ring-orange-500/50", off: "bg-orange-100 text-orange-800 hover:bg-orange-200" },
+  };
+  const tabBtn = (t: "shared" | "file") => `rounded-lg px-4 py-2 text-sm transition ${tab === t ? `font-bold ${TAB_COLORS[t].on}` : `font-semibold ${TAB_COLORS[t].off}`}`;
   return (
     <div className="space-y-4">
       <div>
@@ -127,7 +130,7 @@ export function SharedDesignsPage() {
             타학교 완성 설계안
           </button>
           <button type="button" role="tab" aria-selected={tab === "file"} onClick={() => choose("file")} className={tabBtn("file")}>
-            우리 학교 기존 문서 가져오기
+            우리 학교 기존 문서(hwpx, pdf) 등록하기
           </button>
         </div>
         <div className="rounded-2xl bg-white p-4 shadow-sm">
