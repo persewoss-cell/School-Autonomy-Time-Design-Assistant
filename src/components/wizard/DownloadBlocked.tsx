@@ -23,9 +23,11 @@ export function blockReasons(doc: DesignDoc, issues: Issue[]): BlockReason[] {
   const errors: BlockReason[] = issues
     .filter((i) => i.level === "error")
     .map((i) => ({ kind: "error", title: i.field, detail: `${i.message} → ${i.fix}`, step: i.step ?? "final", target: i.target }));
-  const checks: BlockReason[] = checklistResults(doc, {}, issues)
-    .filter((c) => !c.auto && !c.ok)
-    .map((c) => ({ kind: "check", title: `체크리스트 [${c.area}]`, detail: c.label, step: "final", target: `check.${c.id}` }));
+  // 체크리스트는 하나로 묶어서 (고치러 가기 → 체크 안 한 칸이 모두 번쩍, 사용자 결정 2026-11-11)
+  const left = checklistResults(doc, {}, issues).filter((c) => !c.auto && !c.ok).length;
+  const checks: BlockReason[] = left
+    ? [{ kind: "check", title: "체크리스트", detail: `확인하지 않은 체크리스트가 ${left}개 있어요. 내용을 직접 점검하고 체크해 주세요.`, step: "final", target: "check.left" }]
+    : [];
   return [...errors, ...checks];
 }
 
@@ -56,7 +58,7 @@ export function DownloadBlockedModal({
       <p className="font-semibold">
         아래 {reasons.length}가지를 마쳐야 문서가 만들어져요.
         <span className="ml-1 text-sm font-normal text-gray-600">
-          ({[errors ? `오류 ${errors}개` : "", checks ? `확인하지 않은 체크리스트 ${checks}개` : ""].filter(Boolean).join(", ")})
+          ({[errors ? `오류 ${errors}개` : "", checks ? "확인하지 않은 체크리스트" : ""].filter(Boolean).join(", ")})
         </span>
       </p>
       <p className="text-sm text-gray-600">

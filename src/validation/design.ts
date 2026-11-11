@@ -517,7 +517,7 @@ export function checkChecklist(doc: Pick<DesignDoc, "basic" | "checklist">): Iss
       message: `직접 확인할 체크리스트 항목이 ${left.length}개 남았습니다.`,
       fix: "점검 화면의 체크리스트에서 확인한 항목에 표시해 주세요.",
       step: "final",
-      target: `check.${left[0].id}`,
+      target: "check.left",
     },
   ];
 }

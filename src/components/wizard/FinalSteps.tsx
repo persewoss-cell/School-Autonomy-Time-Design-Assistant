@@ -188,7 +188,7 @@ export function FinalStep({
         <p className="text-sm text-gray-600">&lsquo;자동&rsquo; 항목은 프로그램 점검 결과로 정해져요. 나머지는 직접 확인하고 표시해 주세요.</p>
         <ul className="divide-y divide-gray-100">
           {checklist.map((c) => (
-            <li key={c.id} data-fix={`check.${c.id}`} className="flex items-start gap-3 rounded-lg py-2 text-sm">
+            <li key={c.id} data-fix={c.ok || c.auto ? `check.${c.id}` : "check.left"} className="flex items-start gap-3 rounded-lg py-2 text-sm">
               {c.auto ? (
                 <span className={`mt-0.5 w-10 shrink-0 rounded text-center text-xs font-bold ${c.ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                   {c.ok ? "○" : "X"}
@@ -197,6 +197,7 @@ export function FinalStep({
                 <input
                   type="checkbox"
                   data-req=""
+                  data-req-group="checklist"
                   data-req-done={c.ok ? "1" : "0"}
                   className="mt-1 ml-3 mr-2.5 h-4 w-4 shrink-0 rounded"
                   checked={c.ok}

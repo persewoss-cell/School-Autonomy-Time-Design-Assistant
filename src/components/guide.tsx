@@ -18,8 +18,8 @@ export function showToast(title: string, lines: string[]) {
   window.dispatchEvent(new CustomEvent<ToastMsg>(TOAST_EVENT, { detail: { id: Date.now() + Math.random(), title, lines } }));
 }
 
-/** 글 길이에 맞춘 표시 시간: 기본 4초 + 글자당 0.07초 (4~20초) */
-export const toastDuration = (text: string) => Math.min(20000, Math.max(4000, 4000 + text.length * 70));
+/** 알림이 보이는 시간 (사용자 결정, 2026-11-11: 10초, 남은 초를 보여 줌) */
+export const TOAST_SECONDS = 10;
 
 /** 프롬프트를 복사했을 때 안내. same: 이미 쓰던 같은 AI 대화창에 보내는 요청(2부·수정·고치기) */
 export function promptCopiedToast(same = false) {
@@ -39,51 +39,70 @@ export function promptCopiedToast(same = false) {
   );
 }
 
-/** 화면 오른쪽 아래 파란 알림 (layout에 하나) */
+/** 화면 아래 연한 파란 알림 (layout에 하나). 10초 뒤 저절로 닫히고, 남은 초를 × 옆에 보여 준다 */
 export function ToastHost() {
   const [list, setList] = useState<ToastMsg[]>([]);
   useEffect(() => {
     const on = (e: Event) => {
       const m = (e as CustomEvent<ToastMsg>).detail;
-      // 같은 안내는 하나만 (연달아 눌러도 쌓이지 않게)
+      // 같은 안내는 하나만 (연달아 눌러도 쌓이지 않고 새로 10초)
       setList((l) => [...l.filter((x) => x.title !== m.title), m]);
-      setTimeout(() => setList((l) => l.filter((x) => x.id !== m.id)), toastDuration(m.title + m.lines.join("")));
     };
     window.addEventListener(TOAST_EVENT, on);
     return () => window.removeEventListener(TOAST_EVENT, on);
   }, []);
   if (list.length === 0) return null;
+  const close = (id: number) => setList((l) => l.filter((x) => x.id !== id));
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex flex-col items-center gap-2 px-4">
       {list.map((m) => (
-        <div key={m.id} role="status" className="toast-in pointer-events-auto w-full max-w-lg rounded-xl bg-blue-600 px-4 py-3 text-white shadow-2xl">
-          <div className="flex items-start justify-between gap-2">
-            <p className="font-bold">{m.title}</p>
-            <button type="button" aria-label="알림 닫기" onClick={() => setList((l) => l.filter((x) => x.id !== m.id))} className="-mr-1 rounded px-1.5 text-xl leading-none text-white/80 hover:bg-white/20">
-              ×
-            </button>
-          </div>
-          <ul className="mt-1 space-y-0.5 text-sm text-blue-50">
-            {m.lines.map((t) => (
-              <li key={t}>{t}</li>
-            ))}
-          </ul>
-        </div>
+        <Toast key={m.id} m={m} onClose={() => close(m.id)} />
       ))}
+    </div>
+  );
+}
+
+function Toast({ m, onClose }: { m: ToastMsg; onClose: () => void }) {
+  const [left, setLeft] = useState(TOAST_SECONDS);
+  useEffect(() => {
+    const t = setInterval(() => setLeft((n) => n - 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    if (left <= 0) onClose();
+  }, [left, onClose]);
+  return (
+    <div role="status" className="toast-in pointer-events-auto w-fit max-w-[95vw] rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-blue-900 shadow-lg">
+      <div className="flex items-start justify-between gap-3">
+        <p className="font-bold">{m.title}</p>
+        <span className="flex shrink-0 items-center gap-1">
+          <span className="text-xs text-blue-500">{Math.max(left, 0)}초 뒤 닫힘</span>
+          <button type="button" aria-label="알림 닫기" onClick={onClose} className="-mr-1 rounded px-1.5 text-xl leading-none text-blue-400 hover:bg-blue-100 hover:text-blue-700">
+            ×
+          </button>
+        </span>
+      </div>
+      <ul className="mt-1 space-y-0.5 text-sm text-blue-800">
+        {m.lines.map((t) => (
+          <li key={t} className="md:whitespace-nowrap">
+            {t}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
 // ── 빨간 번쩍임 (고치러 가기) ──────────────────────────────
 
-/** 표시를 찾는다: data-fix="a.b.c"가 없으면 "a.b", "a" 순으로 */
-function findFix(target: string): HTMLElement | null {
+/** 표시를 찾는다: data-fix="a.b.c"가 없으면 "a.b", "a" 순으로. 같은 표시가 여러 개면 모두 (예: 남은 체크리스트) */
+function findFix(target: string): HTMLElement[] {
   const parts = target.split(".");
   for (let n = parts.length; n > 0; n--) {
-    const el = document.querySelector<HTMLElement>(`[data-fix="${CSS.escape(parts.slice(0, n).join("."))}"]`);
-    if (el && el.offsetParent !== null) return el;
+    const els = [...document.querySelectorAll<HTMLElement>(`[data-fix="${CSS.escape(parts.slice(0, n).join("."))}"]`)].filter((el) => el.offsetParent !== null);
+    if (els.length) return els;
   }
-  return null;
+  return [];
 }
 
 /**
@@ -96,17 +115,21 @@ export function flashFix(target: string | undefined, fallback?: string) {
   const tryNow = () => {
     // 접힌 곳 안에 있으면 펼쳐 달라고 알림 (data-fix-open 이벤트)
     if (target) window.dispatchEvent(new CustomEvent("fix-open", { detail: target }));
-    const exact = target ? findFix(target) : null;
-    const el = exact ?? (Date.now() - started > 1200 && fallback ? findFix(fallback) : null);
-    if (!el) {
+    let els = target ? findFix(target) : [];
+    if (!els.length && Date.now() - started > 1200 && fallback) els = findFix(fallback);
+    if (!els.length) {
       if (Date.now() - started < 2500) setTimeout(tryNow, 120);
       return;
     }
+    const el = els[0];
     el.scrollIntoView({ behavior: "smooth", block: "center" });
-    el.classList.remove("fix-flash");
-    void el.offsetWidth; // 애니메이션 다시 시작
-    el.classList.add("fix-flash");
-    setTimeout(() => el.classList.remove("fix-flash"), 2200);
+    for (const e of els) {
+      e.classList.remove("fix-flash");
+      void e.offsetWidth; // 애니메이션 다시 시작
+      e.classList.add("fix-flash");
+      setTimeout(() => e.classList.remove("fix-flash"), 2600);
+    }
+    if (els.length > 1) return; // 여러 칸이면 커서는 두지 않음
     const field = el.matches("input,textarea,select") ? el : el.querySelector<HTMLElement>("input:not([type=hidden]),textarea,select");
     if (field && !(field as HTMLInputElement).disabled) setTimeout(() => field.focus({ preventScroll: true }), 400);
   };
@@ -126,7 +149,7 @@ export function useNextHalo(enabled = true, /** 바뀌면(단계 이동 등) 다
   useEffect(() => {
     const root = ref.current;
     if (!root || !enabled) return;
-    let current: HTMLElement | null = null;
+    let current: HTMLElement[] = [];
     const isDone = (el: HTMLElement) => {
       const d = el.getAttribute("data-req-done");
       if (d !== null) return d === "1";
@@ -135,11 +158,17 @@ export function useNextHalo(enabled = true, /** 바뀌면(단계 이동 등) 다
     };
     const pick = () => {
       const list = [...root.querySelectorAll<HTMLElement>("[data-req]")].filter((el) => el.offsetParent !== null);
-      let next = list.find((el) => !isDone(el)) ?? null;
-      if (!next) next = [...root.querySelectorAll<HTMLElement>("[data-req-final]")].find((el) => el.offsetParent !== null && !(el as HTMLButtonElement).disabled) ?? null;
-      if (next === current) return;
-      current?.classList.remove("halo-next");
-      next?.classList.add("halo-next");
+      const first = list.find((el) => !isDone(el));
+      // data-req-group이 같은 것(예: 체크 안 한 체크리스트)은 함께 반짝
+      const group = first?.getAttribute("data-req-group");
+      let next: HTMLElement[] = first ? (group ? list.filter((el) => el.getAttribute("data-req-group") === group && !isDone(el)) : [first]) : [];
+      if (!first) {
+        const fin = [...root.querySelectorAll<HTMLElement>("[data-req-final]")].find((el) => el.offsetParent !== null && !(el as HTMLButtonElement).disabled);
+        next = fin ? [fin] : [];
+      }
+      if (next.length === current.length && next.every((el, k) => el === current[k])) return;
+      for (const el of current) el.classList.remove("halo-next");
+      for (const el of next) el.classList.add("halo-next");
       current = next;
     };
     pick();
@@ -159,7 +188,7 @@ export function useNextHalo(enabled = true, /** 바뀌면(단계 이동 등) 다
       root.removeEventListener("change", later);
       root.removeEventListener("click", later);
       if (t) clearTimeout(t);
-      current?.classList.remove("halo-next");
+      for (const el of current) el.classList.remove("halo-next");
     };
   }, [enabled, resetKey]);
   return ref;
