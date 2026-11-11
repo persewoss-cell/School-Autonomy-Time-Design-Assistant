@@ -75,7 +75,7 @@ function LoginNeeded({ onClose }: { onClose: () => void }) {
 /**
  * '설계안 가져오기' 화면 (탭 2개)
  * - 타학교 완성 설계안: 완성한 설계(오류 0 + 체크리스트 모두 ○)를 보고·내려받고·우리 학교로 가져온다. 본교 설계도 '본교' 표시로 함께 보인다.
- * - 우리 학교 기존 문서(hwpx, pdf) 등록하기: 예전에 만든 문서(PDF·hwpx)를 AI 프롬프트로 옮겨 새 설계로 가져온다.
+ * - 우리 학교 기존 문서(hwpx) 등록하기: 예전에 만든 한글 문서(hwpx)를 AI 프롬프트로 옮겨 새 설계로 가져온다.
  */
 export function SharedDesignsPage() {
   const [rows, setRows] = useState<Shared[] | null>(null);
@@ -97,12 +97,17 @@ export function SharedDesignsPage() {
     setTab(t);
     window.history.replaceState(null, "", t === "file" ? "/shared?tab=file" : "/shared");
   };
-  // 탭 버튼은 탭마다 다른 연한 색 (사용자 요청, 2026-11-11): 타학교 = 하늘, 우리 학교 = 살구. 고른 탭은 조금 더 진하게 + 테두리
+  // 파일철 색인 탭 모양 (사용자 요청, 2026-11-11): 타학교 = 하늘, 우리 학교 = 살구.
+  // 고른 탭은 흰 바탕 + 탭 색 테두리로 아래 상자와 한 장처럼 이어지고(탭 아래쪽 선 없음),
+  // 고르지 않은 탭은 조금 낮고 흐리게 뒤에 꽂힌 것처럼 보인다.
   const TAB_COLORS = {
-    shared: { on: "bg-sky-200 text-sky-900 ring-1 ring-sky-500/50", off: "bg-sky-100 text-sky-800 hover:bg-sky-200" },
-    file: { on: "bg-orange-200 text-orange-900 ring-1 ring-orange-500/50", off: "bg-orange-100 text-orange-800 hover:bg-orange-200" },
+    shared: { on: "border-sky-300 text-sky-900", off: "bg-sky-100 text-sky-800 hover:bg-sky-200", box: "border-sky-300" },
+    file: { on: "border-orange-300 text-orange-900", off: "bg-orange-100 text-orange-800 hover:bg-orange-200", box: "border-orange-300" },
   };
-  const tabBtn = (t: "shared" | "file") => `rounded-lg px-4 py-2 text-sm transition ${tab === t ? `font-bold ${TAB_COLORS[t].on}` : `font-semibold ${TAB_COLORS[t].off}`}`;
+  const tabBtn = (t: "shared" | "file") =>
+    tab === t
+      ? `relative z-10 -mb-[2px] rounded-t-xl border-2 border-b-white bg-white px-5 pt-2.5 pb-3 text-sm font-bold ${TAB_COLORS[t].on}`
+      : `rounded-t-xl border-2 border-b-0 border-transparent px-4 pt-1.5 pb-2 text-sm font-semibold opacity-80 transition hover:opacity-100 ${TAB_COLORS[t].off}`;
   return (
     <div className="space-y-4">
       <div>
@@ -125,15 +130,16 @@ export function SharedDesignsPage() {
         )}
       </div>
       <div>
-        <div className="mb-3 flex gap-2" role="tablist">
+        <div className="flex items-end gap-1" role="tablist">
           <button type="button" role="tab" aria-selected={tab === "shared"} onClick={() => choose("shared")} className={tabBtn("shared")}>
             타학교 완성 설계안
           </button>
           <button type="button" role="tab" aria-selected={tab === "file"} onClick={() => choose("file")} className={tabBtn("file")}>
-            우리 학교 기존 문서(hwpx, pdf) 등록하기
+            우리 학교 기존 문서(hwpx) 등록하기
           </button>
         </div>
-        <div className="rounded-2xl bg-white p-4 shadow-sm">
+        {/* 첫 탭을 고르면 상자의 왼쪽 위 모서리를 각지게 해서 탭과 곧게 이어지게 */}
+        <div className={`rounded-2xl border-2 bg-white p-4 shadow-sm ${TAB_COLORS[tab].box} ${tab === "shared" ? "rounded-tl-none" : ""}`}>
           {login ? (
             <p className="text-gray-600">
               로그인한 학교만 볼 수 있어요.{" "}
