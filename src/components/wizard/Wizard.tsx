@@ -422,6 +422,8 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
           style={{ "--steps": steps.length } as React.CSSProperties}
         >
           {steps.map((s, i) => {
+            // 활동지(선택)는 문서를 받을 수 있게 되면(오류 0개 + 체크리스트 모두 확인) 바로 들어갈 수 있다
+            const locked = i > maxIndex && !(s.key === "worksheet" && reasons.length === 0);
             const state = i > maxIndex || !stepStarted(doc, s.key) ? "todo" : errorSteps.has(s.key) ? "error" : "done";
             const current = i === index;
             const color = current
@@ -437,7 +439,7 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
               <li key={s.key} className="min-w-0">
                 <button
                   type="button"
-                  disabled={i > maxIndex}
+                  disabled={locked}
                   onClick={() => goIndex(i)}
                   title={state === "error" ? `${s.label}: 고칠 오류가 있어요` : state === "todo" ? `${s.label}: 아직 작성하지 않았어요` : s.label}
                   className={`flex h-full w-full flex-col items-center justify-center rounded-md px-0.5 py-1.5 text-center leading-tight disabled:cursor-not-allowed ${color} ${current ? "font-bold shadow-sm" : "font-medium"}`}

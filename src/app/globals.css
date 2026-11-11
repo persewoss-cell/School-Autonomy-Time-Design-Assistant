@@ -25,7 +25,7 @@ body {
 /* 다음에 할 칸·버튼: 연한 노란빛이 뒤에서 은은하게 비추듯 천천히 계속 (src/components/guide.tsx) */
 @keyframes halo-next {
   0%, 100% { box-shadow: 0 0 0 0 rgba(253, 224, 71, 0); }
-  50% { box-shadow: 0 0 14px 5px rgba(253, 224, 71, 0.38); }
+  50% { box-shadow: 0 0 16px 6px rgba(250, 204, 21, 0.55); }
 }
 .halo-next {
   animation: halo-next 2.4s ease-in-out infinite;

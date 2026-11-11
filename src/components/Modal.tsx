@@ -31,7 +31,8 @@ export function Modal({
             ×
           </button>
         </div>
-        <div className={`space-y-2 px-5 py-4 text-[15px] text-gray-800 ${xl ? "max-h-[78vh] overflow-y-auto bg-gray-50" : ""}`}>{children}</div>
+        {/* 내용이 길면 창 안에서 스크롤 (아래 버튼이 늘 보이게) */}
+        <div className={`space-y-2 overflow-y-auto overscroll-contain px-5 py-4 text-[15px] text-gray-800 ${xl ? "max-h-[78vh] bg-gray-50" : "max-h-[calc(100vh-11rem)]"}`}>{children}</div>
         <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3">{actions}</div>
       </div>
     </div>
