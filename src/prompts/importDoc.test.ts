@@ -1,8 +1,12 @@
+import { readFileSync } from "fs";
 import { describe, expect, it } from "vitest";
 import { seedDesigns } from "@/server/seed";
 import { codeMap } from "@/domain/codes";
 import type { DesignDoc } from "@/domain/types";
-import { buildImportPrompt, extractAllJson, guessAbbrev, IMPORT_PART2_PROMPT, parseImport, uniqueName } from "./importDoc";
+import { buildImportPrompt, checkAgainstSource, extractAllJson, guessAbbrev, IMPORT_PART2_PROMPT, parseImport, uniqueName } from "./importDoc";
+
+/** 예시안 PDF(지구마을 첫걸음)에서 앱이 실제로 뽑은 글자 */
+const PDF_TEXT = readFileSync(new URL("./__fixtures__/jigu-first-step.pdf.txt", import.meta.url), "utf8");
 
 /** 앱 설계를 'AI가 문서를 옮겨 적은 답' 모양으로 (되돌려 읽으면 같아야 함) */
 function asAnswers(doc: DesignDoc): [string, string] {
@@ -54,7 +58,7 @@ describe("기존 문서 가져오기", () => {
 
   it("문서를 옮긴 답을 읽으면 원래 설계와 같은 내용이 된다", () => {
     const [a1, a2] = asAnswers(seed);
-    const r = parseImport(a1, a2, { schoolYear: seed.application.startYear, schoolName: "가나초등학교" });
+    const r = parseImport(a1, a2, { schoolYear: seed.application.startYear, schoolName: "가나초등학교", sourceText: PDF_TEXT });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const d = r.doc;
@@ -70,6 +74,25 @@ describe("기존 문서 가져오기", () => {
     expect(d.assessments[0].standardIds.length).toBe(seed.assessments[0].standardIds.length);
     expect(d.application.schoolName).toBe("가나초등학교");
     expect(r.notes).toEqual([]);
+  });
+
+  it("문서와 다른 답(예시 베끼기·다른 설계)은 막는다", () => {
+    const [a1, a2] = asAnswers(seed);
+    const other = "학교자율시간 활동 「나도 그림책 작가」 광양중동초등학교 3학년 2학기 그림책의 구성요소와 제작 과정을 이해한다.";
+    const r = parseImport(a1, a2, { schoolYear: "2026", schoolName: "", sourceText: other });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("「지구마을 첫걸음」이(가) 올린 문서에 없어요");
+    // 이름만 맞고 내용은 다른 경우
+    expect(checkAgainstSource(seed, `${other} 지구마을 첫걸음`)).toContain("찾을 수 있는 것이");
+    // 문서 글자를 주지 않으면(파일 첨부 방식) 확인하지 못했다고 알림
+    const r2 = parseImport(a1, a2, { schoolYear: "2026", schoolName: "" });
+    expect(r2.ok && r2.notes.join()).toContain("확인하지 못했어요");
+  });
+
+  it("프롬프트 형식 예시에는 실제 설계 내용이 없다 (AI가 베끼지 않게)", () => {
+    const p = buildImportPrompt("문서") + IMPORT_PART2_PROMPT;
+    for (const real of ["지구마을", "세계시민", "세계와 연결된 나", "\"2026\""]) expect(p).not.toContain(real);
+    expect(p).toContain("자리 표시");
   });
 
   it("1부·2부를 한 칸에 함께 붙여 넣어도 읽는다", () => {

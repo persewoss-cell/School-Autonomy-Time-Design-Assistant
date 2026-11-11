@@ -20,29 +20,30 @@ import { COMMON_RULES, toList } from "./common";
  * 답이 길어 잘리지 않게 1부(문서 앞부분)·2부(단원 지도계획·평가 계획)로 나눠 받는다.
  */
 
+// 예시 값은 자리 표시만 쓴다. 실제 설계 내용을 넣으면 AI가 문서 대신 예시를 베끼는 일이 생김 (2026-11-11 실제 사례)
 const PART1_EXAMPLE = `{
   "part": 1,
   "designCount": 1,
-  "type": "활동",
-  "name": "지구마을 첫걸음",
-  "grade": 3,
-  "semester": 2,
-  "hours": 29,
-  "subjectGroup": "사회",
-  "openingType": "학교 특색교육형",
-  "operationMode": "지속형",
-  "schoolYear": "2026",
-  "topic": "세계시민의 이해 · 문화 다양성과 존중",
-  "abbrev": "지구",
-  "rationale": "필요성(활동) 또는 성격(과목) 문단 전체",
-  "overallGoal": "총괄 목표 문장",
-  "detailGoals": ["(1) 지식·이해 목표", "(2) 과정·기능 목표", "(3) 가치·태도 목표"],
-  "coreIdeas": ["핵심아이디어 1", "핵심아이디어 2"],
+  "type": "(과목 또는 활동)",
+  "name": "(문서에 적힌 과목명·활동명)",
+  "grade": "(학년 숫자)",
+  "semester": "(학기 숫자)",
+  "hours": "(운영 시수 숫자)",
+  "subjectGroup": "(편성 교과)",
+  "openingType": "(개설 형태)",
+  "operationMode": "(운영 방식)",
+  "schoolYear": "(문서의 운영 학년도, 없으면 빈칸)",
+  "topic": "(주제 한 줄)",
+  "abbrev": "(성취기준 코드 속 약어)",
+  "rationale": "(필요성 또는 성격 문단 전체)",
+  "overallGoal": "(총괄 목표 문장)",
+  "detailGoals": ["(세부 목표 1)", "(세부 목표 2)", "(세부 목표 3)"],
+  "coreIdeas": ["(핵심아이디어)"],
   "areas": [
-    { "name": "세계시민의 이해", "knowledge": ["내용 요소"], "process": ["내용 요소"], "values": ["내용 요소"] }
+    { "name": "(영역명)", "knowledge": ["(지식·이해 내용 요소)"], "process": ["(과정·기능 내용 요소)"], "values": ["(가치·태도 내용 요소)"] }
   ],
   "standards": [
-    { "code": "[3사지구01-01]", "area": 1, "text": "성취기준 문장", "elements": ["이 성취기준과 연결된 내용 요소"] }
+    { "code": "(문서의 성취기준 코드)", "area": "(몇 번째 영역)", "text": "(성취기준 문장)", "elements": ["(연결된 내용 요소)"] }
   ],
   "teaching": { "teachingDirection": [], "teachingMethods": [], "assessDirection": [], "assessMethods": [] },
   "application": {
@@ -55,30 +56,32 @@ const PART2_EXAMPLE = `{
   "part": 2,
   "units": [
     {
-      "unitName": "1. 세계와 연결된 나",
+      "unitName": "(단원명)",
       "lessons": [
         {
-          "hours": 1,
-          "topic": "학습주제",
-          "goal": "학습 목표(있으면)",
-          "activities": ["학습 내용(활동) 한 줄씩"],
-          "assessment": "[과정중심평가] 내용 (없으면 빈칸)",
-          "assessStandards": ["[3사지구01-01]"],
-          "note": "비고"
+          "hours": "(이 줄의 차시 수)",
+          "topic": "(학습주제)",
+          "goal": "(학습 목표, 없으면 빈칸)",
+          "activities": ["(학습 내용 한 줄씩)"],
+          "assessment": "(과정중심평가 내용, 없으면 빈칸)",
+          "assessStandards": ["(평가하는 성취기준 코드)"],
+          "note": "(비고)"
         }
       ]
     }
   ],
   "assessments": [
     {
-      "month": "9월",
-      "standards": ["[3사지구01-01]"],
-      "focus": "수업·평가 방법 및 연계의 주안점",
-      "levels": { "A": "상 수준", "B": "중 수준", "C": "하 수준" },
-      "methods": ["관찰평가"]
+      "month": "(시기)",
+      "standards": ["(성취기준 코드)"],
+      "focus": "(수업·평가 방법 및 연계의 주안점)",
+      "levels": { "A": "(상 수준)", "B": "(중 수준)", "C": "(하 수준)" },
+      "methods": ["(평가 방법)"]
     }
   ]
 }`;
+
+const PLACEHOLDER_RULE = "괄호 ( ) 안의 말은 자리 표시입니다. 그대로 베끼지 말고 반드시 **올린 문서의 내용**으로 바꿔 채웁니다. 문서에 없으면 빈칸으로 둡니다.";
 
 /** 1부 프롬프트. text가 비면(스캔 문서) 원본 파일을 AI에 직접 첨부하도록 안내한다. */
 export function buildImportPrompt(text: string): string {
@@ -97,7 +100,7 @@ ${text.trim()}
 ## 꼭 지킬 것
 - 문서에 적힌 문장을 **글자 그대로** 옮깁니다. 요약하거나, 고치거나, 더 낫게 바꾸지 않습니다.
 - 문서에 없는 내용은 지어내지 말고 빈칸("") 또는 빈 목록([])으로 둡니다.
-- 성취기준 코드(예: [3사지구01-01])도 문서에 적힌 그대로 씁니다.
+- 성취기준 코드(예: [4과탐구01-01] 모양)도 문서에 적힌 그대로 씁니다.
 - 문서에 설계(과목·활동)가 **여러 개** 들어 있으면, 내용을 옮기지 말고 "designCount"에 설계 개수만 적어 답하세요.
 ${COMMON_RULES}
 
@@ -108,7 +111,7 @@ ${COMMON_RULES}
 - openingType(개설 형태): ${OPENING_TYPES.join("·")} 중 하나 / operationMode(운영 방식): ${OPERATION_MODES.join("·")} 중 하나 (문서에 없으면 "")
 - schoolYear: 문서에 적힌 운영 학년도 (없으면 "")
 - topic: 이 설계의 주제를 문서의 낱말로 한 줄 (영역명을 이어도 됩니다)
-- abbrev: 성취기준 코드 속 과목명 약어 (예: [3사지구01-01]이면 "지구")
+- abbrev: 성취기준 코드 속 과목명 약어 (예: [4과탐구01-01]이면 "탐구")
 - rationale: 활동은 '필요성', 과목은 '성격' 문단 전체 / overallGoal: 총괄 목표 / detailGoals: 세부 목표 3개 (번호는 빼고)
 - areas: 내용 체계의 영역마다 범주별 내용 요소 (knowledge=지식·이해, process=과정·기능, values=가치·태도)
 - standards: 성취기준마다 code, area(몇 번째 영역인지 1부터), text(문장), elements(이 성취기준과 연결된 내용 요소. 문서의 내용 체계 문구 그대로)
@@ -120,6 +123,7 @@ ${source}
 ## 답하는 형식 (아주 중요)
 답이 길어 잘리지 않도록 **두 번에 나눠** 답합니다. 지금은 **1부만** 아래 모양의 JSON 코드 블록 하나로 답하세요.
 설명은 쓰지 말고, 키 이름은 영어 그대로 둡니다. 제가 '2부'를 요청하면 그때 단원 지도계획과 평가 계획을 답합니다.
+${PLACEHOLDER_RULE}
 
 \`\`\`json
 ${PART1_EXAMPLE}
@@ -138,6 +142,7 @@ export const IMPORT_PART2_PROMPT = `이제 같은 문서의 **2부**를 답해 �
 
 ## 답하는 형식
 설명 없이 아래 모양의 JSON 코드 블록 하나만 답하세요. 답이 중간에 끊기면 제가 '이어서'라고 요청하겠습니다.
+${PLACEHOLDER_RULE}
 
 \`\`\`json
 ${PART2_EXAMPLE}
@@ -182,7 +187,11 @@ export type ImportParse =
  * 1부·2부 답을 읽어 설계 문서로 만든다.
  * 문서 내용은 그대로 두고, 앱 선택지에 없는 값만 기본값으로 바꾼 뒤 notes로 알린다.
  */
-export function parseImport(part1Text: string, part2Text: string, opts: { schoolYear: string; schoolName: string }): ImportParse {
+export function parseImport(
+  part1Text: string,
+  part2Text: string,
+  opts: { schoolYear: string; schoolName: string; /** 문서에서 뽑은 글자 (있으면 AI 답이 이 문서 내용인지 확인) */ sourceText?: string },
+): ImportParse {
   const all = [...extractAllJson(part1Text), ...extractAllJson(part2Text)].filter(isObj);
   if (!part1Text.trim()) return { ok: false, error: "1부 답을 붙여 넣어 주세요." };
   if (all.length === 0) return { ok: false, error: "답에서 JSON 코드 블록을 찾지 못했거나 형식이 깨져 있습니다. (답이 중간에 끊겼을 수 있어요)" };
@@ -358,7 +367,48 @@ export function parseImport(part1Text: string, part2Text: string, opts: { school
   if (unknownCodes.size) notes.push(`성취기준 목록에 없는 코드가 단원 지도계획·평가 계획에 있어 연결하지 못했어요: ${[...unknownCodes].join(", ")}`);
 
   if (!doc.basic.name) notes.push("설계 이름을 찾지 못했어요. 기본 정보 단계에서 적어 주세요.");
+  if (opts.sourceText?.trim()) {
+    const mismatch = checkAgainstSource(doc, opts.sourceText);
+    if (mismatch) return { ok: false, error: mismatch };
+  } else notes.push("원본 파일을 AI에 첨부한 방식이라, 답이 문서 내용과 같은지 앱이 확인하지 못했어요. 단계마다 꼭 확인해 주세요.");
   return { ok: true, doc, notes };
+}
+
+/** 비교용: 띄어쓰기·줄바꿈·표 칸(|)·문장부호·괄호를 모두 빼고 */
+const squash = (t: string) => t.replace(/[\s|·∙⋅‧•\-–—"'“”‘’「」『』<>〈〉《》()[\]{}.,:;!?~/⇒→※*#]/g, "").toLowerCase();
+
+/**
+ * AI 답이 정말 올린 문서의 내용인지 확인한다 (AI가 프롬프트의 예시나 다른 설계를 베끼는 일 막기).
+ * - 설계 이름이 문서에 있어야 한다.
+ * - 성취기준·학습주제·영역명·목표 문장 중 60% 이상이 문서에 있어야 한다.
+ *   PDF 표는 한 칸의 글이 여러 줄로 나뉘고 옆 칸 글과 섞이므로, 문장 앞 20자가 그대로 있거나
+ *   문장의 낱말(어절) 80% 이상이 문서에 있으면 '있다'로 본다.
+ * 다르면 오류 문장, 같으면 null.
+ */
+export function checkAgainstSource(doc: DesignDoc, sourceText: string): string | null {
+  const src = squash(sourceText);
+  const name = squash(doc.basic.name);
+  if (name && !src.includes(name)) {
+    return `AI 답의 설계 이름 「${doc.basic.name}」이(가) 올린 문서에 없어요. AI가 문서 대신 다른 내용(예시 등)을 쓴 것 같아요. 아래 수정 요청을 보내 다시 받아 주세요.`;
+  }
+  const samples = [
+    ...doc.standards.map((s) => s.text),
+    ...doc.areas.map((a) => a.name),
+    ...(doc.plan.selected?.units.flatMap((u) => u.lessons.map((l) => l.topic)) ?? []),
+    doc.intro.overallGoal,
+    ...doc.intro.rationale.split("\n"),
+  ].filter((t) => squash(t).length >= 4);
+  if (samples.length < 3) return null;
+  const inSource = (t: string) => {
+    if (src.includes(squash(t).slice(0, 20))) return true;
+    const words = t.split(/\s+/).map(squash).filter((w) => w.length >= 2);
+    return words.length > 0 && words.filter((w) => src.includes(w)).length / words.length >= 0.8;
+  };
+  const found = samples.filter(inSource).length;
+  if (found / samples.length < 0.6) {
+    return `AI 답의 문장 ${samples.length}개 중 올린 문서에서 찾을 수 있는 것이 ${found}개뿐이에요. 다른 문서(예시 등)의 내용이 섞였거나 AI가 문장을 바꿔 쓴 것 같아요. 아래 수정 요청을 보내 문서 글자 그대로 다시 받아 주세요.`;
+  }
+  return null;
 }
 
 /** 코드에서 약어 짐작: [학년][교과 첫 글자?][약어][영역]-[순서] */

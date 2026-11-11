@@ -15,7 +15,8 @@ const nextSchoolYear = () => {
 };
 
 const FIX_REMINDER = `- 1부는 "part": 1, 2부는 "part": 2 를 넣습니다.
-- 문서의 문장을 글자 그대로 옮기고, 없는 내용은 빈칸으로 둡니다.`;
+- 처음에 보낸 문서의 문장을 글자 그대로 옮기고, 없는 내용은 빈칸으로 둡니다.
+- 형식 예시의 괄호 안 말이나 다른 설계의 내용을 쓰지 않습니다.`;
 
 /**
  * '설계안 가져오기 → 우리 학교 기존 문서' 탭.
@@ -61,7 +62,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
   };
 
   const importNow = async () => {
-    const r = parseImport(answer1, answer2, { schoolYear: year, schoolName });
+    const r = parseImport(answer1, answer2, { schoolYear: year, schoolName, sourceText: useAttach ? undefined : file?.result.text });
     if (!r.ok) {
       if (r.multiple) {
         setMultiple(r.multiple);
