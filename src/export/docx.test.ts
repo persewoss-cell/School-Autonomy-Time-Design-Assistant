@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Packer } from "docx";
 import { sampleSubject } from "@/domain/sample";
-import { buildDesignDocx, docxFileName } from "./docx";
+import { buildDesignDocx, docxFileName, goalLines } from "./docx";
 
 async function xmlOf(doc: ReturnType<typeof sampleSubject>) {
   const buf = await Packer.toBuffer(buildDesignDocx(doc));
@@ -31,6 +31,25 @@ describe("docx 만들기", () => {
     expect(text).toContain("1. 필요성 및 목표");
     expect(text).toContain("4. 지도의 실제");
     expect(text).toContain("광양중동초등학교운영위원장 귀하");
+  });
+  it("단원명이 이미 'N단원'으로 시작하면 번호를 한 번만 (가져온 설계)", async () => {
+    const doc = sampleSubject();
+    doc.plan.selected!.units[0].unitName = "1단원 먼저 읽어요";
+    const text = await xmlOf(doc);
+    expect(text).toContain("1단원먼저 읽어요");
+    expect(text).not.toContain("1단원1단원");
+    expect(text).toContain("2단원");
+  });
+  it("활동 문서에는 교수·학습 방향이 있어도 넣지 않는다 (2027 활동 양식)", async () => {
+    const doc = sampleSubject();
+    doc.basic.type = "activity";
+    doc.teaching.teachingDirection = ["보관만 하는 문장"];
+    expect(await xmlOf(doc)).not.toContain("보관만 하는 문장");
+  });
+  it("학습 내용: 목표가 비면 '~봅시다.' 첫 줄을 · 줄로, 그것도 없으면 빈 · 줄을 만들지 않음", () => {
+    expect(goalLines({ goal: "", activities: ["책을 읽어봅시다.", "표지 살펴보기"] })).toEqual({ goal: "책을 읽어봅시다.", activities: ["표지 살펴보기"] });
+    expect(goalLines({ goal: "", activities: ["표지 살펴보기", "내용 예상하기"] })).toEqual({ goal: "", activities: ["표지 살펴보기", "내용 예상하기"] });
+    expect(goalLines({ goal: "목표", activities: ["읽어봅시다.", "a"] })).toEqual({ goal: "목표", activities: ["읽어봅시다.", "a"] });
   });
   it("파일 이름", () => {
     expect(docxFileName(sampleSubject())).toBe("지구마을 첫걸음_학교자율시간_과목_3학년2학기.docx");

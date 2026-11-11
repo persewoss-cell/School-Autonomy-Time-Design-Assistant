@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { seedDesigns } from "@/server/seed";
 import { codeMap } from "@/domain/codes";
 import type { DesignDoc } from "@/domain/types";
-import { buildImportPrompt, checkAgainstSource, codeDiffNote, extractAllJson, guessAbbrev, IMPORT_PART2_PROMPT, parseImport, uniqueName } from "./importDoc";
+import { buildImportPrompt, checkAgainstSource, codeDiffNote, stripUnitNo, extractAllJson, guessAbbrev, IMPORT_PART2_PROMPT, parseImport, uniqueName } from "./importDoc";
 
 /** 예시안 PDF(지구마을 첫걸음)에서 앱이 실제로 뽑은 글자 */
 const PDF_TEXT = readFileSync(new URL("./__fixtures__/jigu-first-step.pdf.txt", import.meta.url), "utf8");
@@ -146,6 +146,36 @@ describe("기존 문서 가져오기", () => {
     expect(codeDiffNote(doc, r.originalCodes)).toContain("앱 [3사지구01-01]");
     doc.basic.subjectGroup = "국어";
     expect(codeDiffNote(doc, r.originalCodes)).toContain("앱 [3국지구01-01]");
+  });
+
+  it("원본 모양 맞추기: 단원 번호 떼기, '·~봅시다.' 첫 줄은 학습 목표로, 활동 문서의 교수·학습도 보관", () => {
+    const [a1] = asAnswers(seed);
+    const p1 = JSON.parse(a1.slice(a1.indexOf("{"), a1.lastIndexOf("}") + 1));
+    p1.teaching = { teachingDirection: ["(1) 여건을 조성한다."], teachingMethods: [], assessDirection: [], assessMethods: [] };
+    const p2 = {
+      part: 2,
+      units: [
+        {
+          unitName: "1단원 먼저 읽어요",
+          lessons: [
+            { hours: 1, topic: "책 읽기", goal: "", activities: ["·「고래는 왜 돌아왔을까?」를 읽어봅시다.", "- 표지 그림 살펴보기", "- 내용 예상하기"], assessment: "", note: "" },
+            { hours: 1, topic: "책 읽기2", goal: "", activities: ["- 표지 살펴보기"], assessment: "", note: "" },
+          ],
+        },
+      ],
+      assessments: [],
+    };
+    const r = parseImport("```json\n" + JSON.stringify(p1) + "\n```", "```json\n" + JSON.stringify(p2) + "\n```", { schoolYear: "2026", schoolName: "" });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const u = r.doc.plan.selected!.units[0];
+    expect(u.unitName).toBe("먼저 읽어요");
+    expect(u.lessons[0].goal).toBe("「고래는 왜 돌아왔을까?」를 읽어봅시다.");
+    expect(u.lessons[0].activities).toEqual(["표지 그림 살펴보기", "내용 예상하기"]);
+    expect(u.lessons[1].goal).toBe("");
+    expect(r.doc.basic.type).toBe("activity");
+    expect(r.doc.teaching.teachingDirection.length).toBe(1);
+    expect(["2. 작가님과 함께 해요", "(3) 그림책", "Ⅱ. 만들기", "단원 없음"].map(stripUnitNo)).toEqual(["작가님과 함께 해요", "그림책", "만들기", "단원 없음"]);
   });
 
   it("JSON이 없으면 오류", () => {

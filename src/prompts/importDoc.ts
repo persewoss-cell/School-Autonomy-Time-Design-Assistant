@@ -115,7 +115,7 @@ ${COMMON_RULES}
 - rationale: 활동은 '필요성', 과목은 '성격' 문단 전체 / overallGoal: 총괄 목표 / detailGoals: 세부 목표 3개 (번호는 빼고)
 - areas: 내용 체계의 영역마다 범주별 내용 요소 (knowledge=지식·이해, process=과정·기능, values=가치·태도)
 - standards: 성취기준마다 code, area(몇 번째 영역인지 1부터), text(문장), elements(이 성취기준과 연결된 내용 요소. 문서의 내용 체계 문구 그대로)
-- teaching: 과목 문서의 '교수·학습 방향/방법', '평가 방향/방법' (한 줄에 하나, 활동이면 빈 목록)
+- teaching: 문서의 '교수·학습 방향/방법', '평가 방향/방법' (한 줄에 하나, 번호는 빼고). 활동 문서라도 있으면 옮깁니다.
 - application: 계획서·신청서에 있는 영문명, 설립 구분, 교재 유형·이름, 담당 교사 운영 방안, 기타, 개설 필요성·목표·내용 요약 (없으면 빈칸)
 
 ${source}
@@ -136,7 +136,9 @@ export const IMPORT_PART2_PROMPT = `이제 같은 문서의 **2부**를 답해 �
 ## 꼭 지킬 것
 - 문서의 문장을 글자 그대로 옮깁니다. 없는 내용은 빈칸으로 둡니다.
 - 단원 지도계획 표의 한 줄(차시)마다 lessons 하나. 차시가 '2~3/29'처럼 묶여 있으면 hours는 묶인 차시 수(2)입니다.
-- activities: '학습 내용' 칸의 줄을 하나씩 / assessment: 그 차시의 [과정중심평가] 내용 (없으면 "")
+- goal: '학습 내용' 칸에서 ·로 시작하는 첫 문장(예: ~해 봅시다.) / activities: 그 아래 - 로 시작하는 줄을 하나씩 (· 문장은 넣지 않음)
+- assessment: 그 차시의 [과정중심평가] 내용 (없으면 "")
+- unitName: 단원 이름만 (앞의 '1단원', '1.' 같은 번호는 빼고)
 - assessStandards: 그 차시에서 평가하는 성취기준 코드 (없으면 [])
 - assessments: 평가 계획 표의 한 줄마다 하나. levels는 성취수준 A(상)·B(중)·C(하) 문장, methods는 평가 방법 낱말
 
@@ -328,17 +330,22 @@ export function parseImport(
   const units: Unit[] = arr(p2.units)
     .filter(isObj)
     .map((u, ui) => ({
-      unitName: str(u.unitName),
+      // '1단원 먼저 읽어요' → '먼저 읽어요' (번호는 앱이 붙임)
+      unitName: stripUnitNo(str(u.unitName)),
       standardIds: doc.standards.filter((s) => s.areaIndex === ui).map((s) => s.id),
       lessons: arr(u.lessons)
         .filter(isObj)
         .map((l): Lesson => {
           const assessed = idsOf(l.assessStandards);
+          // 원본의 '·~해 봅시다.' 첫 줄을 AI가 활동에 넣었으면 학습 목표로 옮김
+          let goal = str(l.goal);
+          const activities = toList(l.activities);
+          if (!goal && activities.length > 1 && /(시다|봅시다|합시다)\.?$/.test(activities[0])) goal = activities.shift()!;
           return {
             hours: Math.max(1, Math.min(32, num(l.hours) ?? 1)),
             topic: str(l.topic),
-            goal: str(l.goal),
-            activities: toList(l.activities),
+            goal,
+            activities,
             assessment: str(l.assessment),
             assessFor: assessed[0] ?? "",
             ...(assessed.length > 1 ? { assessWith: assessed.slice(1) } : {}),
@@ -378,6 +385,9 @@ export function parseImport(
   } else notes.push("원본 파일을 AI에 첨부한 방식이라, 답이 문서 내용과 같은지 앱이 확인하지 못했어요. 단계마다 꼭 확인해 주세요.");
   return { ok: true, doc, notes, missing, originalCodes };
 }
+
+/** 단원명 앞의 번호('1단원', '1.', '(1)', 'Ⅰ.')를 뗀다 */
+export const stripUnitNo = (name: string) => name.replace(/^\s*(\d+\s*단원|\(?\d+[).]|[ⅠⅡⅢⅣⅤⅥ]+\.)\s*/, "").trim() || name.trim();
 
 export const CODE_NOTE_START = "성취기준 코드 ";
 

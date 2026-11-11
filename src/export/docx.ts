@@ -68,6 +68,16 @@ interface ParaOpts extends RunOpts {
 }
 
 const pt = (n: number) => Math.round(n * 20);
+
+/**
+ * 학습 내용 칸: '· 학습 목표' 한 줄 + '- 활동' 줄들.
+ * 학습 목표가 비어 있고 첫 활동이 '~봅시다.'처럼 목표 문장이면 그것을 · 줄로 (예전에 가져온 설계). 둘 다 없으면 · 줄 없음.
+ */
+export function goalLines(l: { goal: string; activities: string[] }): { goal: string; activities: string[] } {
+  const acts = l.activities.filter((x) => x.trim());
+  if (!l.goal.trim() && acts.length > 1 && /시다\.?$/.test(acts[0].trim())) return { goal: acts[0].trim(), activities: acts.slice(1) };
+  return { goal: l.goal.trim(), activities: acts };
+}
 const run = (text: string, o: RunOpts = {}) =>
   new TextRun({
     text,
@@ -395,7 +405,7 @@ function unitPlanTable(doc: DesignDoc): Table | Paragraph {
     );
     const lessonH = u.lessons.map((l) =>
       Math.max(
-        parasHeight([`· ${l.goal}`], widths[4], 9.5) + parasHeight(l.activities.filter((x) => x.trim()).map((x) => `- ${x}`), widths[4], 9) + (l.assessment.trim() ? parasHeight([`[과정중심평가] ${l.assessment}`], widths[4], 10) + 2 : 0),
+        parasHeight(goalLines(l).goal ? [`· ${goalLines(l).goal}`] : [], widths[4], 9.5) + parasHeight(goalLines(l).activities.map((x) => `- ${x}`), widths[4], 9) + (l.assessment.trim() ? parasHeight([`[과정중심평가] ${l.assessment}`], widths[4], 10) + 2 : 0),
         parasHeight([l.topic], widths[3], 9),
       ) + 2,
     );
@@ -412,8 +422,8 @@ function unitPlanTable(doc: DesignDoc): Table | Paragraph {
       const mergedB = (col: number) => ({ top: NONE, bottom: last ? THIN : NONE, ...side(col) });
       const lineB = (col: number) => ({ top: NONE, bottom: THIN, ...side(col) });
       const content = [
-        para(`· ${l.goal}`, { size: 9.5, bold: true, left: 9, first: -9, align: AlignmentType.LEFT, line: 1.0 }),
-        ...l.activities.filter((x) => x.trim()).map((x) => para(`- ${x}`, { size: 9, left: 9, first: -7, align: AlignmentType.LEFT, line: 1.0 })),
+        ...(goalLines(l).goal ? [para(`· ${goalLines(l).goal}`, { size: 9.5, bold: true, left: 9, first: -9, align: AlignmentType.LEFT, line: 1.0 })] : []),
+        ...goalLines(l).activities.map((x) => para(`- ${x}`, { size: 9, left: 9, first: -7, align: AlignmentType.LEFT, line: 1.0 })),
         ...(l.assessment.trim()
           ? [
               new Paragraph({
@@ -426,7 +436,7 @@ function unitPlanTable(doc: DesignDoc): Table | Paragraph {
       ];
       const row: TableCell[] = [];
       if (li === 0) {
-        row.push(cell(lines(`${ui + 1}단원\n${u.unitName}`, { size: 9.5, bold: true, align: AlignmentType.CENTER, line: 1.0 }), { rows: keep, borders: { top: NONE, bottom: keep === n ? THIN : NONE, ...side(0) } }));
+        row.push(cell(lines(/^\s*\d+\s*단원/.test(u.unitName) ? u.unitName.trim().replace(/^(\d+\s*단원)\s*/, "$1\n") : `${ui + 1}단원\n${u.unitName}`, { size: 9.5, bold: true, align: AlignmentType.CENTER, line: 1.0 }), { rows: keep, borders: { top: NONE, bottom: keep === n ? THIN : NONE, ...side(0) } }));
         row.push(cell(standardParas(doc, u.standardIds), { rows: keep, borders: { top: NONE, bottom: keep === n ? THIN : NONE, ...side(1) } }));
       } else if (li >= keep) {
         row.push(cell([], { borders: mergedB(0) }), cell([], { borders: mergedB(1) }));
