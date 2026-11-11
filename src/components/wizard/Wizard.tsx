@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { emptyDesign, type DesignDoc } from "@/domain/types";
 import { api } from "@/lib/api";
 import type { StepKey } from "@/validation/types";
-import { checklistResults, validateDesign } from "@/validation/design";
+import { validateDesign } from "@/validation/design";
 import { mergeTyping, type TypingState } from "@/domain/history";
 import { useHourChecks } from "../hours/useHourChecks";
 import { DownloadIcon } from "../icons";
@@ -18,6 +18,8 @@ import { PlanStep } from "./PlanStep";
 import { AssessmentStep } from "./AssessmentStep";
 import { ApplicationStep, FinalStep } from "./FinalSteps";
 import { WorksheetStep } from "./WorksheetStep";
+import { blockReasons, DownloadBlockedModal } from "./DownloadBlocked";
+import { flashFix, useNextHalo } from "../guide";
 
 /**
  * 설계 단계. 문서 작성 부분은 2027 연수 PPT의 순서를 따른다:
@@ -252,7 +254,7 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
   const index = Math.max(0, steps.findIndex((s) => s.key === stepKey));
   // 지침 점검은 문서가 바뀔 때 한 번만 (단계 색·문서 버튼이 함께 씀)
   const issues = useMemo(() => validateDesign(doc), [doc]);
-  const checklistLeft = useMemo(() => checklistResults(doc, {}, issues).filter((c) => !c.ok).length, [doc, issues]);
+  const reasons = useMemo(() => blockReasons(doc, issues), [doc, issues]);
   const errorCount = issues.filter((i) => i.level === "error").length;
   const errorSteps = new Set(issues.filter((i) => i.level === "error").map((i) => i.step));
   /** 단계 이동: 진행 위치를 문서에 적고, 로그인했으면 서버에 자동 저장 */
@@ -322,18 +324,35 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
             ? "단계를 넘기면 자동 저장돼요"
             : "이 브라우저에 임시 저장 중";
 
-  // 위 줄의 '문서' 버튼: 최종 점검과 같은 조건(오류 0개 + 체크리스트 모두 ○ + 로그인)일 때만 내려받는다
+  // 위 줄의 '문서' 버튼: 늘 누를 수 있고, 최종 점검과 같은 조건(오류 0개 + 체크리스트 모두 확인 + 로그인)이 아니면 이유 목록 팝업
   const hc = useHourChecks();
   const guest = !!hc.me?.enabled && !hc.loggedIn;
   const docReady = guest
     ? { ok: false, reason: "로그인해야 문서를 내려받을 수 있어요." }
-    : errorCount > 0 || checklistLeft > 0
-      ? { ok: false, reason: `문서가 아직 완성되지 않았어요. (오류 ${errorCount}개, 확인하지 않은 체크리스트 ${checklistLeft}개)` }
+    : reasons.length > 0
+      ? { ok: false, reason: `문서가 아직 완성되지 않았어요. 눌러서 남은 것을 확인하세요. (${reasons.length}가지)` }
       : { ok: true, reason: "" };
+  const [showReasons, setShowReasons] = useState(false);
+  /** 고치러 가기: 그 단계로 가서 그 칸을 빨갛게 두 번 번쩍 */
+  const fixIt = (step: StepKey, target?: string) => {
+    if (step !== stepRef.current) goTo(step);
+    flashFix(target);
+  };
+  // 설계 현황에서 '고치러 가기'로 열면 (?step=…&fix=…) 그 단계·그 칸으로
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const step = q.get("step") as StepKey | null;
+    if (!step || !stepsFor(docRef.current).some((s) => s.key === step)) return;
+    const fix = q.get("fix") ?? undefined;
+    window.history.replaceState(null, "", window.location.pathname);
+    setTimeout(() => fixIt(step, fix), 100);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const halo = useNextHalo(stepKey !== "worksheet", `${undoKey}-${stepKey}`);
   const downloadFromBar = async () => {
     if (!docReady.ok) {
       if (guest) return alert(docReady.reason);
-      if (confirm(`${docReady.reason}\n\n'점검·내려받기' 단계로 가서 남은 것을 확인할까요?`)) goTo("final");
+      setShowReasons(true);
       return;
     }
     if (!confirm(`${FORM_NOTICE}\n\n확인을 누르면 내려받습니다.`)) return;
@@ -383,7 +402,7 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
             type="button"
             onClick={() => void downloadFromBar()}
             title={docReady.ok ? "문서(.docx) 내려받기" : docReady.reason}
-            className={`flex items-center gap-1 rounded-lg px-3 py-1 font-semibold ${docReady.ok ? "bg-brand-100 text-brand-700 hover:bg-brand-50" : "bg-gray-50 text-gray-300"}`}
+            className="flex items-center gap-1 rounded-lg bg-brand-100 px-3 py-1 font-semibold text-brand-700 hover:bg-brand-50"
           >
             문서 <DownloadIcon />
           </button>
@@ -434,7 +453,7 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
       </div>
 
       {/* 되돌리기·다시 실행하면 key가 바뀌어 단계 화면을 새로 그린다 */}
-      <div key={undoKey} className="space-y-6">
+      <div key={`${undoKey}-${stepKey}`} ref={halo} className="space-y-6">
       {stepKey === "type" && (
         <TypeStep
           value={doc.basic.type}
@@ -497,6 +516,17 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
         />
       )}
       </div>
+      {showReasons && (
+        <DownloadBlockedModal
+          reasons={reasons}
+          stepLabel={(k) => steps.find((s) => s.key === k)?.label ?? ""}
+          onClose={() => setShowReasons(false)}
+          onGo={(r) => {
+            setShowReasons(false);
+            fixIt(r.step, r.target);
+          }}
+        />
+      )}
     </div>
     </DismissContext.Provider>
   );

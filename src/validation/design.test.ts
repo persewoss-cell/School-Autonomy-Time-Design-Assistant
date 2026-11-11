@@ -223,3 +223,48 @@ describe("확인 필요 점검 무시하기", () => {
     expect(validateDesign(doc).some((i) => issueKey(i) === issueKey(err))).toBe(true);
   });
 });
+
+describe("고치러 가기: 모든 점검에 고칠 칸(target)이 있다", () => {
+  it("빈 설계·망가뜨린 설계의 모든 오류·확인 필요에 target", async () => {
+    const { emptyDesign } = await import("@/domain/types");
+    const { validateDesign } = await import("./design");
+    const empty = emptyDesign();
+    const broken = sampleSubject();
+    broken.abbrev = "";
+    broken.areas[0].name = "";
+    broken.areas[0].knowledge = [];
+    broken.coreIdeas = ["", "~해야 한다"];
+    broken.standards[0].text = "만들 수 있다.";
+    broken.standards[1].elements = [];
+    broken.intro = { rationale: "", overallGoal: "", detailGoals: ["", "", ""] };
+    broken.assessments[0].focus = "";
+    broken.assessments[0].methods = [];
+    broken.assessments.push({ month: "", standardIds: [], focus: "", levels: { A: "", B: "", C: "" }, methods: [] });
+    broken.plan.selected!.units[0].lessons[0].assessment = "평가";
+    broken.plan.selected!.units[0].lessons[0].assessFor = "";
+    broken.plan.selected!.units[0].lessons[0].hours += 3;
+    broken.teaching.assessMethods = [];
+    broken.application.schoolName = "";
+    broken.application.textbookType = "";
+    broken.application.teacherPlans = [];
+    broken.basic.hours = 5;
+    broken.checklist = {};
+    for (const doc of [empty, broken]) {
+      const issues = validateDesign(doc);
+      expect(issues.length).toBeGreaterThan(3);
+      expect(issues.filter((i) => !i.target)).toEqual([]);
+      expect(issues.filter((i) => !i.step)).toEqual([]);
+    }
+    const t = validateDesign(broken).map((i) => i.target);
+    expect(t).toContain("abbrev");
+    expect(t).toContain("area.0.name");
+    expect(t).toContain("coreIdea.1");
+    expect(t).toContain("intro.rationale");
+    expect(t).toContain(`assess.${broken.assessments.length - 1}.standards`);
+    expect(t).toContain("app.textbook");
+    expect(t).toContain("teaching.assessMethods");
+    expect(t).toContain("basic.hours");
+    expect(t.some((x) => x?.startsWith("check."))).toBe(true);
+    expect(t.some((x) => x?.startsWith("lesson.0.0"))).toBe(true);
+  });
+});

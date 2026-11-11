@@ -94,6 +94,8 @@ export function BasicStep({
         <div className="flex gap-2">
           <input
             id="design-name"
+            data-fix="basic.name"
+            data-req=""
             className={`${inputClass} ${nameTried && sameName ? "border-red-400" : ""}`}
             value={b.name}
             onChange={(e) => set("name", e.target.value)}
@@ -152,7 +154,7 @@ export function BasicStep({
             <option value={2}>2학기</option>
           </select>
         </Field>
-        <Field label="운영 시수" hint={`${b.grade}학년 한 학기 기준 ${semesterHours(b.grade)}시간 · 최소 10시간`}>
+        <Field fix="basic.hours" label="운영 시수" hint={`${b.grade}학년 한 학기 기준 ${semesterHours(b.grade)}시간 · 최소 10시간`}>
           <input
             type="number"
             min={1}

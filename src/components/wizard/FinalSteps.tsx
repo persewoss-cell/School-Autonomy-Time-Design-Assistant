@@ -11,6 +11,8 @@ import { checkApplication, checklistResults, validateDesign } from "@/validation
 import type { Issue, StepKey } from "@/validation/types";
 import type { StepProps } from "./DocSteps";
 import { Card, Field, IssueList, NavButtons, StepHeader, StepIssues, inputClass, toggle } from "../ui";
+import { flashFix } from "../guide";
+import { blockReasons, DownloadBlockedModal, type BlockReason } from "./DownloadBlocked";
 
 // ───────────── 계획서(서식1)·신청서(서식3) 항목 ─────────────
 export function ApplicationStep({ doc, setDoc, onBack, onNext }: StepProps) {
@@ -29,8 +31,8 @@ export function ApplicationStep({ doc, setDoc, onBack, onNext }: StepProps) {
       />
       <Card className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="학교명">
-            <input className={inputClass} value={a.schoolName} placeholder="○○초등학교" onChange={(e) => set("schoolName", e.target.value)} />
+          <Field fix="app.schoolName" label="학교명">
+            <input data-req="" className={inputClass} value={a.schoolName} placeholder="○○초등학교" onChange={(e) => set("schoolName", e.target.value)} />
           </Field>
           {subject ? (
             <Field label="설립 구분">
@@ -48,7 +50,7 @@ export function ApplicationStep({ doc, setDoc, onBack, onNext }: StepProps) {
         </div>
         {subject && (
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="영문 과목명">
+            <Field fix="app.englishName" label="영문 과목명">
               <input className={inputClass} value={a.englishName} onChange={(e) => set("englishName", e.target.value)} />
             </Field>
             <Field label="적용 시작 학년도">
@@ -75,7 +77,7 @@ export function ApplicationStep({ doc, setDoc, onBack, onNext }: StepProps) {
 
       <Card className="space-y-4">
         <h2 className="font-bold">교재 활용 계획</h2>
-        <div className="space-y-1">
+        <div data-fix="app.textbook" data-req="" data-req-done={a.textbookType ? "1" : "0"} className="space-y-1 rounded-lg p-1">
           {TEXTBOOK_TYPES[doc.basic.type].map((x) => (
             <label key={x} className="flex items-center gap-2 text-sm">
               <input type="radio" name="textbook" checked={a.textbookType === x} onChange={() => set("textbookType", x)} />
@@ -87,7 +89,7 @@ export function ApplicationStep({ doc, setDoc, onBack, onNext }: StepProps) {
           <input className={inputClass} value={a.textbookName} onChange={(e) => set("textbookName", e.target.value)} />
         </Field>
         <h2 className="font-bold">지도교사 확보 방안</h2>
-        <div className="space-y-1">
+        <div data-fix="app.teacher" data-req="" data-req-done={a.teacherPlans.length ? "1" : "0"} className="space-y-1 rounded-lg p-1">
           {TEACHER_PLANS.map((x) => (
             <label key={x} className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={a.teacherPlans.includes(x)} onChange={() => set("teacherPlans", toggle(a.teacherPlans, x))} />
@@ -124,7 +126,8 @@ export function FinalStep({
   onDownloaded?: () => void;
 }) {
   const ctx = useDesignContext(doc, designId);
-  const issues = validateDesign(doc, ctx).filter((i) => i.field !== "체크리스트");
+  const all = validateDesign(doc, ctx);
+  const issues = all.filter((i) => i.field !== "체크리스트");
   const errors = issues.filter((i) => i.level === "error");
   const checklist = checklistResults(doc, ctx);
   const [busy, setBusy] = useState(false);
@@ -135,16 +138,23 @@ export function FinalStep({
   const { status: hours, year } = allocationFor(doc, designId ?? "current", hc.checks, hc.designs);
   // 로그인하지 않은 체험: 문서를 내려받을 수 없다 (사용자 결정, 2026-10-30)
   const guest = !!hc.me?.enabled && !hc.loggedIn;
-  const blocked = unchecked.length > 0 || guest;
+  // 오류 + 직접 확인할 체크리스트가 남으면 내려받지 않고 이유 목록을 보여 준다 (버튼은 늘 누를 수 있음, 사용자 결정 2026-11-11)
+  const reasons = blockReasons(doc, all);
+  const [showReasons, setShowReasons] = useState(false);
+  /** 고치러 가기: 다른 단계면 그 단계로, 그 칸을 빨갛게 두 번 번쩍 */
+  const fixIt = (step: StepKey | undefined, target?: string) => {
+    if (step && step !== "final") goTo(step);
+    flashFix(target);
+  };
   const goHours = async (grade: number) => {
     if (onSave) await onSave().catch(() => {});
     window.location.href = `/hours?grade=${grade}&year=${year}`;
   };
 
   const download = async () => {
-    if (blocked) return;
+    if (guest) return alert("로그인해야 문서를 내려받을 수 있어요.");
+    if (reasons.length > 0) return setShowReasons(true);
     if (!confirm(`${FORM_NOTICE}\n\n확인을 누르면 내려받습니다.`)) return;
-    if (errors.length > 0 && !confirm(`아직 오류가 ${errors.length}개 있습니다. 그래도 문서를 내려받을까요?`)) return;
     setBusy(true);
     try {
       await saveDesignDocx(doc, allocationFor(doc, designId ?? "current", hc.checks, hc.designs).attachment);
@@ -170,7 +180,7 @@ export function FinalStep({
 
       <Card className="space-y-3">
         <h2 className="font-bold">① 지침 점검 결과</h2>
-        <IssueList issues={issues} onGo={(i: Issue) => i.step && goTo(i.step)} stepLabel={(i) => stepLabel(i.step)} />
+        <IssueList issues={issues} onGo={(i: Issue) => fixIt(i.step, i.target)} stepLabel={(i) => stepLabel(i.step)} />
       </Card>
 
       <Card className="space-y-3">
@@ -178,7 +188,7 @@ export function FinalStep({
         <p className="text-sm text-gray-600">&lsquo;자동&rsquo; 항목은 프로그램 점검 결과로 정해져요. 나머지는 직접 확인하고 표시해 주세요.</p>
         <ul className="divide-y divide-gray-100">
           {checklist.map((c) => (
-            <li key={c.id} className="flex items-start gap-3 py-2 text-sm">
+            <li key={c.id} data-fix={`check.${c.id}`} className="flex items-start gap-3 rounded-lg py-2 text-sm">
               {c.auto ? (
                 <span className={`mt-0.5 w-10 shrink-0 rounded text-center text-xs font-bold ${c.ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                   {c.ok ? "○" : "X"}
@@ -186,7 +196,9 @@ export function FinalStep({
               ) : (
                 <input
                   type="checkbox"
-                  className="mt-1 ml-3 mr-2.5 h-4 w-4 shrink-0"
+                  data-req=""
+                  data-req-done={c.ok ? "1" : "0"}
+                  className="mt-1 ml-3 mr-2.5 h-4 w-4 shrink-0 rounded"
                   checked={c.ok}
                   onChange={() => setDoc((d) => void (d.checklist[c.id] = !d.checklist[c.id]))}
                 />
@@ -233,7 +245,7 @@ export function FinalStep({
           </p>
         )}
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={download} disabled={busy || blocked} className="rounded-lg bg-brand-600 px-5 py-2 font-semibold text-white hover:bg-brand-700 disabled:bg-gray-300">
+          <button type="button" onClick={download} disabled={busy} data-req-final="" className="rounded-lg bg-brand-600 px-5 py-2 font-semibold text-white hover:bg-brand-700 disabled:bg-gray-300">
             {busy ? "만드는 중…" : "📄 문서 내려받기 (.docx)"}
           </button>
           {onSave && (
@@ -256,6 +268,17 @@ export function FinalStep({
         </div>
       </Card>
 
+      {showReasons && (
+        <DownloadBlockedModal
+          reasons={reasons}
+          stepLabel={(s) => stepLabel(s)}
+          onClose={() => setShowReasons(false)}
+          onGo={(r: BlockReason) => {
+            setShowReasons(false);
+            fixIt(r.step, r.target);
+          }}
+        />
+      )}
       <DocPreview doc={doc} />
       <NavButtons onBack={onBack} onNext={onNext} nextLabel="다음: 차시별 활동지 (선택)" />
     </div>

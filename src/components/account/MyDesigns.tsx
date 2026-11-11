@@ -5,7 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { DesignDoc } from "@/domain/types";
 import { api, sendLog } from "@/lib/api";
-import { checklistResults, validateDesign } from "@/validation/design";
+import { validateDesign } from "@/validation/design";
+import { blockReasons, DownloadBlockedModal, type BlockReason } from "../wizard/DownloadBlocked";
 import type { Issue } from "@/validation/types";
 import { allocationFor, FORM_NOTICE, saveDesignDocx } from "../wizard/downloadDesign";
 import { Modal } from "../Modal";
@@ -145,16 +146,19 @@ export function MyDesigns() {
   };
   // 카드에서 바로 문서 내려받기 (최종 점검 화면과 같은 안내·같은 문서)
   const [busyId, setBusyId] = useState<string | null>(null);
+  // 오류·체크리스트가 남았으면 내려받지 않고 이유 목록 (고치러 가기 → 그 설계의 그 단계·그 칸)
+  const [blocked, setBlocked] = useState<{ row: DesignRow; doc: DesignDoc; reasons: BlockReason[] } | null>(null);
   const download = async (row: DesignRow) => {
-    if (!confirm(`${FORM_NOTICE}\n\n확인을 누르면 내려받습니다.`)) return;
     setBusyId(row.id);
     try {
       const { design } = await api<{ design: { doc: DesignDoc } }>(`/api/designs/${row.id}`);
-      const left = checklistResults(design.doc).filter((c) => !c.ok).length;
-      if (left > 0) {
-        alert(`체크리스트에 확인하지 않은 항목이 ${left}개 있어요. 설계의 '점검·내려받기' 단계에서 확인해 주세요.`);
+      const semesterOthers = sameSemesterOthers({ id: row.id, grade: row.grade, semester: row.semester, schoolYear: row.schoolYear }, rows ?? []);
+      const reasons = blockReasons(design.doc, validateDesign(design.doc, { semesterOthers }));
+      if (reasons.length > 0) {
+        setBlocked({ row, doc: design.doc, reasons });
         return;
       }
+      if (!confirm(`${FORM_NOTICE}\n\n확인을 누르면 내려받습니다.`)) return;
       await saveDesignDocx(design.doc, allocationFor(design.doc, row.id, checks, rows ?? []).attachment);
       sendLog("download", undefined, row.id);
     } catch (e) {
@@ -237,6 +241,14 @@ export function MyDesigns() {
             onRemove={(r) => void remove(r)}
           />
         </div>
+      )}
+      {blocked && (
+        <DownloadBlockedModal
+          reasons={blocked.reasons}
+          stepLabel={(k) => stepsFor(blocked.doc).find((s) => s.key === k)?.label ?? ""}
+          onClose={() => setBlocked(null)}
+          onGo={(r) => router.push(`/designs/${blocked.row.id}?step=${r.step}${r.target ? `&fix=${encodeURIComponent(r.target)}` : ""}`)}
+        />
       )}
       {warnView && (
         <Modal
@@ -459,8 +471,8 @@ function DesignTable({
               <td className="p-2 text-center">
                 <button
                   type="button"
-                  disabled={!docReady(r) || busyId === r.id}
-                  title={docReady(r) ? "문서(.docx) 내려받기" : "설계를 완성하면(오류 0개, 체크리스트 모두 확인) 내려받을 수 있어요"}
+                  disabled={busyId === r.id}
+                  title={docReady(r) ? "문서(.docx) 내려받기" : "아직 완성되지 않았어요. 누르면 남은 것을 보여 줘요"}
                   onClick={() => onDownload(r)}
                   className={`${ICON_BTN} text-brand-700`}
                 >

@@ -25,4 +25,6 @@ export interface Issue {
   fix: string;
   /** 고칠 단계 */
   step?: StepKey;
+  /** 고칠 칸 (화면의 data-fix 표시). '고치러 가기'를 누르면 그 칸이 빨갛게 번쩍인다. 점(.)으로 나눠 앞부분이 넓은 범위 */
+  target?: string;
 }

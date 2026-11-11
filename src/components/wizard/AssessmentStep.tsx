@@ -29,6 +29,7 @@ export function AssessmentStep({ doc, setDoc, onBack, onNext, onParseFail }: Ste
           doc.basic.type === "subject" ? "과목은 모든 성취기준에 대한 성취수준을 작성해야 해요" : "단원 지도계획의 [과정중심평가]와 내용이 맞아야 해요",
         ]}
       />
+      <div data-fix="assessment" className="rounded-2xl">
       <AiAssist
         doc={doc}
         step={assessmentPrompt}
@@ -39,8 +40,9 @@ export function AssessmentStep({ doc, setDoc, onBack, onNext, onParseFail }: Ste
         onReset={() => setDoc((d) => void (d.assessments = []))}
         resetWhat="평가 계획"
       />
+      </div>
       {doc.assessments.map((r, i) => (
-        <Card key={i} className="space-y-3">
+        <Card key={i} fix={`assess.${i}`} className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-bold">평가 {i + 1}</h2>
             <button type="button" className="text-sm text-gray-400 hover:text-red-600" onClick={() => setDoc((d) => void d.assessments.splice(i, 1))}>
@@ -48,10 +50,10 @@ export function AssessmentStep({ doc, setDoc, onBack, onNext, onParseFail }: Ste
             </button>
           </div>
           <div className="grid gap-3 sm:grid-cols-[120px_1fr]">
-            <Field label="시기">
-              <input className={inputClass} value={r.month} placeholder="예: 9월" onChange={(e) => set(i, (x) => void (x.month = e.target.value))} />
+            <Field fix={`assess.${i}.month`} label="시기">
+              <input data-req="" className={inputClass} value={r.month} placeholder="예: 9월" onChange={(e) => set(i, (x) => void (x.month = e.target.value))} />
             </Field>
-            <div className="space-y-1">
+            <div data-fix={`assess.${i}.standards`} data-req="" data-req-done={r.standardIds.length ? "1" : "0"} className="space-y-1 rounded-lg">
               <p className="text-sm font-semibold">성취기준</p>
               <Chips
                 options={doc.standards.map((s) => s.id)}
@@ -61,15 +63,15 @@ export function AssessmentStep({ doc, setDoc, onBack, onNext, onParseFail }: Ste
               />
             </div>
           </div>
-          <Field label="수업·평가 방법, 연계의 주안점" hint="예: [협력중심 학습] ▪ 평가 내용 ⇒ (관찰평가, 동료평가) 확인 방법">
-            <textarea rows={3} className={inputClass} value={r.focus} onChange={(e) => set(i, (x) => void (x.focus = e.target.value))} />
+          <Field fix={`assess.${i}.focus`} label="수업·평가 방법, 연계의 주안점" hint="예: [협력중심 학습] ▪ 평가 내용 ⇒ (관찰평가, 동료평가) 확인 방법">
+            <textarea rows={3} data-req="" className={inputClass} value={r.focus} onChange={(e) => set(i, (x) => void (x.focus = e.target.value))} />
           </Field>
           {(["A", "B", "C"] as const).map((lv) => (
-            <Field key={lv} label={`성취수준 ${lv}`}>
-              <input className={inputClass} value={r.levels[lv]} placeholder="~할 수 있다." onChange={(e) => set(i, (x) => void (x.levels[lv] = e.target.value))} />
+            <Field key={lv} fix={`assess.${i}.level${lv}`} label={`성취수준 ${lv}`}>
+              <input data-req="" className={inputClass} value={r.levels[lv]} placeholder="~할 수 있다." onChange={(e) => set(i, (x) => void (x.levels[lv] = e.target.value))} />
             </Field>
           ))}
-          <div className="space-y-1">
+          <div data-fix={`assess.${i}.methods`} data-req="" data-req-done={r.methods.some((m) => m.trim()) ? "1" : "0"} className="space-y-1 rounded-lg">
             <p className="text-sm font-semibold">방법</p>
             <Chips options={[...new Set([...ASSESS_METHODS, ...r.methods])]} selected={r.methods} onToggle={(m) => set(i, (x) => void (x.methods = toggle(x.methods, m)))} />
           </div>
@@ -77,6 +79,7 @@ export function AssessmentStep({ doc, setDoc, onBack, onNext, onParseFail }: Ste
       ))}
       <button
         type="button"
+        data-fix="assessment.add"
         className="w-full rounded-xl border-2 border-dashed border-gray-300 py-3 text-sm text-gray-500 hover:border-brand-500 hover:text-brand-600"
         onClick={() => setDoc((d) => void d.assessments.push(emptyRow()))}
       >

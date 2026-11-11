@@ -9,6 +9,8 @@ import { DESIGN_TYPES, GRADES, OPENING_TYPES, OPERATION_MODES, SUBJECT_GROUPS, t
 import { readDocument, type ReadResult } from "@/import/readDocument";
 import { Modal } from "./Modal";
 import { CopyBox, inputClass } from "./ui";
+import { useNextHalo } from "./guide";
+import { AiWarnModal } from "./wizard/AiAssist";
 
 const nextSchoolYear = () => {
   const now = new Date();
@@ -42,6 +44,10 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
   const [done, setDone] = useState<{ id: string; name: string; notes: string[]; fixes: string[]; formChanges: string[] } | null>(null);
   const [drag, setDrag] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  /** 1부·2부 프롬프트를 복사했는지 (다음 할 일 노란 후광용) */
+  const [copied1, setCopied1] = useState(false);
+  const [copied2, setCopied2] = useState(false);
+  const halo = useNextHalo();
 
 
   const pick = async (f: File | undefined) => {
@@ -52,6 +58,8 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
     setAnswer1("");
     setAnswer2("");
     setError("");
+    setCopied1(false);
+    setCopied2(false);
     try {
       setFile({ name: f.name, result: await readDocument(f) });
     } catch (e) {
@@ -63,7 +71,10 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
   };
 
   /** 가져오기 전 확인 팝업: 고를 칸 + 자동으로 고친 것 + 알림 */
-  const [ask, setAsk] = useState<{ doc: DesignDoc; notes: string[]; fixes: string[]; formChanges: string[]; missing: MissingField[]; originalCodes: Record<string, string> } | null>(null);
+  type Parsed = { doc: DesignDoc; notes: string[]; fixes: string[]; formChanges: string[]; missing: MissingField[]; originalCodes: Record<string, string> };
+  const [ask, setAsk] = useState<Parsed | null>(null);
+  /** 그 앞에 먼저 뜨는 빨간 'AI는 실수를 해요' 경고 */
+  const [warn, setWarn] = useState<Parsed | null>(null);
 
   const importNow = () => {
     const r = parseImport(answer1, answer2, { schoolYear: year, schoolName, sourceText: file?.result.text });
@@ -75,8 +86,8 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
       return;
     }
     setError("");
-    // 가져오기 전에 항상 확인받는다: 고를 칸·자동으로 고친 것·알림·2027 양식에 맞춰 바뀌는 것
-    setAsk(r);
+    // 먼저 'AI는 실수를 해요' 경고 → 확인하면 가져오기 전 확인 팝업(고를 칸·자동으로 고친 것·알림·2027 양식에 맞춰 바뀌는 것)
+    setWarn(r);
   };
 
   const save = async (doc: DesignDoc, baseNotes: string[], fixes: string[], formChanges: string[]) => {
@@ -93,6 +104,8 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
       setFile(null);
       setAnswer1("");
       setAnswer2("");
+      setCopied1(false);
+      setCopied2(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "저장하지 못했어요.");
     } finally {
@@ -104,7 +117,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
   const num = "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-sm text-white";
 
   return (
-    <div className="space-y-5">
+    <div ref={halo} className="space-y-5">
       <div className="space-y-1 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
         <p>
           ⚠ <b>한 파일에 설계 하나만</b> 올려 주세요. 여러 학년·여러 과목이 한 파일에 들어 있으면 가져오지 않아요. (설계마다 파일을 나눠 저장한 뒤 하나씩 올려 주세요)
@@ -142,7 +155,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
         >
           <p className="text-gray-600">
             한글(.hwpx) 파일을 여기에 끌어다 놓거나{" "}
-            <button type="button" onClick={() => input.current?.click()} className="font-semibold text-brand-700 underline">
+            <button type="button" onClick={() => input.current?.click()} data-req="" data-req-done={file ? "1" : "0"} className="rounded px-1 font-semibold text-brand-700 underline">
               파일 고르기
             </button>
           </p>
@@ -167,13 +180,28 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
           {/* ② 1부 */}
           <section className="space-y-3">
             <p className={stepTitle}>
-              <span className={num}>2</span> 프롬프트를 복사해 AI에 보내고, 답(1부)을 붙여 넣으세요
+              <span className={num}>2</span> 1부 프롬프트를 복사해 AI에 보내고, AI의 답(1부)을 그대로 붙여 넣으세요
             </p>
+            <ol className="list-decimal space-y-0.5 pl-5 text-sm text-gray-700">
+              <li>
+                아래 <b>1부 프롬프트 복사</b>를 누르세요. (올린 문서의 글자가 프롬프트 안에 함께 들어 있어요)
+              </li>
+              <li>
+                평소 쓰는 생성형 AI 사이트(ChatGPT, Claude, Gemini, 뤼튼 등)에서 <b>새 대화창</b>을 열고, 입력칸에 붙여 넣어(Ctrl+V) 보내세요.
+              </li>
+              <li>
+                AI가 1부 답(코드 블록)을 다 쓰면, 답 아래의 복사 버튼으로 <b>답 전체를 그대로 복사</b>해 아래 칸에 붙여 넣으세요. 답을 고치거나 일부만 붙이지 마세요.
+              </li>
+              <li>AI 대화창은 닫지 말고 그대로 두세요. 다음 2부도 같은 대화창에서 받아요.</li>
+            </ol>
+            <p className="text-xs text-gray-500">💡 유료 버전의 가장 높은(최신) 모델을 쓸수록 문서를 빠짐없이, 정확하게 옮겨요.</p>
             <p className="text-xs text-amber-700">문서에 학생 이름 등 개인정보가 있으면 지우고 보내세요.</p>
             <CopyBox
               text={buildImportPrompt(file.result.text)}
-              label="프롬프트 복사"
+              label="1부 프롬프트 복사"
               rows={5}
+              req={copied1 || !!answer1.trim()}
+              onCopied={() => setCopied1(true)}
               extra={
                 <button
                   type="button"
@@ -181,7 +209,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
                   disabled={!answer1.trim()}
                   className="rounded-lg border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 disabled:border-gray-100 disabled:bg-gray-50 disabled:text-gray-300"
                 >
-                  답변 초기화
+                  AI 답변 초기화
                 </button>
               }
             />
@@ -189,6 +217,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
               rows={5}
               className={`${inputClass} font-mono text-xs`}
               placeholder="AI의 1부 답을 통째로 복사해 붙여 넣으세요."
+              data-req=""
               value={answer1}
               onChange={(e) => setAnswer1(e.target.value)}
             />
@@ -197,12 +226,29 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
           {/* ③ 2부 */}
           <section className="space-y-3">
             <p className={stepTitle}>
-              <span className={num}>3</span> 같은 AI 대화창에 2부 요청을 보내고, 답(2부)을 붙여 넣으세요
+              <span className={num}>3</span> 같은 AI 대화창에 2부 프롬프트를 보내고, AI의 답(2부)을 그대로 붙여 넣으세요
             </p>
+            <ol className="list-decimal space-y-0.5 pl-5 text-sm text-gray-700">
+              <li>
+                아래 <b>2부 프롬프트 복사</b>를 누르세요.
+              </li>
+              <li>
+                1부 답을 받은 <b>같은 AI 대화창</b>에 붙여 넣어(Ctrl+V) 보내세요. (새 대화창에 보내면 AI가 문서를 몰라서 엉뚱한 답을 해요)
+              </li>
+              <li>
+                AI가 2부 답(단원 지도계획·평가 계획)을 다 쓰면, <b>답 전체를 그대로 복사</b>해 아래 칸에 붙여 넣으세요.
+              </li>
+              <li>
+                답이 중간에 끊겼으면 같은 대화창에 <b>이어서</b>라고 보내고, 이어진 답까지 아래 칸에 이어 붙여 넣으세요.
+              </li>
+            </ol>
             <CopyBox
               text={IMPORT_PART2_PROMPT}
-              label="2부 요청 복사"
+              label="2부 프롬프트 복사"
               rows={3}
+              sameChat
+              req={copied2 || !!answer2.trim()}
+              onCopied={() => setCopied2(true)}
               extra={
                 <button
                   type="button"
@@ -210,13 +256,14 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
                   disabled={!answer2.trim()}
                   className="rounded-lg border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 disabled:border-gray-100 disabled:bg-gray-50 disabled:text-gray-300"
                 >
-                  답변 초기화
+                  AI 답변 초기화
                 </button>
               }
             />
             <textarea
               rows={5}
               className={`${inputClass} font-mono text-xs`}
+              data-req=""
               placeholder="AI의 2부 답(단원 지도계획·평가 계획)을 통째로 붙여 넣으세요. 답이 끊겼다면 '이어서'를 보내고 이어진 답까지 함께 붙여 넣으세요."
               value={answer2}
               onChange={(e) => setAnswer2(e.target.value)}
@@ -229,13 +276,14 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
               <p className="text-gray-700">
                 아래 <b>수정 요청</b>을 복사해 <b>같은 AI 대화창</b>에 보내고, 새 답을 다시 붙여 넣어 보세요.
               </p>
-              <CopyBox text={buildFixPrompt(error, FIX_REMINDER)} label="수정 요청 복사" rows={4} />
+              <CopyBox text={buildFixPrompt(error, FIX_REMINDER)} label="수정 요청 복사" rows={4} sameChat />
             </div>
           )}
           <button
             type="button"
             onClick={importNow}
             disabled={!answer1.trim() || busy}
+            data-req-final=""
             className="rounded-lg bg-brand-600 px-5 py-2 font-bold text-white hover:bg-brand-700 disabled:bg-gray-300"
           >
             {busy ? "가져오는 중…" : "설계 현황으로 가져오기"}
@@ -245,7 +293,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
 
       {clearPart && (
         <Modal
-          title="답변 초기화"
+          title="AI 답변 초기화"
           onClose={() => setClearPart(null)}
           actions={
             <>
@@ -270,6 +318,16 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
           <p className="font-semibold">붙여 넣은 {clearPart}부 답을 모두 지울까요?</p>
           <p className="text-sm text-gray-600">지운 뒤 AI의 새 답을 다시 붙여 넣으면 돼요.</p>
         </Modal>
+      )}
+      {warn && (
+        <AiWarnModal
+          imported
+          onClose={() => setWarn(null)}
+          onOk={() => {
+            setAsk(warn);
+            setWarn(null);
+          }}
+        />
       )}
       {ask && (
         <ConfirmImportModal

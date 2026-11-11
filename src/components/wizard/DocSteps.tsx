@@ -71,7 +71,7 @@ function ContentTable({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">) {
 
   return (
     <Card className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div data-fix="content" className="flex flex-wrap items-center justify-between gap-2 rounded-lg">
         <h2 className="font-bold">내용 체계표</h2>
         <button type="button" onClick={addArea} className="rounded-lg border border-brand-500 px-3 py-1 text-sm font-semibold text-brand-700 hover:bg-brand-50">
           + 영역 추가 (오른쪽에 열 추가)
@@ -95,6 +95,8 @@ function ContentTable({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">) {
                     <div className="flex items-center gap-1">
                       <span className="shrink-0 text-brand-700">({i + 1})</span>
                       <input
+                        data-fix={`area.${i}.name`}
+                        data-req=""
                         className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-center font-semibold focus:border-brand-500 focus:outline-none"
                         value={a.name}
                         placeholder="영역 이름 (명사형)"
@@ -113,7 +115,13 @@ function ContentTable({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">) {
                 <tr key={c}>
                   <th className={`border border-gray-300 p-2 text-sm font-semibold whitespace-nowrap ${CATEGORY_STYLE[c].head}`}>{CATEGORIES[c]}</th>
                   {doc.areas.map((a, i) => (
-                    <td key={i} className={`border border-gray-300 p-2 align-top ${CATEGORY_STYLE[c].cell}`}>
+                    <td
+                      key={i}
+                      data-fix={`area.${i}.${c}`}
+                      data-req=""
+                      data-req-done={a[c].some((e) => e.trim()) ? "1" : "0"}
+                      className={`border border-gray-300 p-2 align-top ${CATEGORY_STYLE[c].cell}`}
+                    >
                       <CellList
                         boxClass={CATEGORY_STYLE[c].box}
                         items={a[c]}
@@ -211,7 +219,9 @@ export function CoreIdeasStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
         resetWhat="핵심아이디어"
       />
       <Card>
-        <ListEditor items={doc.coreIdeas} onChange={(items) => setDoc((d) => void (d.coreIdeas = items))} placeholder="~다." multiline addLabel="+ 핵심아이디어 추가" />
+        <div data-fix="coreIdeas" className="rounded-lg">
+          <ListEditor items={doc.coreIdeas} onChange={(items) => setDoc((d) => void (d.coreIdeas = items))} placeholder="~다." multiline addLabel="+ 핵심아이디어 추가" fix="coreIdea" required />
+        </div>
       </Card>
       <StepIssues issues={checkCoreIdeas(doc.coreIdeas, doc.areas.length)} />
       <NavButtons onBack={onBack} onNext={onNext} />
@@ -245,6 +255,8 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
         <Field label="성취기준 코드에 쓸 과목명 약어 (2~3자)" hint={`코드 예: [${doc.basic.grade}${Number(doc.application.startYear) < CODE_WITH_GROUP_FROM ? "" : doc.basic.subjectGroup.charAt(0)}${abbrev}01-01]`}>
           <input
             id="abbrev"
+            data-fix="abbrev"
+            data-req=""
             className={`${inputClass} max-w-40 ${doc.abbrev ? "" : "border-red-300"}`}
             value={doc.abbrev}
             placeholder="예: 지구"
@@ -275,6 +287,7 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
           }
         />
       )}
+      <div data-fix="standards" className="rounded-2xl">
       <AiAssist
         doc={{ ...doc, abbrev }}
         step={standardsPrompt}
@@ -293,9 +306,10 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
         onReset={() => setDoc((d) => void (d.standards = []))}
         resetWhat="성취기준"
       />
+      </div>
       {doc.areas.map((a, ai) => (
         <Card key={ai} className="space-y-3">
-          <h2 className="font-bold">
+          <h2 data-fix={`stdArea.${ai}`} className="rounded-lg font-bold">
             ({ai + 1}) {a.name}
           </h2>
           {doc.standards
@@ -305,7 +319,7 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
               const cats = standardCategories(doc.areas, s);
               const set = (fn: (st: Standard) => void) => setDoc((d) => fn(d.standards[idx]));
               return (
-                <div key={s.id} className={`space-y-2 rounded-xl border p-3 ${standardNeedsRewrite(s) ? "border-amber-400 bg-amber-50/40" : "border-gray-200"}`}>
+                <div key={s.id} data-fix={`std.${s.id}`} className={`space-y-2 rounded-xl border p-3 ${standardNeedsRewrite(s) ? "border-amber-400 bg-amber-50/40" : "border-gray-200"}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-mono text-sm font-bold text-brand-700">
                       {codes.get(s.id)}
@@ -335,6 +349,8 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
                   )}
                   <textarea
                     rows={2}
+                    data-fix={`std.${s.id}.text`}
+                    data-req=""
                     className={inputClass}
                     value={s.text}
                     placeholder="~을 이해하고, ~한다."
@@ -351,6 +367,7 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
                     {s.elements.length > 3 && <span className="ml-1 font-semibold text-red-600">— 3개까지예요 (지금 {s.elements.length}개)</span>}
                     {hasSameCategory(doc.areas, s.elements) && <span className="ml-1 font-semibold text-red-600">— 같은 범주끼리 묶였어요</span>}
                   </p>
+                  <div data-fix={`std.${s.id}.elements`} data-req="" data-req-done={s.elements.length >= 2 ? "1" : "0"} className="rounded-lg">
                   <Chips
                     options={allElements(a)}
                     render={(o) => {
@@ -382,6 +399,7 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
                       })
                     }
                   />
+                  </div>
                 </div>
               );
             })}
@@ -508,15 +526,15 @@ export function IntroStep({ doc, setDoc, onBack, onNext, onParseFail }: StepProp
         resetWhat="필요성·목표"
       />
       <Card className="space-y-4">
-        <Field label={subject ? "성격" : "필요성"} hint="문단은 줄바꿈으로 나눠요">
-          <textarea rows={8} className={inputClass} value={doc.intro.rationale} onChange={(e) => setDoc((d) => void (d.intro.rationale = e.target.value))} />
+        <Field fix="intro.rationale" label={subject ? "성격" : "필요성"} hint="문단은 줄바꿈으로 나눠요">
+          <textarea rows={8} data-req="" className={inputClass} value={doc.intro.rationale} onChange={(e) => setDoc((d) => void (d.intro.rationale = e.target.value))} />
         </Field>
-        <Field label="총괄 목표">
-          <textarea rows={3} className={inputClass} value={doc.intro.overallGoal} onChange={(e) => setDoc((d) => void (d.intro.overallGoal = e.target.value))} />
+        <Field fix="intro.overallGoal" label="총괄 목표">
+          <textarea rows={3} data-req="" className={inputClass} value={doc.intro.overallGoal} onChange={(e) => setDoc((d) => void (d.intro.overallGoal = e.target.value))} />
         </Field>
         {["지식·이해", "과정·기능", "가치·태도"].map((c, i) => (
-          <Field key={c} label={`세부 목표 (${i + 1}) ${c}`}>
-            <input className={inputClass} value={doc.intro.detailGoals[i]} onChange={(e) => setDoc((d) => void (d.intro.detailGoals[i] = e.target.value))} />
+          <Field key={c} fix={`intro.detail.${i}`} label={`세부 목표 (${i + 1}) ${c}`}>
+            <input data-req="" className={inputClass} value={doc.intro.detailGoals[i]} onChange={(e) => setDoc((d) => void (d.intro.detailGoals[i] = e.target.value))} />
           </Field>
         ))}
       </Card>
@@ -551,7 +569,7 @@ export function TeachingStep({ doc, setDoc, onBack, onNext, onParseFail }: StepP
         <Card key={key} className="space-y-2">
           <h2 className="font-bold">{label}</h2>
           <p className="text-xs text-gray-500">{hint}</p>
-          <ListEditor items={doc.teaching[key]} onChange={(items) => setDoc((d) => void (d.teaching[key] = items))} multiline placeholder="~한다." />
+          <ListEditor items={doc.teaching[key]} onChange={(items) => setDoc((d) => void (d.teaching[key] = items))} multiline placeholder="~한다." required fix={`teaching.${key}`} />
         </Card>
       ))}
       <StepIssues issues={checkTeaching(doc)} />

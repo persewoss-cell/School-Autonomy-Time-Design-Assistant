@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 import { AuthNav } from "@/components/AuthNav";
+import { ToastHost } from "@/components/guide";
 
 export const metadata: Metadata = {
   title: "학교자율시간 설계 도우미 앱",
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="py-8 text-center text-xs text-gray-400">
           만든 이: 광양중동초등학교 강형권, 강지훈 선생님 / 문의: 나이스 업무메일 또는 메신저
         </footer>
+        <ToastHost />
       </body>
     </html>
   );

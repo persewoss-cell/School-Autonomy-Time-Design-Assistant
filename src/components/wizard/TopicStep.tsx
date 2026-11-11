@@ -75,7 +75,7 @@ export function TopicStep({
       </p>
 
       <Field label="주제" hint="예: 세계시민으로 함께 살아가기, 우리 마을 생태 지킴이">
-        <input className={inputClass} value={topic} onChange={(e) => setTopic(e.target.value)} />
+        <input className={inputClass} data-req="" value={topic} onChange={(e) => setTopic(e.target.value)} />
       </Field>
       <Field label="꼭 들어가야 할 내용 (선택, 한 줄에 하나씩)" hint="예: 세계와 연결된 나의 삶 / 문화 다양성 존중">
         <textarea rows={4} className={inputClass} value={required} onChange={(e) => setRequired(e.target.value)} />

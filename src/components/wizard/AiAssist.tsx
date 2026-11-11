@@ -47,6 +47,10 @@ export function AiAssist<T>({
   const [checkWarn, setCheckWarn] = useState(false);
   const [manualDone, setManualDone] = useState(false);
   const [askReset, setAskReset] = useState(false);
+  const [copied, setCopied] = useState(false);
+  /** 아직 내용이 없으면 AI 받기가 '다음 할 일' (노란 후광 순서: 펼치기 → 프롬프트 복사 → 답 칸 → 반영하기) */
+  const aiTodo = !hasContent && !manualDone;
+  const todo = (done: boolean) => (aiTodo ? { "data-req": "", "data-req-done": done ? "1" : "0" } : {});
 
   const read = () => {
     const r = step.parse(answer, doc);
@@ -75,7 +79,7 @@ export function AiAssist<T>({
   return (
     <Card className="space-y-3 border-2 border-dashed border-brand-100">
       <div className="flex items-center justify-between gap-2">
-        <button type="button" onClick={() => setOpen(!open)} className="flex flex-1 items-center justify-between gap-2 text-left">
+        <button type="button" onClick={() => setOpen(!open)} {...todo(open)} className="flex flex-1 items-center justify-between gap-2 rounded-lg text-left">
           <span className="font-bold text-brand-700">🤖 {title}</span>
           <span className="text-sm text-gray-400">{open ? "접기 ▲" : "펼치기 ▼"}</span>
         </button>
@@ -108,7 +112,7 @@ export function AiAssist<T>({
           <p className="text-gray-700">
             아래 요청을 복사해 <b>같은 AI 대화창</b>에 보내고, 새 답을 아래 칸에 붙여 넣어 <b>AI 답 반영하기</b>를 누르세요.
           </p>
-          <CopyBox text={follow.prompt} label="고치기 요청 복사" rows={5} />
+          <CopyBox text={follow.prompt} label="고치기 요청 복사" rows={5} sameChat />
         </div>
       )}
       {open && (
@@ -121,11 +125,12 @@ export function AiAssist<T>({
             <li>읽어 온 내용은 아래에서 자유롭게 고칠 수 있어요. AI 없이 쓰려면 위의 <b>AI 없이 직접 입력하기</b>를 누르세요.</li>
           </ol>
           <p className="text-xs text-amber-700">AI에게 학생 이름 등 개인정보는 보내지 마세요.</p>
-          <CopyBox text={step.build(doc)} label="프롬프트 복사" rows={6} />
+          <CopyBox text={step.build(doc)} label="프롬프트 복사" rows={6} req={aiTodo ? copied || !!answer.trim() : undefined} onCopied={() => setCopied(true)} />
           <textarea
             rows={6}
             className={`${inputClass} font-mono text-xs`}
             placeholder={"AI 답을 통째로 복사해 붙여 넣으세요."}
+            {...(aiTodo ? { "data-req": "" } : {})}
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
           />
@@ -135,7 +140,7 @@ export function AiAssist<T>({
               <p className="text-gray-700">
                 아래 <b>수정 요청</b>을 복사해 <b>같은 AI 대화창</b>에 보내고, 새 답을 다시 붙여 넣어 보세요.
               </p>
-              <CopyBox text={buildFixPrompt(error, step.reminder(doc))} label="수정 요청 복사" rows={5} />
+              <CopyBox text={buildFixPrompt(error, step.reminder(doc))} label="수정 요청 복사" rows={5} sameChat />
             </div>
           )}
           <div className="flex flex-wrap items-center gap-2">
@@ -143,6 +148,7 @@ export function AiAssist<T>({
               type="button"
               onClick={read}
               disabled={!answer.trim()}
+              {...todo(false)}
               className="rounded-lg border-2 border-brand-600 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50 disabled:border-gray-300 disabled:text-gray-300"
             >
               AI 답 반영하기
@@ -161,16 +167,44 @@ export function AiAssist<T>({
         </div>
       )}
       {askReset && <ResetConfirm what={resetWhat} onConfirm={reset} onClose={() => setAskReset(false)} />}
-      {checkWarn && (
-        <Modal
-          title="AI가 만든 내용, 반드시 직접 점검하세요"
-          onClose={() => setCheckWarn(false)}
-          actions={
-            <button type="button" onClick={() => setCheckWarn(false)} className="rounded-lg bg-red-600 px-5 py-2 font-bold text-white hover:bg-red-700">
-              직접 읽고 점검할게요
-            </button>
-          }
-        >
+      {checkWarn && <AiWarnModal onClose={() => setCheckWarn(false)} />}
+    </Card>
+  );
+}
+
+/** AI 답을 반영·가져온 뒤 뜨는 빨간 경고 (설계 단계와 기존 문서 가져오기에서 같이 씀) */
+export function AiWarnModal({ onClose, onOk, imported }: { onClose: () => void; /** 확인 버튼 (없으면 onClose) */ onOk?: () => void; /** 기존 문서 가져오기 */ imported?: boolean }) {
+  return (
+    <Modal
+      title="AI가 만든 내용, 반드시 직접 점검하세요"
+      onClose={onClose}
+      actions={
+        <button type="button" onClick={onOk ?? onClose} className="rounded-lg bg-red-600 px-5 py-2 font-bold text-white hover:bg-red-700">
+          직접 읽고 점검할게요
+        </button>
+      }
+    >
+      {imported ? (
+        <>
+          <p className="font-semibold">AI는 실수를 해요. 가져온 내용이 실제 문서와 다를 수 있어요.</p>
+          <p className="text-sm">가져온 뒤 설계 화면에서 원래 한글 문서와 한 줄씩 비교해 꼭 확인해 주세요.</p>
+          <ul className="list-disc space-y-0.5 pl-5 text-sm">
+            <li>
+              <b>빠지거나 바뀐 내용</b> (차시·성취기준·평가 내용이 빠지거나, 다른 칸에 들어감)
+            </li>
+            <li>
+              <b>문서에 없는 내용</b> (AI가 지어내거나 요약해 바꾼 문장)
+            </li>
+            <li>
+              <b>숫자·기호</b> (차시 수, 성취기준 코드, 성취수준 A·B·C)
+            </li>
+            <li>
+              <b>문법·맞춤법 오류</b>, 어색한 문장
+            </li>
+          </ul>
+        </>
+      ) : (
+        <>
           <p className="font-semibold">AI의 답은 그럴듯해 보여도 틀릴 수 있어요. 문서에 쓰기 전에 한 줄씩 읽어 보세요.</p>
           <ul className="list-disc space-y-0.5 pl-5 text-sm">
             <li>
@@ -189,9 +223,9 @@ export function AiAssist<T>({
               <b>다른 자료를 그대로 옮긴 문장</b> (저작권), 치우친 관점
             </li>
           </ul>
-          <p className="text-sm font-bold text-red-600">최종 책임은 작성한 선생님께 있어요.</p>
-        </Modal>
+        </>
       )}
-    </Card>
+      <p className="text-sm font-bold text-red-600">최종 책임은 작성한 선생님께 있어요.</p>
+    </Modal>
   );
 }

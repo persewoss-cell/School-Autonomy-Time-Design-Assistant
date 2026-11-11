@@ -38,7 +38,9 @@ export function PlanStep(props: StepProps & { designId?: string }) {
   if (!doc.plan.selected) {
     return (
       <div className="space-y-4">
-        <StepHeader title="단원 지도계획 — 3안 받기" tips={tips} />
+        <div data-fix="plan" className="rounded-2xl">
+          <StepHeader title="단원 지도계획 — 3안 받기" tips={tips} />
+        </div>
         <PlanRequestCard doc={doc} setDoc={setDoc} />
         {blockers.length > 0 ? (
           <Card className="space-y-2 border-2 border-red-200">
@@ -181,7 +183,8 @@ function Candidates({ doc, setDoc }: StepProps) {
       {doc.plan.notes.map((n) => (
         <p key={n} className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800">ℹ️ {n}</p>
       ))}
-      <div className="grid gap-4 lg:grid-cols-3">
+      {/* 3안 중 하나 고르기가 다음 할 일 */}
+      <div className="grid gap-4 rounded-2xl lg:grid-cols-3" data-req="" data-req-done="0">
         {doc.plan.candidates.map((p, i) => {
           const total = totalLessonHours(p.units);
           const err = checkPlanHours(p, doc.basic).find((x) => x.level === "error");
@@ -249,7 +252,7 @@ function CoverageCard({ doc, plan, labels }: { doc: StepProps["doc"]; plan: Plan
     plan.units.flatMap((u, ui) => u.lessons.flatMap((l, li) => (match(l) ? [`${labels[ui]?.[li]} ${l.topic}`] : [])));
   return (
     <Card className="grid gap-4 md:grid-cols-2">
-      <div className="space-y-1">
+      <div className="space-y-1 rounded-lg" data-fix="plan.coverage.activities">
         <h2 className="font-bold">전단계 활동 반영</h2>
         {doc.input.desiredActivities.length === 0 && <p className="text-sm text-gray-500">전단계에서 적은 활동이 없어요.</p>}
         {doc.input.desiredActivities.map((a) => {
@@ -261,7 +264,7 @@ function CoverageCard({ doc, plan, labels }: { doc: StepProps["doc"]; plan: Plan
           );
         })}
       </div>
-      <div className="space-y-1">
+      <div className="space-y-1 rounded-lg" data-fix="plan.coverage.assess">
         <h2 className="font-bold">과정중심평가 (성취기준마다 1개, 같은 단원의 성취기준은 묶어서 평가 가능)</h2>
         {doc.standards.map((s) => {
           const at = where((l) => assessedIds(l).includes(s.id));
@@ -298,7 +301,7 @@ function EditPlan({ doc, setDoc, onBack, onNext, tips, designId }: StepProps & {
     <div className="space-y-4">
       <StepHeader title={`단원 지도계획 고치기 — ${plan.title}`} tips={tips}>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className={`text-lg font-bold ${total === doc.basic.hours ? "text-green-700" : "text-red-600"}`}>
+          <p data-fix="plan.total" className={`rounded-lg px-1 text-lg font-bold ${total === doc.basic.hours ? "text-green-700" : "text-red-600"}`}>
             차시 합계 {total} / {doc.basic.hours}시간
           </p>
           <div className="flex flex-wrap items-center gap-3">
@@ -330,7 +333,7 @@ function EditPlan({ doc, setDoc, onBack, onNext, tips, designId }: StepProps & {
       <CoverageCard doc={doc} plan={plan} labels={labels} />
 
       {plan.units.map((u, ui) => (
-        <Card key={ui} className="space-y-3">
+        <Card key={ui} fix={`unit.${ui}`} className="space-y-3">
           <div className="flex items-center gap-2">
             <span className="shrink-0 text-sm font-bold text-brand-600">{ui + 1}단원</span>
             <input className={`${inputClass} font-semibold`} value={u.unitName} onChange={(e) => mutate((p) => void (p.units[ui].unitName = e.target.value))} />
@@ -345,7 +348,7 @@ function EditPlan({ doc, setDoc, onBack, onNext, tips, designId }: StepProps & {
               단원 삭제
             </button>
           </div>
-          <div className="rounded-lg bg-gray-50 p-2 text-sm">
+          <div data-fix={`unit.${ui}.standards`} className="rounded-lg bg-gray-50 p-2 text-sm">
             <p className="mb-1 text-xs text-gray-500">이 단원의 성취기준 ({ui + 1}번째 영역)</p>
             {u.standardIds.filter((id) => codes.has(id)).length === 0 ? (
               <p className="text-xs text-red-600">{ui + 1}번째 영역에 성취기준이 없어요. 영역 수와 단원 수가 같은지 확인해 주세요.</p>
@@ -382,7 +385,7 @@ function EditPlan({ doc, setDoc, onBack, onNext, tips, designId }: StepProps & {
                 </div>
               </div>
               <div className="space-y-2">
-                <input className={inputClass} placeholder="학습주제" value={l.topic} onChange={(e) => setLesson(ui, li, { topic: e.target.value })} />
+                <input className={inputClass} data-req="" placeholder="학습주제" value={l.topic} onChange={(e) => setLesson(ui, li, { topic: e.target.value })} />
                 <input className={inputClass} placeholder="학습 목표 (~해 봅시다.)" value={l.goal} onChange={(e) => setLesson(ui, li, { goal: e.target.value })} />
                 <textarea
                   rows={Math.max(2, l.activities.length)}
@@ -401,7 +404,7 @@ function EditPlan({ doc, setDoc, onBack, onNext, tips, designId }: StepProps & {
                     />
                   </div>
                 )}
-                <div className={`space-y-2 rounded-lg p-2 ${l.assessFor ? "bg-brand-50" : "bg-gray-50"}`}>
+                <div data-fix={`lesson.${ui}.${li}.assess`} className={`space-y-2 rounded-lg p-2 ${l.assessFor ? "bg-brand-50" : "bg-gray-50"}`}>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-semibold text-gray-600">[과정중심평가]</span>
                     <select

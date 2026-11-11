@@ -3,22 +3,30 @@
 import { createContext, useContext, useState } from "react";
 import type { Issue } from "@/validation/types";
 import { issueKey, withoutDismissed } from "@/validation/design";
+import { promptCopiedToast } from "./guide";
 
-export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <section className={`rounded-2xl bg-white p-6 shadow-sm ${className}`}>{children}</section>;
+export function Card({ children, className = "", fix }: { children: React.ReactNode; className?: string; /** '고치러 가기' 표시 */ fix?: string }) {
+  return (
+    <section data-fix={fix} className={`rounded-2xl bg-white p-6 shadow-sm ${className}`}>
+      {children}
+    </section>
+  );
 }
 
 export function Field({
   label,
   hint,
   children,
+  fix,
 }: {
   label: string;
   hint?: string;
   children: React.ReactNode;
+  /** '고치러 가기' 표시 (src/components/guide.tsx) */
+  fix?: string;
 }) {
   return (
-    <label className="block space-y-1">
+    <label className="block space-y-1 rounded-lg" data-fix={fix}>
       <span className="text-sm font-semibold">{label}</span>
       {children}
       {hint && <span className="block text-xs text-gray-500">{hint}</span>}
@@ -54,6 +62,7 @@ export function NavButtons({
           type="button"
           onClick={onNext}
           disabled={nextDisabled}
+          data-req-final=""
           className="rounded-lg bg-brand-600 px-5 py-2 font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-gray-300"
         >
           {nextLabel}
@@ -170,21 +179,29 @@ export function ListEditor({
   placeholder,
   addLabel = "+ 추가",
   multiline = false,
+  fix,
+  required,
 }: {
   items: string[];
   onChange: (items: string[]) => void;
   placeholder?: string;
   addLabel?: string;
   multiline?: boolean;
+  /** '고치러 가기' 표시: 목록은 fix, 칸은 fix.0, fix.1 … */
+  fix?: string;
+  /** 하나 이상 꼭 적어야 하는 목록 (다음 할 일 노란 후광) */
+  required?: boolean;
 }) {
+  const filled = items.some((v) => v.trim());
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 rounded-lg" data-fix={fix} {...(required ? { "data-req": "", "data-req-done": filled ? "1" : "0" } : {})}>
       {items.map((v, i) => (
         <div key={i} className="flex gap-2">
           {multiline ? (
             <textarea
               rows={2}
               className={inputClass}
+              data-fix={fix ? `${fix}.${i}` : undefined}
               value={v}
               placeholder={placeholder}
               onChange={(e) => onChange(items.map((x, j) => (j === i ? e.target.value : x)))}
@@ -192,6 +209,7 @@ export function ListEditor({
           ) : (
             <input
               className={inputClass}
+              data-fix={fix ? `${fix}.${i}` : undefined}
               value={v}
               placeholder={placeholder}
               onChange={(e) => onChange(items.map((x, j) => (j === i ? e.target.value : x)))}
@@ -214,14 +232,35 @@ export function ListEditor({
   );
 }
 
-/** 복사 상자 */
-export function CopyBox({ text, label, rows = 8, extra }: { text: string; label: string; rows?: number; /** 복사 버튼 오른쪽에 둘 버튼 */ extra?: React.ReactNode }) {
+/** 복사 상자 (AI에 보낼 프롬프트). 누르면 파란 알림으로 "AI에 붙여 넣고 답을 아래 칸에" 안내 */
+export function CopyBox({
+  text,
+  label,
+  rows = 8,
+  extra,
+  sameChat,
+  onCopied,
+  req,
+}: {
+  text: string;
+  label: string;
+  rows?: number;
+  /** 복사 버튼 오른쪽에 둘 버튼 */
+  extra?: React.ReactNode;
+  /** 이미 쓰던 같은 AI 대화창에 보내는 요청 (2부·수정·고치기) */
+  sameChat?: boolean;
+  onCopied?: () => void;
+  /** 다음 할 일 노란 후광: 복사 버튼이 '할 일'이면 했는지 여부 */
+  req?: boolean;
+}) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+      promptCopiedToast(sameChat);
+      onCopied?.();
     } catch {
       alert("복사하지 못했습니다. 상자 안을 눌러 전체 선택(Ctrl+A) 후 복사(Ctrl+C)해 주세요.");
     }
@@ -236,7 +275,12 @@ export function CopyBox({ text, label, rows = 8, extra }: { text: string; label:
         onFocus={(e) => e.currentTarget.select()}
       />
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={copy} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
+        <button
+          type="button"
+          onClick={copy}
+          {...(req === undefined ? {} : { "data-req": "", "data-req-done": req ? "1" : "0" })}
+          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+        >
           {copied ? "✓ 복사했어요" : label}
         </button>
         {extra}
