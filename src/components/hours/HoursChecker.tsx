@@ -24,6 +24,7 @@ import {
 } from "@/domain/hoursView";
 import { useHourChecks } from "./useHourChecks";
 import { AllocationFormTable } from "./AllocationFormTable";
+import { ExcelInput } from "./ExcelInput";
 import {
   bandInfo,
   autoReduce,
@@ -308,8 +309,8 @@ export function HoursChecker() {
         </div>
       )}
 
-      <Card className="space-y-3">
-        <h2 className="font-bold">① 학교자율시간 과목·활동</h2>
+      <Card className="scroll-mt-32 space-y-3">
+        <h2 id="hours-courses" className="font-bold">① 학교자율시간 과목·활동</h2>
         <p className="text-sm text-gray-600">
           운영하는 학기는 합계가 <b>{r.semesterTarget}시간</b>(1주 분량)이어야 하고, 학년마다 한 학기 이상 운영합니다(2027학년도부터. 2026학년도는 학년군에 1개, 2025학년도는 학교에 1개 이상).
           한 과목·활동은 10시간 이상, 학기당 {maxCoursesPerSemester(a.band)}개 이내.
@@ -412,6 +413,18 @@ export function HoursChecker() {
         </div>
       </Card>
 
+      <ExcelInput
+        a={a}
+        grade={grade}
+        year={year}
+        years={viewYears(grade, year)}
+        label={label}
+        schoolName={me?.user?.schoolName}
+        guest={guest}
+        onApply={setA}
+        onFixFirst={() => document.getElementById("hours-courses")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+      />
+
       <Card className="space-y-3">
         <h2 className="font-bold">② 교과·창체 편성표</h2>
         <p className="text-sm text-gray-600">
@@ -450,12 +463,14 @@ export function HoursChecker() {
               className="rounded-lg border-2 border-brand-600 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400 disabled:hover:bg-transparent"
               onClick={() => void downloadForm(kind)}
             >
-              {kind === "docx" ? "📄 편성표 내려받기 (.docx)" : "📊 편성표 내려받기 (.xlsx, 수식 포함)"}
+              {kind === "docx" ? "📄 편성표 완성본 내려받기 (.docx)" : "📊 편성표 완성본 내려받기 (.xlsx, 수식 포함)"}
             </button>
           ))}
         </div>
         <p className={`text-xs ${guest ? "font-semibold text-red-600" : "text-gray-500"}`}>
-          {guest ? "로그인해야 편성표를 내려받을 수 있어요." : "계획서·신청서의 붙임 '( )학년 교육과정 편성표'로 쓸 수 있어요."}
+          {guest
+            ? "로그인해야 편성표를 내려받을 수 있어요."
+            : "엑셀로 입력한 뒤 앱에서 더 고친 지금 화면이 완성본이에요. 계획서·신청서의 붙임 '( )학년 교육과정 편성표'로 쓸 수 있어요. (완성본은 앱에 다시 올리는 입력 양식이 아니에요)"}
         </p>
       </Card>
     </div>

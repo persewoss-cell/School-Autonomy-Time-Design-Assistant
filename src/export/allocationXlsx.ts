@@ -2,6 +2,7 @@ import type { Borders, Cell, Fill, Font, Worksheet } from "exceljs";
 import { checkAllocation, type AllocationInput, type SemesterIndex } from "@/validation/allocation";
 import { formModel } from "@/domain/allocationForm";
 import type { AllocationMeta } from "./allocationDocx";
+import { TEMPLATE_INFO_SHEET, TEMPLATE_MARKER, courseSignature, type TemplateMeta } from "@/domain/allocationTemplate";
 
 /**
  * 시수 점검 결과 → '( )학년 교육과정 편성표' (.xlsx).
@@ -28,7 +29,15 @@ interface Opt {
   fmt?: string;
 }
 
-export async function buildAllocationXlsx(a: AllocationInput, meta: AllocationMeta = {}): Promise<ArrayBuffer> {
+/**
+ * template: 앱에 다시 올릴 '입력 양식'으로 만든다 (사용자 결정, 2026-11-11)
+ * - 노란 칸(교과·창체 학기별 편성 시수)만 입력할 수 있고 나머지는 잠금 (암호 없음)
+ * - 학교자율시간(주황 줄)은 앱 ①에서만 고치므로 노란색 없이 잠금
+ * - 숨긴 '앱정보' 시트에 학년·학년도·① 목록·줄 위치를 적어 두고, 올릴 때 맞는 양식인지 확인한다
+ */
+export async function buildAllocationXlsx(a: AllocationInput, meta: AllocationMeta = {}, opts: { template?: boolean } = {}): Promise<ArrayBuffer> {
+  const template = !!opts.template;
+  const rowMap: TemplateMeta["rows"] = { subjects: {}, creative: {} };
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
   wb.creator = "학교자율시간 설계 도우미 앱";
@@ -70,8 +79,14 @@ export async function buildAllocationXlsx(a: AllocationInput, meta: AllocationMe
   ws.getCell(2, 15).value = meta.schoolName ?? "";
   ws.getCell(2, 15).alignment = { horizontal: "right" };
   ws.mergeCells(3, 1, 3, COL.judge);
-  ws.getCell(3, 1).value = "노란 칸의 숫자를 바꾸면 증감·계·합계·판정이 자동으로 다시 계산돼요. (학교자율시간은 주황 줄)";
-  ws.getCell(3, 1).font = { name: "맑은 고딕", size: 9, color: { argb: "FF666666" } };
+  ws.getCell(3, 1).value = template
+    ? "【입력 양식】 노란 칸에 학기별 편성 시수를 넣고 저장한 뒤, 앱의 시수 점검 화면에서 '입력한 엑셀 올리기'로 반영하세요. 주황 줄(학교자율시간)은 앱 ①에서만 고칠 수 있어요. 줄·칸을 넣거나 지우지 마세요."
+    : "노란 칸의 숫자를 바꾸면 증감·계·합계·판정이 자동으로 다시 계산돼요. (학교자율시간은 주황 줄)";
+  ws.getCell(3, 1).font = { name: "맑은 고딕", size: 9, color: { argb: template ? "FFC00000" : "FF666666" }, bold: template };
+  if (template) {
+    ws.getCell(3, 1).alignment = { wrapText: true, vertical: "middle" };
+    ws.getRow(3).height = 30;
+  }
 
   // ── 머리글 (4~6줄)
   const H = 4;
@@ -113,6 +128,7 @@ export async function buildAllocationXlsx(a: AllocationInput, meta: AllocationMe
         const B = (y * 2 + 1) as SemesterIndex;
         const [h1, h2, sum] = [L(c + 2), L(c + 4), L(c + 5)];
         if (ln.kind === "subject") {
+          rowMap.subjects[ln.key] = row;
           const q = ln.base / 4;
           put(row, c, ln.base / 2);
           put(row, c + 1, f(`${h1}${row}-${q}`, ln.hours[A] - q), { fmt: SIGNED, font: { color: { argb: RED } } });
@@ -124,9 +140,9 @@ export async function buildAllocationXlsx(a: AllocationInput, meta: AllocationMe
           const at = (s: SemesterIndex) => (ln.semester === s ? ln.hours : 0);
           put(row, c, "-", { fill: COURSE });
           put(row, c + 1, f(`${h1}${row}`, at(A)), { fmt: SIGNED, fill: COURSE, font: { color: { argb: RED }, bold: true } });
-          put(row, c + 2, at(A) || null, { fill: INPUT });
+          put(row, c + 2, at(A) || null, { fill: template ? COURSE : INPUT });
           put(row, c + 3, f(`${h2}${row}`, at(B)), { fmt: SIGNED, fill: COURSE, font: { color: { argb: RED }, bold: true } });
-          put(row, c + 4, at(B) || null, { fill: INPUT });
+          put(row, c + 4, at(B) || null, { fill: template ? COURSE : INPUT });
           put(row, c + 5, f(`${h1}${row}+${h2}${row}`, at(A) + at(B)), { fmt: '0;-0;""', fill: COURSE, font: { bold: true } });
         } else {
           for (let k = 0; k < 6; k++) put(row, c + k, k === 0 && y === 0 ? "-" : null);
@@ -189,6 +205,7 @@ export async function buildAllocationXlsx(a: AllocationInput, meta: AllocationMe
   const cr = m.creative;
   const c0 = row;
   cr.parts.forEach((p, k) => {
+    rowMap.creative[p.key] = row;
     put(row, COL.group, p.name);
     merge(row, COL.group, row, COL.subject);
     [0, 1].forEach((y) => {
@@ -242,6 +259,31 @@ export async function buildAllocationXlsx(a: AllocationInput, meta: AllocationMe
 
   judgeColors(ws, L(COL.judge), H + 3, row - 1);
   ws.views = [{ state: "frozen", ySplit: H + 2, xSplit: 3 }];
+
+  if (template) {
+    // 노란 칸만 풀고 시트 잠금 (암호 없음: 꼭 필요하면 엑셀 [검토]→[시트 보호 해제])
+    const inputCols = [COL.year[0] + 2, COL.year[0] + 4, COL.year[1] + 2, COL.year[1] + 4];
+    for (const r of [...Object.values(rowMap.subjects), ...Object.values(rowMap.creative)]) for (const c of inputCols) ws.getCell(r, c).protection = { locked: false };
+    await ws.protect("", { selectLockedCells: true, selectUnlockedCells: true, formatColumns: true, formatRows: true });
+    const info: TemplateMeta = {
+      marker: TEMPLATE_MARKER,
+      version: 1,
+      sheet: ws.name,
+      band: a.band,
+      grade,
+      schoolYear: meta.schoolYear ?? 0,
+      courses: courseSignature(a.courses),
+      baseHours: { ...a.baseHours },
+      creativeBaseHours: a.creativeBaseHours,
+      rows: rowMap,
+      cols: inputCols,
+      labelCols: [COL.group, COL.subject],
+    };
+    const hidden = wb.addWorksheet(TEMPLATE_INFO_SHEET);
+    hidden.getCell(1, 1).value = TEMPLATE_MARKER;
+    hidden.getCell(2, 1).value = JSON.stringify(info);
+    hidden.state = "veryHidden";
+  }
   return (await wb.xlsx.writeBuffer()) as ArrayBuffer;
 }
 
