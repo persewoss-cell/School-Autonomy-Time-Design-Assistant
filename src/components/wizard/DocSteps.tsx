@@ -362,7 +362,7 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
                     }
                   />
                   <p className="text-xs text-gray-500">
-                    이 성취기준이 다루는 내용 요소 2~3개, <b>서로 다른 범주</b>에서 하나씩 (눌러서 고르기 · 회색은 고를 수 없는 것, 마우스를 올리면 이유가 보여요)
+                    이 성취기준이 다루는 내용 요소 2~3개, <b>서로 다른 범주</b>에서 하나씩 (눌러서 고르기 · 회색은 같은 범주라 고를 수 없는 것, 마우스를 올리면 이유가 보여요)
                     {s.elements.length < 2 && <span className="ml-1 font-semibold text-red-600">— 2개 이상 골라 주세요 (지금 {s.elements.length}개)</span>}
                     {s.elements.length > 3 && <span className="ml-1 font-semibold text-red-600">— 3개까지예요 (지금 {s.elements.length}개)</span>}
                     {hasSameCategory(doc.areas, s.elements) && <span className="ml-1 font-semibold text-red-600">— 같은 범주끼리 묶였어요</span>}
@@ -372,10 +372,13 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
                     options={allElements(a)}
                     render={(o) => {
                       const c = categoryOf(doc.areas, o);
+                      // 다른 성취기준에서도 쓰는 내용 요소 (겹쳐 쓰기는 가능하지만 확인 필요)
+                      const other = doc.standards.filter((x) => x.id !== s.id && x.elements.includes(o)).map((x) => codes.get(x.id));
                       return (
                         <>
                           {c && <span className="mr-1 opacity-60">[{CATEGORIES[c].slice(0, 2)}]</span>}
                           {o}
+                          {other.length > 0 && <span className="ml-1 text-[10px] opacity-60">({other.join(", ")}에서도 씀)</span>}
                         </>
                       );
                     }}
@@ -385,8 +388,6 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
                     }}
                     selected={s.elements}
                     disabled={(o) => {
-                      const other = doc.standards.find((x) => x.id !== s.id && x.elements.includes(o));
-                      if (other) return `${codes.get(other.id)}에서 사용 중`;
                       const c = categoryOf(doc.areas, o);
                       if (c && s.elements.some((e) => categoryOf(doc.areas, e) === c)) return `이미 ${CATEGORIES[c]} 내용 요소를 골랐어요 (서로 다른 범주끼리 묶어요)`;
                       if (s.elements.length >= 3) return "3개까지 묶을 수 있어요";
@@ -450,7 +451,7 @@ function StandardCountPicker({ doc, setDoc }: Pick<StepProps, "doc" | "setDoc">)
         )}
       </div>
       <p className="text-sm text-gray-600">
-        성취기준 하나에 서로 다른 범주의 내용 요소 2~3개를 묶고, 내용 요소는 한 번씩만 써요.
+        성취기준 하나에 서로 다른 범주의 내용 요소 2~3개를 묶고, 내용 요소는 빠짐없이 모두 써요. 되도록 한 번씩만 쓰되, 영역별 2개를 맞추려고 모자라면 겹쳐 써도 돼요.
       </p>
       <div className="divide-y divide-gray-100">
         {doc.areas.map((a, i) => {

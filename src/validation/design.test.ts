@@ -89,23 +89,34 @@ describe("성취기준", () => {
     expect(issues.some((i) => i.field === "[3사지구01-01]" && i.message.includes("같은 범주(지식·이해)"))).toBe(true);
     expect(issues.some((i) => i.field === "[3사지구01-02]" && i.message.includes("같은 범주(과정·기능)"))).toBe(true);
   });
-  it("한 범주의 내용 요소가 나머지 두 범주 합보다 많으면 내용 체계 오류", () => {
+  it("한 범주의 내용 요소가 나머지 두 범주 합보다 많아도 겹쳐 쓰면 되므로 내용 체계 오류 아님", () => {
     const doc = sampleSubject();
     doc.areas[1].knowledge.push("문화의 뜻", "문화의 종류", "문화의 변화");
-    expect(errors(checkContentSystem(doc.areas)).some((i) => i.message.includes("서로 다른 범주끼리 묶을 수 없습니다"))).toBe(true);
-    expect(errors(checkContentSystem(sampleSubject().areas))).toHaveLength(0);
+    expect(errors(checkContentSystem(doc.areas))).toHaveLength(0);
   });
-  it("한 내용 요소를 두 성취기준에 넣으면 오류", () => {
+  it("과정·기능이 '~하기'로 끝나지 않으면 오류", () => {
+    const doc = sampleSubject();
+    doc.areas[0].process[0] = "세계 어린이의 생활 탐구";
+    expect(errors(checkContentSystem(doc.areas)).some((i) => i.message.includes("'~하기'"))).toBe(true);
+  });
+  it("한 내용 요소를 두 성취기준에 넣으면 확인 필요 (오류 아님)", () => {
     const doc = sampleSubject();
     doc.standards[1].elements.push("세계와 연결된 나의 삶");
-    expect(errors(checkStandards(doc)).some((i) => i.message.includes("겹쳐 들어가"))).toBe(true);
+    const issues = checkStandards(doc);
+    expect(issues.some((i) => i.level === "warning" && i.message.includes("겹쳐 들어가"))).toBe(true);
+    expect(errors(issues).some((i) => i.message.includes("겹쳐 들어가"))).toBe(false);
   });
-  it("어느 성취기준에도 안 쓴 내용 요소는 경고, 내용 요소 1개는 오류", () => {
+  it("어느 성취기준에도 안 쓴 내용 요소는 오류, 내용 요소 1개도 오류", () => {
     const doc = sampleSubject();
     doc.standards[0].elements = ["세계와 연결된 나의 삶"];
-    const issues = checkStandards(doc);
+    const issues = errors(checkStandards(doc));
     expect(issues.some((i) => i.message.includes("연결되지 않은 내용 요소") && i.message.includes("세계 어린이의 생활 탐구하기"))).toBe(true);
-    expect(errors(issues).some((i) => i.message.includes("1개뿐"))).toBe(true);
+    expect(issues.some((i) => i.message.includes("1개뿐"))).toBe(true);
+  });
+  it("영역별 성취기준이 2개 미만이면 오류", () => {
+    const doc = sampleSubject();
+    doc.standards = doc.standards.filter((s) => !(s.areaIndex === 1 && s !== doc.standards.find((x) => x.areaIndex === 1)));
+    expect(errors(checkStandards(doc)).some((i) => i.message.includes("2가지 이상"))).toBe(true);
   });
   it("문장을 쓴 뒤 내용 요소가 바뀌면 확인 필요", () => {
     const doc = sampleSubject();
@@ -124,7 +135,7 @@ describe("성취기준", () => {
   it("내용 요소가 없으면 오류", () => {
     const doc = sampleSubject();
     doc.standards[0].elements = [];
-    expect(errors(checkStandards(doc))).toHaveLength(1);
+    expect(errors(checkStandards(doc)).some((i) => i.message.includes("연결된 내용 요소가 없습니다"))).toBe(true);
   });
 });
 
@@ -147,19 +158,26 @@ describe("단원 지도계획·평가 계획", () => {
     doc.assessments[1].standardIds = ["s3"];
     expect(errors(checkAssessments(doc)).some((i) => i.field === "[3사지구02-02]")).toBe(true);
   });
-  it("활동은 같은 경우 경고", () => {
+  it("활동도 평가 계획에 없는 성취기준은 오류", () => {
     const doc = sampleSubject();
     doc.basic.type = "activity";
     doc.assessments[1].standardIds = ["s3"];
-    expect(errors(checkAssessments(doc))).toEqual([]);
+    expect(errors(checkAssessments(doc)).some((i) => i.field === "[3사지구02-02]")).toBe(true);
+  });
+  it("평가 시기가 비면 오류", () => {
+    const doc = sampleSubject();
+    doc.assessments[0].month = "";
+    expect(errors(checkAssessments(doc)).some((i) => i.message.includes("시기"))).toBe(true);
   });
   it("예시 문서의 단원 지도계획은 오류 없음", () => {
     expect(errors(checkUnitPlan(sampleSubject()))).toEqual([]);
   });
-  it("전단계 활동이 빠지면 오류", () => {
+  it("전단계 활동이 빠지면 확인 필요 (오류 아님)", () => {
     const doc = sampleSubject();
     for (const u of doc.plan.selected!.units) for (const l of u.lessons) l.inputActivities = l.inputActivities.filter((a) => a !== "문화 존중 역할극");
-    expect(errors(checkUnitPlan(doc)).some((i) => i.field === "전단계 활동" && i.message.includes("'문화 존중 역할극'"))).toBe(true);
+    const issues = checkUnitPlan(doc);
+    expect(issues.some((i) => i.level === "warning" && i.field === "전단계 활동" && i.message.includes("'문화 존중 역할극'"))).toBe(true);
+    expect(errors(issues).some((i) => i.field === "전단계 활동")).toBe(false);
   });
   it("과정중심평가는 성취기준마다 정확히 1개", () => {
     const doc = sampleSubject();

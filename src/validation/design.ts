@@ -77,9 +77,10 @@ export function checkContentSystem(areas: Area[]): Issue[] {
             fix: "예: (X) 평화의 중요성 알기 → (O) 평화의 중요성",
           });
         }
+        // '~하기'는 코드로 확실히 판단할 수 있어 오류 (명사형 판단은 틀릴 수 있어 확인 필요로 둠, 사용자 결정 2026-11-11)
         if (c === "process" && !/기$/.test(t)) {
           issues.push({
-            level: "warning",
+            level: "error",
             field: `${where} 과정·기능`,
             target: `area.${i}.process`,
             message: `'${e}' — 과정·기능은 '~하기'로 끝맺습니다.`,
@@ -155,41 +156,43 @@ export function checkStandards(doc: Pick<DesignDoc, "basic" | "abbrev" | "areas"
   const codes = codeMap(doc);
   doc.areas.forEach((a, i) => {
     const n = doc.standards.filter((s) => s.areaIndex === i).length;
+    // 영역별 2가지 이상 (연수 PPT 49쪽) → 오류 (사용자 결정, 2026-11-11)
     if (n < 2) {
       issues.push({
-        level: "warning",
+        level: "error",
         field: `${i + 1}영역(${a.name}) 성취기준`,
         target: `stdArea.${i}`,
-        message: `이 영역의 성취기준이 ${n}개입니다. 영역별로 2가지 이상 개발을 권장합니다.`,
-        fix: "성취기준을 추가해 주세요.",
+        message: `이 영역의 성취기준이 ${n}개입니다. 영역별로 성취기준을 2가지 이상 개발합니다.`,
+        fix: "성취기준을 추가해 주세요. 내용 요소가 모자라면 한 내용 요소를 두 성취기준에 겹쳐 써도 돼요.",
       });
     }
   });
-  // 내용 요소 하나는 성취기준 하나에만, 내용 요소는 빠짐없이
+  // 내용 요소는 빠짐없이(오류). 한 내용 요소를 두 성취기준에 겹쳐 쓰는 것은 지침에 없어 확인 필요 (사용자 결정, 2026-11-11)
   const owner = new Map<string, string>();
   for (const s of doc.standards) {
     for (const e of s.elements) {
       const prev = owner.get(e);
       if (prev && prev !== s.id) {
         issues.push({
-          level: "error",
+          level: "warning",
           field: `내용 요소 '${e}'`,
           target: `std.${s.id}.elements`,
-          message: `${codes.get(prev)}와(과) ${codes.get(s.id)}에 겹쳐 들어가 있습니다. 내용 요소 하나는 성취기준 하나에만 넣습니다.`,
-          fix: "한쪽 성취기준에서 이 내용 요소를 빼 주세요.",
+          message: `${codes.get(prev)}와(과) ${codes.get(s.id)}에 겹쳐 들어가 있습니다. 되도록 내용 요소 하나는 성취기준 하나에 넣어요.`,
+          fix: "일부러 겹쳐 쓴 것이면 그대로 두어도 돼요. 아니면 한쪽 성취기준에서 빼 주세요.",
         });
       } else owner.set(e, s.id);
     }
   }
   doc.areas.forEach((a, i) => {
     const unused = [...a.knowledge, ...a.process, ...a.values].map((e) => e.trim()).filter((e) => e && !owner.has(e));
+    // 내용 요소 = 배워야 할 필수 학습 내용 → 성취기준에 빠짐없이 (오류, 사용자 결정 2026-11-11)
     if (unused.length && doc.standards.some((s) => s.areaIndex === i)) {
       issues.push({
-        level: "warning",
+        level: "error",
         field: `${i + 1}영역(${a.name}) 내용 요소`,
         target: `stdArea.${i}`,
         message: `어느 성취기준에도 연결되지 않은 내용 요소가 있습니다: ${unused.join(", ")}`,
-        fix: "성취기준에 연결하거나, 필요 없으면 내용 체계에서 빼 주세요.",
+        fix: "알맞은 성취기준에서 이 내용 요소를 눌러 연결하거나, 필요 없으면 내용 체계에서 빼 주세요.",
       });
     }
   });
@@ -277,18 +280,8 @@ export function checkIntro(doc: Pick<DesignDoc, "basic" | "intro">): Issue[] {
   const r = doc.intro.rationale.trim();
   if (!r) {
     issues.push({ level: "error", field: label, target: "intro.rationale", message: `${label}이 비어 있습니다.`, fix: `${label}을 작성해 주세요.` });
-  } else if (r.length < 150) {
-    issues.push({
-      level: "warning",
-      field: label,
-      target: "intro.rationale",
-      message: `${label}이 짧습니다. (${r.length}자)`,
-      fix:
-        doc.basic.type === "subject"
-          ? "과목의 고유 성격 + 필요성 및 역할 + 기르고자 하는 역량을 담아 주세요."
-          : "사회현상 및 시대적 요구 + 배워야 하는 까닭 + 기르고자 하는 학생상·역량을 담아 주세요.",
-    });
   }
+  // 글자 수 기준(150자)은 지침에 없어 뺐다 (사용자 결정, 2026-11-11)
   if (!doc.intro.overallGoal.trim()) {
     issues.push({ level: "error", field: "총괄 목표", target: "intro.overallGoal", message: "총괄 목표가 비어 있습니다.", fix: "학습의 도달점을 총괄 목표로 적어 주세요." });
   }
@@ -347,10 +340,11 @@ export function checkUnitPlan(doc: Pick<DesignDoc, "basic" | "abbrev" | "standar
   for (const a of coverage.activities) {
     if (!a.done) {
       issues.push({
-        level: "error",
+        // 지침이 아닌 앱 규칙이라 확인 필요 (사용자 결정, 2026-11-11)
+        level: "warning",
         field: "전단계 활동",
         target: "plan.coverage.activities",
-        message: `'${a.text}' 활동이 단원 지도계획에 없습니다. 전단계에서 적은 활동은 실제로 가르칠 내용이라 반드시 넣어야 합니다.`,
+        message: `'${a.text}' 활동이 단원 지도계획에 없습니다. 전단계에서 적은 '하고 싶은 활동'이 빠졌어요.`,
         fix: "이 활동을 하는 차시를 만들고, 그 차시의 '전단계 활동'에서 이 활동을 눌러 연결해 주세요.",
       });
     }
@@ -434,7 +428,8 @@ export function checkAssessments(doc: Pick<DesignDoc, "basic" | "abbrev" | "stan
     if (a.standardIds.filter((id) => codes.has(id)).length === 0) {
       issues.push({ level: "error", field: f, target: `assess.${i}.standards`, message: "평가할 성취기준을 고르지 않았습니다.", fix: "성취기준을 1개 이상(최대 2개 묶음 가능) 골라 주세요." });
     }
-    if (!a.month.trim()) issues.push({ level: "warning", field: f, target: `assess.${i}.month`, message: "평가 시기가 비어 있습니다.", fix: "평가 내용에 알맞은 월을 적어 주세요." });
+    // 시기 = 평가 계획 양식의 열 (PPT 52쪽) → 오류 (사용자 결정, 2026-11-11)
+    if (!a.month.trim()) issues.push({ level: "error", field: f, target: `assess.${i}.month`, message: "평가 시기가 비어 있습니다.", fix: "평가 내용에 알맞은 월을 적어 주세요." });
     if (!a.focus.trim()) issues.push({ level: "error", field: f, target: `assess.${i}.focus`, message: "수업·평가 방법, 연계의 주안점이 비어 있습니다.", fix: "평가 내용을 양식에 맞춰 적어 주세요." });
     (["A", "B", "C"] as const).forEach((lv) => {
       if (!a.levels[lv].trim()) issues.push({ level: "error", field: f, target: `assess.${i}.level${lv}`, message: `성취수준 ${lv}가 비어 있습니다.`, fix: "성취수준 A·B·C를 모두 적어 주세요." });
@@ -461,13 +456,14 @@ export function checkAssessments(doc: Pick<DesignDoc, "basic" | "abbrev" | "stan
   for (const s of doc.standards) {
     if (!covered.has(s.id)) {
       issues.push({
-        level: doc.basic.type === "subject" ? "error" : "warning",
+        // 과목: 지침(모든 성취기준에 성취수준). 활동: 성취기준마다 과정중심평가 1개(앱 규칙)와 맞춰 오류 (사용자 결정, 2026-11-11)
+        level: "error",
         field: codes.get(s.id) ?? "성취기준",
         target: "assessment.add",
         message:
           doc.basic.type === "subject"
             ? "이 성취기준의 성취수준이 없습니다. 과목은 모든 성취기준에 대한 성취수준을 작성해야 합니다."
-            : "이 성취기준에 대한 평가 계획이 없습니다.",
+            : "이 성취기준에 대한 평가 계획이 없습니다. 성취기준마다 과정중심평가를 하므로 평가 계획에도 모두 들어가야 합니다.",
         fix: "평가 계획에 이 성취기준을 포함해 주세요. (두 성취기준을 묶어 평가 가능)",
       });
     }

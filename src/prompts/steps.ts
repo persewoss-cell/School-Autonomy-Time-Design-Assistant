@@ -190,7 +190,7 @@ ${standardCountsFor(doc)
    - 위에 적은 '묶을 범주'를 지킵니다.
    예: 코딩 로봇의 기본 요소와 사용법[지식·이해]을 익히고, 창의적인 작품을 만든다.[과정·기능]
 3. elements에는 그 성취기준이 다루는 내용 요소를 그 영역의 내용 체계에서 **글자 그대로 복사해서** 넣습니다. 성취기준 하나에 **반드시 2개 또는 3개**입니다. 내용 체계에 없는 내용 요소는 넣지 않습니다.
-   **내용 요소 하나는 성취기준 하나에만** 넣습니다. 같은 내용 요소를 두 성취기준에 겹쳐 쓰지 않고, 그 영역의 내용 요소를 **빠짐없이 모두** 나누어 씁니다.
+   그 영역의 내용 요소를 **빠짐없이 모두** 씁니다. 내용 요소 하나는 되도록 성취기준 하나에만 넣고, 정한 개수를 맞추려고 모자랄 때만 두 성취기준에 겹쳐 씁니다.
 4. area에는 영역 번호(1부터)를 씁니다.
 5. 문장은 '~한다.', '~갖는다.', '~기른다.'처럼 끝냅니다. **'~할 수 있다.'로 끝내지 않습니다.** (예: '만들 수 있다.' → '만든다.')
 6. 같은 도달점을 반복하지 않습니다.
@@ -220,6 +220,7 @@ ${formatBlock(`{
     const data: Standard[] = [];
     const usedElements = new Set<string>();
     const repeated = new Set<string>();
+    const allElements = new Set(doc.areas.flatMap((a) => [...a.knowledge, ...a.process, ...a.values].map((e) => e.trim()).filter(Boolean)));
     const short = new Set<string>();
     const over = new Set<string>();
     const sameCat = new Set<string>();
@@ -233,12 +234,9 @@ ${formatBlock(`{
       const kept = s.elements.filter((e) => categoryOf(doc.areas, e) !== null);
       const dropped = s.elements.filter((e) => categoryOf(doc.areas, e) === null);
       if (dropped.length) notes.push(`내용 체계에 없는 내용 요소를 뺐습니다: ${dropped.join(", ")}`);
-      // 내용 요소 하나는 성취기준 하나에만: 앞 성취기준에서 이미 쓴 것은 뺀다
-      const normalized = [...new Set(kept.map((e) => findElementText(doc.areas, e) ?? e))].filter((e) => {
-        if (!usedElements.has(e)) return true;
-        repeated.add(e);
-        return false;
-      });
+      // 겹쳐 쓴 내용 요소는 그대로 두고 알림 (확인 필요, 사용자 결정 2026-11-11)
+      const normalized = [...new Set(kept.map((e) => findElementText(doc.areas, e) ?? e))];
+      normalized.filter((e) => usedElements.has(e)).forEach((e) => repeated.add(e));
       normalized.forEach((e) => usedElements.add(e));
       if (normalized.length < 2) short.add(s.text.slice(0, 20));
       if (normalized.length > 3) over.add(s.text.slice(0, 20));
@@ -249,7 +247,9 @@ ${formatBlock(`{
     if (short.size) notes.push(`내용 요소가 2개 미만인 성취기준이 있습니다: ${[...short].map((t) => `'${t}…'`).join(", ")} — 아래에서 내용 요소를 더 고르고 문장을 고쳐 주세요.`);
     if (over.size) notes.push(`내용 요소를 4개 이상 묶은 성취기준이 있습니다: ${[...over].map((t) => `'${t}…'`).join(", ")} — 성취기준마다 2~3개로 고르게 나누도록 아래에서 고치거나 AI에게 다시 요청하세요.`);
     if (sameCat.size) notes.push(`같은 범주의 내용 요소를 함께 묶은 성취기준이 있습니다: ${[...sameCat].map((t) => `'${t}…'`).join(", ")} — 서로 다른 범주끼리 묶이도록 아래에서 내용 요소를 바꾸고 문장을 고쳐 주세요.`);
-    if (repeated.size) notes.push(`여러 성취기준에 겹쳐 들어간 내용 요소는 처음 것에만 남겼습니다: ${[...repeated].join(", ")}`);
+    if (repeated.size) notes.push(`두 성취기준에 겹쳐 들어간 내용 요소가 있습니다(확인 필요): ${[...repeated].join(", ")}`);
+    const unused = [...allElements].filter((e) => !usedElements.has(e));
+    if (unused.length) notes.push(`어느 성취기준에도 넣지 않은 내용 요소가 있습니다: ${unused.join(", ")} — 아래에서 성취기준에 연결해 주세요.`);
     standardCountsFor(doc).forEach((want, i) => {
       const got = data.filter((s) => s.areaIndex === i).length;
       if (got !== want) notes.push(`(${i + 1}) ${doc.areas[i].name}: ${want}개로 정했는데 AI가 ${got}개를 주었습니다. 아래에서 추가·삭제하거나 AI에게 다시 요청하세요.`);

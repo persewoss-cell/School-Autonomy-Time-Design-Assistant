@@ -42,8 +42,8 @@ describe("내용 체계", () => {
   });
 });
 
-describe("성취기준 — 내용 요소는 한 성취기준에만", () => {
-  it("겹친 내용 요소는 처음 것에만 남기고 알림", () => {
+describe("성취기준 — 겹쳐 쓴 내용 요소", () => {
+  it("겹친 내용 요소는 그대로 두고 확인 필요로 알림", () => {
     const r = standardsPrompt.parse(
       wrap({
         standards: [
@@ -55,7 +55,7 @@ describe("성취기준 — 내용 요소는 한 성취기준에만", () => {
     );
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.data[1].elements).toEqual(["세계 어린이의 생활 탐구하기"]);
+      expect(r.data[1].elements).toEqual(["세계와 연결된 나의 삶", "세계 어린이의 생활 탐구하기"]);
       expect(r.notes.join()).toContain("겹쳐 들어간 내용 요소");
     }
   });
@@ -229,10 +229,10 @@ describe("영역별 성취기준 수", () => {
     process: Array.from({ length: p }, (_, i) => `과정${i}하기`),
     values: Array.from({ length: v }, (_, i) => `태도${i}`),
   });
-  it("범위: 서로 다른 범주끼리 2~3개씩 → 최소 max(⌈n÷3⌉, 가장 많은 범주 수), 최대 ⌊n÷2⌋", async () => {
+  it("범위: 최소 max(⌈n÷3⌉, 가장 많은 범주 수), 최대 max(⌊n÷2⌋, 2) (겹쳐 쓰기로 영역별 2개 가능)", async () => {
     const { standardCountRange } = await import("@/domain/standardCounts");
     expect([area(1, 1, 1), area(2, 2, 1), area(2, 2, 2), area(3, 2, 2), area(3, 3, 3), area(4, 3, 3), area(1, 2, 1)].map(standardCountRange)).toEqual([
-      { min: 1, max: 1 },
+      { min: 1, max: 2 },
       { min: 2, max: 2 },
       { min: 2, max: 3 },
       { min: 3, max: 3 },
@@ -241,17 +241,21 @@ describe("영역별 성취기준 수", () => {
       { min: 2, max: 2 },
     ]);
   });
-  it("한 범주가 나머지 둘을 합한 것보다 많으면 묶을 수 없음", async () => {
-    const { splitProblem } = await import("@/domain/standardCounts");
-    expect(splitProblem(area(4, 1, 1))).toContain("지식·이해 내용 요소(4개)");
-    expect(splitProblem(area(3, 2, 1))).toBeNull();
+  it("내용 요소가 한 범주에만 있으면 묶을 수 없음 (한 범주가 많아도 겹쳐 쓰면 됨)", async () => {
+    const { splitProblem, categorySplit, standardCountRange } = await import("@/domain/standardCounts");
+    expect(splitProblem(area(4, 0, 0))).toContain("지식·이해 범주에만");
+    expect(splitProblem(area(4, 1, 1))).toBeNull();
+    expect(standardCountRange(area(4, 1, 1))).toEqual({ min: 4, max: 4 });
+    expect(categorySplit(area(4, 1, 1), 4)).toEqual([["knowledge", "values"], ["knowledge", "values"], ["knowledge", "process"], ["knowledge", "process"]]);
+    // 3개로 2개 만들기: 하나를 겹쳐 씀
+    expect(categorySplit(area(1, 1, 1), 2)?.every((cs) => cs.length === 2)).toBe(true);
   });
   it("묶을 범주 조합: 3개짜리는 세 범주, 2개짜리는 서로 다른 두 범주", async () => {
     const { categorySplit } = await import("@/domain/standardCounts");
     expect(categorySplit(area(2, 2, 2), 2)).toEqual([["knowledge", "process", "values"], ["knowledge", "process", "values"]]);
     expect(categorySplit(area(2, 2, 2), 3)).toEqual([["process", "values"], ["knowledge", "values"], ["knowledge", "process"]]);
     expect(categorySplit(area(2, 2, 1), 2)).toEqual([["knowledge", "process"], ["knowledge", "process", "values"]]);
-    expect(categorySplit(area(4, 1, 1), 3)).toBeNull();
+    expect(categorySplit(area(4, 1, 1), 3)).toBeNull(); // 지식·이해 4개를 3개에 하나씩은 불가
     // 범주별로 정확히 내용 요소 수만큼 쓰임
     const sp = categorySplit(area(4, 3, 3), 5)!;
     expect(sp.flat().filter((c) => c === "knowledge")).toHaveLength(4);
