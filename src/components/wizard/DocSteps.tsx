@@ -47,6 +47,7 @@ export function ContentStep({ doc, setDoc, onBack, onNext, onParseFail }: StepPr
         onApply={(areas) => setDoc((d) => void (d.areas = areas))}
         onManual={() => setDoc((d) => void (d.areas = manualAreas(d)))}
         onReset={() => setDoc((d) => void (d.areas = []))}
+        resetWhat="내용 체계"
       />
       <ContentTable doc={doc} setDoc={setDoc} />
       <StepIssues issues={checkContentSystem(doc.areas.map((a) => ({ ...a, knowledge: clean(a.knowledge), process: clean(a.process), values: clean(a.values) })))} />
@@ -207,6 +208,7 @@ export function CoreIdeasStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
         onApply={(ideas) => setDoc((d) => void (d.coreIdeas = ideas))}
         onManual={() => setDoc((d) => void (d.coreIdeas = manualCoreIdeas(d)))}
         onReset={() => setDoc((d) => void (d.coreIdeas = []))}
+        resetWhat="핵심아이디어"
       />
       <Card>
         <ListEditor items={doc.coreIdeas} onChange={(items) => setDoc((d) => void (d.coreIdeas = items))} placeholder="~다." multiline addLabel="+ 핵심아이디어 추가" />
@@ -289,6 +291,7 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
           })
         }
         onReset={() => setDoc((d) => void (d.standards = []))}
+        resetWhat="성취기준"
       />
       {doc.areas.map((a, ai) => (
         <Card key={ai} className="space-y-3">
@@ -502,6 +505,7 @@ export function IntroStep({ doc, setDoc, onBack, onNext, onParseFail }: StepProp
         onApply={(intro) => setDoc((d) => void (d.intro = intro))}
         onManual={() => {}}
         onReset={() => setDoc((d) => void (d.intro = { rationale: "", overallGoal: "", detailGoals: ["", "", ""] }))}
+        resetWhat="필요성·목표"
       />
       <Card className="space-y-4">
         <Field label={subject ? "성격" : "필요성"} hint="문단은 줄바꿈으로 나눠요">
@@ -541,6 +545,7 @@ export function TeachingStep({ doc, setDoc, onBack, onNext, onParseFail }: StepP
         onApply={(t) => setDoc((d) => void (d.teaching = t))}
         onManual={() => setDoc((d) => void (d.teaching = manualTeaching()))}
         onReset={() => setDoc((d) => void (d.teaching = { teachingDirection: [], teachingMethods: [], assessDirection: [], assessMethods: [] }))}
+        resetWhat="교수·학습 및 평가 방향"
       />
       {parts.map(([key, label, hint]) => (
         <Card key={key} className="space-y-2">

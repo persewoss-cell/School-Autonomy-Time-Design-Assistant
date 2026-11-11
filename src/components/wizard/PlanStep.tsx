@@ -10,6 +10,7 @@ import { checkPlanHours, checkUnitHours, lessonLabels, totalLessonHours } from "
 import { recommendedUnitHours, unitHoursFor } from "@/domain/unitHours";
 import type { PlanRequest } from "@/domain/types";
 import { AiAssist } from "./AiAssist";
+import { ResetConfirm } from "./ResetConfirm";
 import { useDesignContext } from "./useSavedDesigns";
 import { manualPlan } from "@/domain/manual";
 import type { StepProps } from "./DocSteps";
@@ -59,6 +60,7 @@ export function PlanStep(props: StepProps & { designId?: string }) {
             }
             onManual={() => setDoc((d) => void (d.plan = { candidates: [], demo: false, notes: [], selected: manualPlan(d) }))}
             onReset={() => setDoc((d) => void (d.plan = { candidates: [], demo: false, notes: [], selected: null }))}
+            resetWhat="3안과 고른 안"
           />
         )}
         {doc.plan.candidates.length > 0 && <Candidates {...props} />}
@@ -279,6 +281,7 @@ function CoverageCard({ doc, plan, labels }: { doc: StepProps["doc"]; plan: Plan
 
 function EditPlan({ doc, setDoc, onBack, onNext, tips, designId }: StepProps & { tips: string[]; designId?: string }) {
   const ctx = useDesignContext(doc, designId);
+  const [askReset, setAskReset] = useState(false);
   const plan = doc.plan.selected!;
   const codes = codeMap(doc);
   const total = totalLessonHours(plan.units);
@@ -309,13 +312,17 @@ function EditPlan({ doc, setDoc, onBack, onNext, tips, designId }: StepProps & {
             <button
               type="button"
               className="rounded-lg border border-red-100 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-100"
-              onClick={() =>
-                confirm("이 단계에서 AI 답으로 만든 내용(3안과 고른 안)을 모두 지울까요?\n지운 내용은 되돌릴 수 없어요.") &&
-                setDoc((d) => void (d.plan = { candidates: [], demo: false, notes: [], selected: null }))
-              }
+              onClick={() => setAskReset(true)}
             >
               AI 답변 초기화
             </button>
+            {askReset && (
+              <ResetConfirm
+                what="3안과 고른 안"
+                onConfirm={() => setDoc((d) => void (d.plan = { candidates: [], demo: false, notes: [], selected: null }))}
+                onClose={() => setAskReset(false)}
+              />
+            )}
           </div>
         </div>
         <p className="text-xs text-gray-500">차시 번호(예: 2~3/{doc.basic.hours})는 차시 수에 맞춰 자동으로 붙어요.</p>

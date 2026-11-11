@@ -37,6 +37,7 @@ export function AssessmentStep({ doc, setDoc, onBack, onNext, onParseFail }: Ste
         onApply={(rows) => setDoc((d) => void (d.assessments = rows))}
         onManual={() => setDoc((d) => void (d.assessments = manualAssessments(d)))}
         onReset={() => setDoc((d) => void (d.assessments = []))}
+        resetWhat="평가 계획"
       />
       {doc.assessments.map((r, i) => (
         <Card key={i} className="space-y-3">

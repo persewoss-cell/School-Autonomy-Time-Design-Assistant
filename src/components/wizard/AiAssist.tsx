@@ -6,6 +6,7 @@ import type { StepPrompt } from "@/prompts/steps";
 import { buildFixPrompt } from "@/prompts/common";
 import { Card, CopyBox, inputClass } from "../ui";
 import { Modal } from "../Modal";
+import { ResetConfirm } from "./ResetConfirm";
 
 /**
  * "AI에게 초안 받기" 패널.
@@ -21,6 +22,7 @@ export function AiAssist<T>({
   onParseFail,
   onManual,
   onReset,
+  resetWhat = "이 단계의 내용",
 }: {
   doc: DesignDoc;
   step: StepPrompt<T>;
@@ -34,6 +36,8 @@ export function AiAssist<T>({
   onManual?: () => void;
   /** 'AI 답변 초기화': 이 단계에서 AI가 만든 결과를 지운다 */
   onReset?: () => void;
+  /** 초기화 팝업에 보여 줄 '지워지는 내용' 이름 */
+  resetWhat?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen ?? !hasContent);
   const [answer, setAnswer] = useState("");
@@ -42,6 +46,7 @@ export function AiAssist<T>({
   const [follow, setFollow] = useState<{ title: string; prompt: string } | null>(null);
   const [checkWarn, setCheckWarn] = useState(false);
   const [manualDone, setManualDone] = useState(false);
+  const [askReset, setAskReset] = useState(false);
 
   const read = () => {
     const r = step.parse(answer, doc);
@@ -60,7 +65,7 @@ export function AiAssist<T>({
   };
 
   const reset = () => {
-    if (!onReset || !confirm("이 단계에서 AI 답으로 만든 내용을 모두 지울까요?\n지운 내용은 되돌릴 수 없어요.")) return;
+    if (!onReset) return;
     setNotes([]);
     setFollow(null);
     setError("");
@@ -85,15 +90,6 @@ export function AiAssist<T>({
             className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
           >
             ✍️ AI 없이 직접 입력하기
-          </button>
-        )}
-        {onReset && hasContent && (
-          <button
-            type="button"
-            onClick={reset}
-            className="shrink-0 rounded-lg border border-red-100 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-100"
-          >
-            AI 답변 초기화
           </button>
         )}
       </div>
@@ -142,16 +138,29 @@ export function AiAssist<T>({
               <CopyBox text={buildFixPrompt(error, step.reminder(doc))} label="수정 요청 복사" rows={5} />
             </div>
           )}
-          <button
-            type="button"
-            onClick={read}
-            disabled={!answer.trim()}
-            className="rounded-lg border-2 border-brand-600 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50 disabled:border-gray-300 disabled:text-gray-300"
-          >
-            AI 답 반영하기
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={read}
+              disabled={!answer.trim()}
+              className="rounded-lg border-2 border-brand-600 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50 disabled:border-gray-300 disabled:text-gray-300"
+            >
+              AI 답 반영하기
+            </button>
+            {/* 'AI 답변 초기화'는 반영하기 오른쪽 (지울 내용이 있을 때만) */}
+            {onReset && hasContent && (
+              <button
+                type="button"
+                onClick={() => setAskReset(true)}
+                className="rounded-lg border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100"
+              >
+                AI 답변 초기화
+              </button>
+            )}
+          </div>
         </div>
       )}
+      {askReset && <ResetConfirm what={resetWhat} onConfirm={reset} onClose={() => setAskReset(false)} />}
       {checkWarn && (
         <Modal
           title="AI가 만든 내용, 반드시 직접 점검하세요"
