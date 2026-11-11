@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { buildFixPrompt } from "@/prompts/common";
-import { buildImportPrompt, CODE_NOTE_START, codeDiffNote, IMPORT_PART2_PROMPT, parseImport, uniqueName, type MissingField } from "@/prompts/importDoc";
+import { buildImportPrompt, CODE_NOTE_START, codeDiffNote, formChangesOf, IMPORT_PART2_PROMPT, parseImport, uniqueName, type MissingField } from "@/prompts/importDoc";
 import { DESIGN_TYPES, GRADES, OPENING_TYPES, OPERATION_MODES, SUBJECT_GROUPS, type DesignDoc } from "@/domain/types";
 import { readDocument, type ReadResult } from "@/import/readDocument";
 import { Modal } from "./Modal";
@@ -39,7 +39,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
   const [error, setError] = useState("");
   const [multiple, setMultiple] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<{ id: string; name: string; notes: string[]; fixes: string[] } | null>(null);
+  const [done, setDone] = useState<{ id: string; name: string; notes: string[]; fixes: string[]; formChanges: string[] } | null>(null);
   const [drag, setDrag] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
@@ -63,7 +63,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
   };
 
   /** 가져오기 전 확인 팝업: 고를 칸 + 자동으로 고친 것 + 알림 */
-  const [ask, setAsk] = useState<{ doc: DesignDoc; notes: string[]; fixes: string[]; missing: MissingField[]; originalCodes: Record<string, string> } | null>(null);
+  const [ask, setAsk] = useState<{ doc: DesignDoc; notes: string[]; fixes: string[]; formChanges: string[]; missing: MissingField[]; originalCodes: Record<string, string> } | null>(null);
 
   const importNow = () => {
     const r = parseImport(answer1, answer2, { schoolYear: year, schoolName, sourceText: file?.result.text });
@@ -75,12 +75,11 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
       return;
     }
     setError("");
-    // 고를 칸·자동으로 고친 것·알림이 하나라도 있으면 저장 전에 꼭 확인받는다
-    if (r.missing.length || r.fixes.length || r.notes.length) setAsk(r);
-    else void save(r.doc, [], []);
+    // 가져오기 전에 항상 확인받는다: 고를 칸·자동으로 고친 것·알림·2027 양식에 맞춰 바뀌는 것
+    setAsk(r);
   };
 
-  const save = async (doc: DesignDoc, baseNotes: string[], fixes: string[]) => {
+  const save = async (doc: DesignDoc, baseNotes: string[], fixes: string[], formChanges: string[]) => {
     setBusy(true);
     try {
       // 같은 학년도에 같은 이름이 있으면 '이름 (2)'로
@@ -90,7 +89,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
       const notes = [...baseNotes];
       if (before && doc.basic.name !== before) notes.unshift(`${year}학년도에 같은 이름의 설계가 있어 「${doc.basic.name}」(으)로 넣었어요.`);
       const saved = await api<{ record: { id: string } }>("/api/designs", { method: "POST", body: { doc } });
-      setDone({ id: saved.record.id, name: doc.basic.name, notes, fixes });
+      setDone({ id: saved.record.id, name: doc.basic.name, notes, fixes, formChanges });
       setFile(null);
       setAnswer1("");
       setAnswer2("");
@@ -277,6 +276,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
           missing={ask.missing}
           fixes={ask.fixes}
           notes={ask.notes}
+          sourceText={file?.result.text ?? ""}
           doc={ask.doc}
           onClose={() => setAsk(null)}
           onConfirm={(doc) => {
@@ -284,8 +284,10 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
             const code = codeDiffNote(doc, ask.originalCodes);
             const notes = [...ask.notes.filter((n) => !n.startsWith(CODE_NOTE_START)), ...(code ? [code] : [])];
             const fixes = ask.fixes;
+            // 팝업에서 과목/활동을 골랐으면 양식 차이도 그에 맞게 다시
+            const formChanges = formChangesOf(doc, file?.result.text ?? "");
             setAsk(null);
-            void save(doc, notes, fixes);
+            void save(doc, notes, fixes, formChanges);
           }}
         />
       )}
@@ -309,7 +311,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
         <Modal
           title="설계 현황에 반영되었어요"
           tone="brand"
-          wide={done.notes.length + done.fixes.length > 0}
+          wide
           onClose={() => setDone(null)}
           actions={
             <>
@@ -329,7 +331,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
             「<b>{done.name}</b>」을(를) {year}학년도 설계로 가져왔어요.
           </p>
           <p className="text-sm text-gray-600">설계를 열면 단계마다 내용이 들어가 있어요. 지침에 맞지 않는 곳이 있는 단계는 번호가 빨간색으로 보여요.</p>
-          <NoteLists fixes={done.fixes} notes={done.notes} />
+          <NoteLists fixes={done.fixes} notes={done.notes} formChanges={done.formChanges} />
         </Modal>
       )}
     </div>
@@ -348,8 +350,8 @@ const FIELD_LABEL: Record<MissingField["key"], string> = {
   abbrev: "성취기준 코드의 과목명 약어 (2~3자)",
 };
 
-/** 앱이 자동으로 고친 것(주황) + 알림(파랑) 목록 */
-function NoteLists({ fixes, notes }: { fixes: string[]; notes: string[] }) {
+/** 앱이 자동으로 고친 것(주황) + 알림(파랑) + 2027 양식에 맞춰 바뀌는 것(회색) 목록 */
+function NoteLists({ fixes, notes, formChanges = [] }: { fixes: string[]; notes: string[]; formChanges?: string[] }) {
   return (
     <>
       {fixes.length > 0 && (
@@ -376,6 +378,18 @@ function NoteLists({ fixes, notes }: { fixes: string[]; notes: string[] }) {
           </ul>
         </div>
       )}
+      {formChanges.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-sm font-bold text-gray-700">2027 양식에 맞춰 문서에서 바뀌는 것 ({formChanges.length}가지)</p>
+          <ul className="space-y-1">
+            {formChanges.map((n) => (
+              <li key={n} className="rounded-lg bg-gray-100 p-2 text-sm text-gray-700">
+                📄 {n}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </>
   );
 }
@@ -389,6 +403,7 @@ function ConfirmImportModal({
   missing,
   fixes,
   notes,
+  sourceText,
   doc,
   onClose,
   onConfirm,
@@ -396,6 +411,7 @@ function ConfirmImportModal({
   missing: MissingField[];
   fixes: string[];
   notes: string[];
+  sourceText: string;
   doc: DesignDoc;
   onClose: () => void;
   onConfirm: (doc: DesignDoc) => void;
@@ -477,7 +493,8 @@ function ConfirmImportModal({
           </label>
         ))}
       </div>
-      <NoteLists fixes={fixes} notes={notes} />
+      {/* 과목/활동을 팝업에서 고르면 양식 차이도 바로 그에 맞게 */}
+      <NoteLists fixes={fixes} notes={notes} formChanges={formChangesOf(missing.some((m) => m.key === "type") && v.type ? { ...doc, basic: { ...doc.basic, type: v.type as DesignDoc["basic"]["type"] } } : doc, sourceText)} />
     </Modal>
   );
 }

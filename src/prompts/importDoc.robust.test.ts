@@ -2,7 +2,7 @@ import { readFileSync } from "fs";
 import { describe, expect, it } from "vitest";
 import { seedDesigns } from "@/server/seed";
 import { codeMap } from "@/domain/codes";
-import { extractJsonBlocks, isGuideLine, joinFragments, mergeLevelRows, parseImport, stripJsonComments, stripUnitNo } from "./importDoc";
+import { extractJsonBlocks, formChangesOf, isGuideLine, joinFragments, mergeLevelRows, parseImport, stripJsonComments, stripUnitNo } from "./importDoc";
 
 /**
  * 가상 시뮬레이션(2026-11-11)에서 찾은 AI 답의 흔한 실수들. 앱이 너그럽게 읽거나, 정확한 이유로 막아야 한다.
@@ -149,6 +149,27 @@ describe("AI 답의 흔한 실수 (가상 시뮬레이션 회귀)", () => {
     const [a2, b2] = answers();
     const ok = read(fence(a2), fence(b2));
     expect(ok.ok && ok.fixes).toEqual([]);
+  });
+
+  it("AI가 이미 A·B·C로 답했어도 원본이 잘함·보통·노력 요함이면 바꿨다고 알린다", () => {
+    const [a, b] = answers();
+    const src = PDF_TEXT + "\n| 잘함 | 정책을 발표한다. |\n| 보통 | … |\n| 노력 / 요함 | … |";
+    const r = parseImport(fence(a), fence(b), { schoolYear: "2026", schoolName: "", sourceText: src });
+    expect(r.ok && r.fixes.join()).toContain("원본 잘함·보통·노력 요함 → A·B·C");
+  });
+
+  it("2027 양식에 맞춰 바뀌는 것을 알린다 (활동/과목에 따라 다름)", () => {
+    const [a, b] = answers();
+    a.teaching = { teachingDirection: ["방향"], teachingMethods: [], assessDirection: [], assessMethods: [] };
+    const r = read(fence(a), fence(b));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const f = r.formChanges.join("\n");
+    for (const want of ["1. 필요성 및 목표", "'·'로 표시", "활동 양식(서식2)에는 들어가지 않아요", "열 순서", "계획서(서식1)", "시수 점검"]) expect(f, want).toContain(want);
+    const subject = formChangesOf({ ...r.doc, basic: { ...r.doc.basic, type: "subject" } }).join("\n");
+    expect(subject).toContain("(1)(2)(3) 번호");
+    expect(subject).toContain("신청서(서식3)");
+    expect(subject).not.toContain("서식2");
   });
 
   it("코드에서도 약어를 알 수 없으면 필수 정보로 묻는다", () => {

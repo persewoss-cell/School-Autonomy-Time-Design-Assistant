@@ -323,6 +323,8 @@ export type ImportParse =
       notes: string[];
       /** 앱이 자동으로 고친 것 — 가져오기 전 팝업에서 꼭 보여 준다 (사용자 결정, 2026-11-11) */
       fixes: string[];
+      /** 2027 양식에 맞춰 문서에서 달라지는 것 (원본과 모양이 다른 곳) — 팝업에서 함께 보여 준다 */
+      formChanges: string[];
       missing: MissingField[];
       /** 성취기준 id → 문서의 원래 코드 */
       originalCodes: Record<string, string>;
@@ -619,6 +621,11 @@ export function parseImport(
       return { month: str(a.month), standardIds: idsOf(a.standards), focus: str(a.focus), levels: levelsOf(a.levels), methods };
     });
   doc.assessments = mergeLevelRows(rawRows);
+  // AI가 이미 A·B·C로 바꿔 답했어도, 원본이 다른 기호를 썼으면 바뀐 것을 알린다
+  const src = opts.sourceText ?? "";
+  const levelSymbols =
+    /잘함/.test(src) && /노력\s*\/?\s*요함/.test(src) ? "잘함·보통·노력 요함" : /◎/.test(src) && /△/.test(src) ? "◎·○·△" : /\|\s*상\s*\|/.test(src) && /\|\s*하\s*\|/.test(src) ? "상·중·하" : "";
+  if (levelSymbols && rawRows.length && ![...fixLog.keys()].some((k) => k.startsWith("성취수준 기호를"))) fix("성취수준 기호를 A·B·C로 바꿨어요.", `원본 ${levelSymbols} → A·B·C`);
   if (doc.assessments.length < rawRows.length) fix("여러 줄로 나뉜 A·B·C 성취수준을 평가 계획 하나로 묶었어요.", `${rawRows.length}줄 → ${doc.assessments.length}개`);
   if (unknownCodes.size) notes.push(`성취기준 목록에 없는 코드가 단원 지도계획·평가 계획에 있어 연결하지 못했어요: ${[...unknownCodes].join(", ")}`);
 
@@ -627,7 +634,7 @@ export function parseImport(
     if (mismatch) return { ok: false, error: mismatch };
   } else notes.push("원본 파일을 AI에 첨부한 방식이라, 답이 문서 내용과 같은지 앱이 확인하지 못했어요. 단계마다 꼭 확인해 주세요.");
   const fixes = [...fixLog].map(([kind, f]) => `${kind}${f.n > 1 ? ` (${f.n}곳)` : ""}${f.ex.length ? ` 예: ${f.ex.join(", ")}` : ""}`);
-  return { ok: true, doc, notes, fixes, missing, originalCodes };
+  return { ok: true, doc, notes, fixes, formChanges: formChangesOf(doc, src), missing, originalCodes };
 }
 
 /** 단원명 앞의 번호('1단원', '1.', '(1)', 'Ⅰ.')를 뗀다 */
@@ -650,6 +657,25 @@ function placeholdersIn(v: unknown): string[] {
   if (Array.isArray(v)) return v.flatMap(placeholdersIn);
   if (v && typeof v === "object") return Object.values(v).flatMap(placeholdersIn);
   return [];
+}
+
+/**
+ * 2027 양식으로 문서를 만들 때 원본과 모양이 달라지는 것 (가져오기 전 팝업에서 알림, 사용자 요청 2026-11-11).
+ * 과목/활동은 팝업에서 바뀔 수 있으므로 화면에서 고른 뒤 다시 부른다.
+ */
+export function formChangesOf(doc: DesignDoc, sourceText = ""): string[] {
+  const activity = doc.basic.type === "activity";
+  const out: string[] = [];
+  if (activity) {
+    if (/성격/.test(sourceText) || /목표/.test(sourceText)) out.push("원본의 '성격'·'목표'는 2027 활동 양식의 '1. 필요성 및 목표' 한 곳에 이어서 들어가요.");
+    if (doc.intro.detailGoals.some((g) => g.trim())) out.push("세부 목표의 번호 (1)(2)(3)은 활동 양식에서 '·'로 표시돼요.");
+    if (Object.values(doc.teaching).some((l) => l.length)) out.push("원본의 교수·학습 방향·방법, 평가 방향·방법은 설계에 보관되지만 2027 활동 양식(서식2)에는 들어가지 않아요. (과목으로 바꾸면 나타나요)");
+  } else if (doc.intro.detailGoals.some((g) => g.trim())) out.push("세부 목표는 과목 양식에서 (1)(2)(3) 번호로 표시돼요.");
+  if (doc.assessments.length) out.push("평가 계획 표는 2027 양식의 열 순서(시기·성취기준·수업·평가 방법·평가 기준·방법)로 바뀌어요.");
+  if (doc.plan.selected) out.push("단원 지도계획의 학습 내용은 '· 학습 목표' 아래 '- 활동' 모양으로 맞춰지고, 단원명 앞에는 'N단원'이 붙어요.");
+  out.push(activity ? "계획서(서식1)와 체크리스트(서식6)는 원본에 없어도 앱이 2027 양식으로 새로 만들어요." : "신청서(서식3)와 체크리스트(서식7)는 원본에 없어도 앱이 2027 양식으로 새로 만들어요.");
+  out.push("교육과정 편성표는 앱의 '시수 점검'을 마쳐야 문서에 들어가요.");
+  return out;
 }
 
 export const CODE_NOTE_START = "성취기준 코드 ";
