@@ -179,13 +179,22 @@ const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 /** 코드 비교용: 띄어쓰기·괄호 모양 무시 */
 const codeKey = (c: string) => c.replace(/\s/g, "").replace(/^\[?/, "[").replace(/\]?$/, "]");
 
+/** 문서에서 찾지 못해 가져오기 전에 선생님이 고르거나 입력할 기본 정보 칸 */
+export type MissingKey = "type" | "name" | "grade" | "semester" | "hours" | "subjectGroup" | "openingType" | "operationMode";
+export interface MissingField {
+  key: MissingKey;
+  /** AI 답에 적힌 값 (없으면 "") */
+  raw: string;
+}
+
 export type ImportParse =
-  | { ok: true; doc: DesignDoc; notes: string[] }
+  | { ok: true; doc: DesignDoc; notes: string[]; missing: MissingField[]; /** 성취기준 id → 문서의 원래 코드 */ originalCodes: Record<string, string> }
   | { ok: false; error: string; multiple?: number };
 
 /**
  * 1부·2부 답을 읽어 설계 문서로 만든다.
- * 문서 내용은 그대로 두고, 앱 선택지에 없는 값만 기본값으로 바꾼 뒤 notes로 알린다.
+ * 문서 내용은 그대로 둔다. 기본 정보 중 문서에서 찾지 못했거나 앱 선택지에 없는 칸은 missing으로 돌려주고,
+ * 화면이 팝업으로 선생님에게 고르게 한다 (사용자 결정, 2026-11-11). 그 밖의 바꾼 점은 notes로 알린다.
  */
 export function parseImport(
   part1Text: string,
@@ -206,33 +215,35 @@ export function parseImport(
   if (!p2) return { ok: false, error: "2부(단원 지도계획·평가 계획) JSON이 없습니다. 2부 요청을 AI에 보내고 그 답을 2부 칸에 붙여 넣어 주세요." };
 
   const notes: string[] = [];
+  const missing: MissingField[] = [];
   const doc = emptyDesign();
 
   // ① 기본 정보: 앱 선택지에 없는 값은 기본값으로 바꾸고 알림
   const typeRaw = str(p1.type);
   doc.basic.type = /과목|subject/i.test(typeRaw) ? "subject" : "activity";
-  if (!typeRaw) notes.push("문서에서 과목/활동 구분을 찾지 못해 '활동'으로 넣었어요. 확인해 주세요.");
+  if (!/과목|활동|subject|activity/i.test(typeRaw)) missing.push({ key: "type", raw: typeRaw });
   let name = str(p1.name).replace(/^[「『"']|[」』"']$/g, "");
   if (name.length > 40) {
     notes.push(`이름이 40자를 넘어 앞부분만 넣었어요: 「${name}」`);
     name = name.slice(0, 40);
   }
   doc.basic.name = name;
+  if (!name) missing.push({ key: "name", raw: "" });
   const grade = num(p1.grade);
   if (grade === 3 || grade === 4 || grade === 5 || grade === 6) doc.basic.grade = grade;
-  else notes.push(`학년(${str(p1.grade) || "없음"})을 읽지 못해 3학년으로 넣었어요.`);
+  else missing.push({ key: "grade", raw: str(p1.grade) });
   const semester = num(p1.semester);
   if (semester === 1 || semester === 2) doc.basic.semester = semester;
-  else notes.push(`학기(${str(p1.semester) || "없음"})를 읽지 못해 1학기로 넣었어요.`);
-  const pick = <T extends string>(raw: string, list: readonly T[], label: string, fallback: T): T => {
+  else missing.push({ key: "semester", raw: str(p1.semester) });
+  const pick = <T extends string>(key: MissingKey, raw: string, list: readonly T[], fallback: T): T => {
     const hit = list.find((x) => x.replace(/\s/g, "") === raw.replace(/\s/g, ""));
     if (hit) return hit;
-    notes.push(`${label}(${raw || "없음"})이(가) 앱의 선택지에 없어 '${fallback}'(으)로 넣었어요. 기본 정보 단계에서 확인해 주세요.`);
+    missing.push({ key, raw });
     return fallback;
   };
-  doc.basic.subjectGroup = pick(str(p1.subjectGroup), SUBJECT_GROUPS, "편성 교과", doc.basic.subjectGroup as (typeof SUBJECT_GROUPS)[number]);
-  doc.basic.openingType = pick(str(p1.openingType), OPENING_TYPES, "개설 형태", doc.basic.openingType);
-  doc.basic.operationMode = pick(str(p1.operationMode), OPERATION_MODES, "운영 방식", doc.basic.operationMode);
+  doc.basic.subjectGroup = pick("subjectGroup", str(p1.subjectGroup), SUBJECT_GROUPS, doc.basic.subjectGroup as (typeof SUBJECT_GROUPS)[number]);
+  doc.basic.openingType = pick("openingType", str(p1.openingType), OPENING_TYPES, doc.basic.openingType);
+  doc.basic.operationMode = pick("operationMode", str(p1.operationMode), OPERATION_MODES, doc.basic.operationMode);
 
   doc.application.startYear = opts.schoolYear;
   doc.application.schoolName = opts.schoolName;
@@ -271,14 +282,9 @@ export function parseImport(
   doc.standards.sort((a, b) => a.areaIndex - b.areaIndex);
   doc.abbrev = str(p1.abbrev) || guessAbbrev([...originalCode.values()][0] ?? "", doc.basic.subjectGroup);
 
-  const computed = codeMap(doc);
-  const differ = doc.standards.filter((s) => originalCode.has(s.id) && codeKey(originalCode.get(s.id)!) !== codeKey(computed.get(s.id)!));
-  if (differ.length) {
-    const s = differ[0];
-    notes.push(
-      `성취기준 코드 ${differ.length}개가 앱의 코드 규칙과 달라요 (예: 원본 ${originalCode.get(s.id)} → 앱 ${computed.get(s.id)}). 앱은 학년·편성 교과·약어·영역·순서로 코드를 다시 계산해요.`,
-    );
-  }
+  const originalCodes = Object.fromEntries(originalCode);
+  const codeNote = codeDiffNote(doc, originalCodes);
+  if (codeNote) notes.push(codeNote);
 
   // ⑥ 필요성(성격)·목표
   const goals = toList(p1.detailGoals).map((g) => g.replace(/^\(?\d\)\s*/, ""));
@@ -348,8 +354,8 @@ export function parseImport(
   const lessonSum = units.reduce((s, u) => s + u.lessons.reduce((a, l) => a + l.hours, 0), 0);
   const hours = num(p1.hours) ?? lessonSum;
   doc.basic.hours = Math.max(1, Math.min(40, hours || 1));
-  if (!hours) notes.push("운영 시수를 찾지 못해 1시간으로 넣었어요. 기본 정보 단계에서 고쳐 주세요.");
-  else if (hours !== doc.basic.hours) notes.push(`운영 시수 ${hours}시간은 앱 범위(1~40)를 벗어나 ${doc.basic.hours}시간으로 넣었어요.`);
+  if (!hours || hours !== doc.basic.hours) missing.push({ key: "hours", raw: hours ? `${hours}시간 (앱 범위 1~40 밖)` : "" });
+  else if (!num(p1.hours) && lessonSum) notes.push(`문서에서 운영 시수를 찾지 못해 차시 합계(${lessonSum}시간)로 넣었어요.`);
 
   // ⑧ 평가 계획
   doc.assessments = arr(p2.assessments)
@@ -366,12 +372,22 @@ export function parseImport(
     });
   if (unknownCodes.size) notes.push(`성취기준 목록에 없는 코드가 단원 지도계획·평가 계획에 있어 연결하지 못했어요: ${[...unknownCodes].join(", ")}`);
 
-  if (!doc.basic.name) notes.push("설계 이름을 찾지 못했어요. 기본 정보 단계에서 적어 주세요.");
   if (opts.sourceText?.trim()) {
     const mismatch = checkAgainstSource(doc, opts.sourceText);
     if (mismatch) return { ok: false, error: mismatch };
   } else notes.push("원본 파일을 AI에 첨부한 방식이라, 답이 문서 내용과 같은지 앱이 확인하지 못했어요. 단계마다 꼭 확인해 주세요.");
-  return { ok: true, doc, notes };
+  return { ok: true, doc, notes, missing, originalCodes };
+}
+
+export const CODE_NOTE_START = "성취기준 코드 ";
+
+/** 문서의 원래 코드와 앱이 계산한 코드가 다르면 알림 (편성 교과·학년을 바꾸면 다시 계산) */
+export function codeDiffNote(doc: DesignDoc, originalCodes: Record<string, string>): string | null {
+  const computed = codeMap(doc);
+  const differ = doc.standards.filter((s) => originalCodes[s.id] && codeKey(originalCodes[s.id]) !== codeKey(computed.get(s.id)!));
+  if (!differ.length) return null;
+  const s = differ[0];
+  return `${CODE_NOTE_START}${differ.length}개가 앱의 코드 규칙과 달라요 (예: 원본 ${originalCodes[s.id]} → 앱 ${computed.get(s.id)}). 앱은 학년·편성 교과·약어·영역·순서로 코드를 다시 계산해요.`;
 }
 
 /** 비교용: 띄어쓰기·줄바꿈·표 칸(|)·문장부호·괄호를 모두 빼고 */

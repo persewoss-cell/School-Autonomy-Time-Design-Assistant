@@ -220,8 +220,9 @@ export function checkStandards(doc: Pick<DesignDoc, "basic" | "abbrev" | "areas"
         fix: "이 영역의 내용 요소를 하나 더 고르거나, 다른 성취기준과 내용 요소를 나누어 조정해 주세요.",
       });
     } else if (s.elements.length > 3) {
+      // 4개 이상은 오류가 아니라 확인 필요 (사용자 결정, 2026-11-11)
       issues.push({
-        level: "error",
+        level: "warning",
         field: code,
         message: `내용 요소가 ${s.elements.length}개 연결되어 있습니다. 성취기준 하나에는 서로 다른 범주의 내용 요소를 2개 또는 3개 묶습니다.`,
         fix: "내용 요소를 2개 또는 3개가 되도록 조정해 주세요.",

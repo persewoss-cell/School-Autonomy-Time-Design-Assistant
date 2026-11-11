@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { buildFixPrompt } from "@/prompts/common";
-import { buildImportPrompt, IMPORT_PART2_PROMPT, parseImport, uniqueName } from "@/prompts/importDoc";
+import { buildImportPrompt, CODE_NOTE_START, codeDiffNote, IMPORT_PART2_PROMPT, parseImport, uniqueName, type MissingField } from "@/prompts/importDoc";
+import { DESIGN_TYPES, GRADES, OPENING_TYPES, OPERATION_MODES, SUBJECT_GROUPS, type DesignDoc } from "@/domain/types";
 import { looksScanned, readDocument, type ReadResult } from "@/import/readDocument";
 import { Modal } from "./Modal";
 import { CopyBox, inputClass } from "./ui";
@@ -61,7 +62,10 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
     }
   };
 
-  const importNow = async () => {
+  /** 문서에서 찾지 못한 기본 정보를 고르는 팝업 */
+  const [ask, setAsk] = useState<{ doc: DesignDoc; notes: string[]; missing: MissingField[]; originalCodes: Record<string, string> } | null>(null);
+
+  const importNow = () => {
     const r = parseImport(answer1, answer2, { schoolYear: year, schoolName, sourceText: useAttach ? undefined : file?.result.text });
     if (!r.ok) {
       if (r.multiple) {
@@ -71,14 +75,18 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
       return;
     }
     setError("");
+    if (r.missing.length) setAsk(r);
+    else void save(r.doc, r.notes);
+  };
+
+  const save = async (doc: DesignDoc, baseNotes: string[]) => {
     setBusy(true);
     try {
       // 같은 학년도에 같은 이름이 있으면 '이름 (2)'로
       const mine = await api<{ designs: { name: string; schoolYear: string }[] }>("/api/designs");
-      const doc = r.doc;
       const before = doc.basic.name;
       doc.basic.name = uniqueName(before || "가져온 설계", mine.designs.filter((d) => d.schoolYear === year).map((d) => d.name));
-      const notes = [...r.notes];
+      const notes = [...baseNotes];
       if (before && doc.basic.name !== before) notes.unshift(`${year}학년도에 같은 이름의 설계가 있어 「${doc.basic.name}」(으)로 넣었어요.`);
       const saved = await api<{ record: { id: string } }>("/api/designs", { method: "POST", body: { doc } });
       setDone({ id: saved.record.id, name: doc.basic.name, notes });
@@ -204,7 +212,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
           )}
           <button
             type="button"
-            onClick={() => void importNow()}
+            onClick={importNow}
             disabled={!answer1.trim() || busy}
             className="rounded-lg bg-brand-600 px-5 py-2 font-bold text-white hover:bg-brand-700 disabled:bg-gray-300"
           >
@@ -213,6 +221,20 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
         </>
       )}
 
+      {ask && (
+        <MissingModal
+          missing={ask.missing}
+          doc={ask.doc}
+          onClose={() => setAsk(null)}
+          onConfirm={(doc) => {
+            // 편성 교과·학년이 바뀌면 성취기준 코드 알림도 다시 계산
+            const code = codeDiffNote(doc, ask.originalCodes);
+            const notes = [...ask.notes.filter((n) => !n.startsWith(CODE_NOTE_START)), ...(code ? [code] : [])];
+            setAsk(null);
+            void save(doc, notes);
+          }}
+        />
+      )}
       {multiple > 0 && (
         <Modal
           title="한 번에 하나씩만 가져올 수 있어요"
@@ -265,5 +287,93 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
         </Modal>
       )}
     </div>
+  );
+}
+
+const FIELD_LABEL: Record<MissingField["key"], string> = {
+  type: "과목 / 활동",
+  name: "과목명·활동명",
+  grade: "학년",
+  semester: "학기",
+  hours: "운영 시수",
+  subjectGroup: "편성 교과",
+  openingType: "개설 형태",
+  operationMode: "운영 방식",
+};
+
+/** 문서에서 찾지 못한 기본 정보만 골라·적어 넣는 팝업. 모두 채워야 가져오기를 끝낸다. */
+function MissingModal({ missing, doc, onClose, onConfirm }: { missing: MissingField[]; doc: DesignDoc; onClose: () => void; onConfirm: (doc: DesignDoc) => void }) {
+  const [v, setV] = useState<Record<string, string>>({});
+  const set = (k: string, val: string) => setV((o) => ({ ...o, [k]: val }));
+  const filled = (k: MissingField["key"]) => {
+    const x = (v[k] ?? "").trim();
+    if (k === "hours") return Number(x) >= 1 && Number(x) <= 40;
+    if (k === "name") return x.length > 0 && x.length <= 40;
+    return x.length > 0;
+  };
+  const ready = missing.every((m) => filled(m.key));
+  const confirm = () => {
+    const next = structuredClone(doc);
+    for (const { key } of missing) {
+      const x = v[key].trim();
+      if (key === "type") next.basic.type = x as DesignDoc["basic"]["type"];
+      else if (key === "name") next.basic.name = x;
+      else if (key === "grade") next.basic.grade = Number(x) as DesignDoc["basic"]["grade"];
+      else if (key === "semester") next.basic.semester = Number(x) as 1 | 2;
+      else if (key === "hours") next.basic.hours = Number(x);
+      else if (key === "subjectGroup") next.basic.subjectGroup = x;
+      else if (key === "openingType") next.basic.openingType = x as DesignDoc["basic"]["openingType"];
+      else next.basic.operationMode = x as DesignDoc["basic"]["operationMode"];
+    }
+    onConfirm(next);
+  };
+  const select = (k: string, options: { value: string; label: string }[]) => (
+    <select className={inputClass} value={v[k] ?? ""} onChange={(e) => set(k, e.target.value)}>
+      <option value="">골라 주세요</option>
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
+  const plain = (list: readonly (string | number)[], suffix = "") => list.map((x) => ({ value: String(x), label: `${x}${suffix}` }));
+  return (
+    <Modal
+      title="문서에서 찾지 못한 정보를 골라 주세요"
+      tone="amber"
+      onClose={onClose}
+      actions={
+        <>
+          <button type="button" onClick={onClose} className="rounded-lg border border-gray-300 px-4 py-2 font-semibold text-gray-700 hover:bg-gray-50">
+            닫기
+          </button>
+          <button type="button" onClick={confirm} disabled={!ready} className="rounded-lg bg-brand-600 px-5 py-2 font-bold text-white hover:bg-brand-700 disabled:bg-gray-300">
+            가져오기
+          </button>
+        </>
+      }
+    >
+      <p className="text-sm text-gray-600">
+        「{doc.basic.name || "이름 없음"}」의 아래 칸은 문서에 없거나 앱의 선택지와 달라요. 골라 주시면 가져올게요. (나중에 기본 정보 단계에서도 고칠 수 있어요)
+      </p>
+      <div className="space-y-3">
+        {missing.map(({ key, raw }) => (
+          <label key={key} className="block space-y-1">
+            <span className="text-sm font-semibold">
+              {FIELD_LABEL[key]} <span className="font-normal text-gray-500">(문서: {raw || "없음"})</span>
+            </span>
+            {key === "type" && select(key, Object.entries(DESIGN_TYPES).map(([value, label]) => ({ value, label })))}
+            {key === "name" && <input className={inputClass} maxLength={40} value={v.name ?? ""} onChange={(e) => set("name", e.target.value)} />}
+            {key === "grade" && select(key, plain(GRADES, "학년"))}
+            {key === "semester" && select(key, plain([1, 2], "학기"))}
+            {key === "hours" && <input type="number" min={1} max={40} className={inputClass} value={v.hours ?? ""} onChange={(e) => set("hours", e.target.value)} placeholder="1~40" />}
+            {key === "subjectGroup" && select(key, plain(SUBJECT_GROUPS))}
+            {key === "openingType" && select(key, plain(OPENING_TYPES))}
+            {key === "operationMode" && select(key, plain(OPERATION_MODES))}
+          </label>
+        ))}
+      </div>
+    </Modal>
   );
 }

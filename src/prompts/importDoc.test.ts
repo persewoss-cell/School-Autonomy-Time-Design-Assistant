@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { seedDesigns } from "@/server/seed";
 import { codeMap } from "@/domain/codes";
 import type { DesignDoc } from "@/domain/types";
-import { buildImportPrompt, checkAgainstSource, extractAllJson, guessAbbrev, IMPORT_PART2_PROMPT, parseImport, uniqueName } from "./importDoc";
+import { buildImportPrompt, checkAgainstSource, codeDiffNote, extractAllJson, guessAbbrev, IMPORT_PART2_PROMPT, parseImport, uniqueName } from "./importDoc";
 
 /** 예시안 PDF(지구마을 첫걸음)에서 앱이 실제로 뽑은 글자 */
 const PDF_TEXT = readFileSync(new URL("./__fixtures__/jigu-first-step.pdf.txt", import.meta.url), "utf8");
@@ -74,6 +74,7 @@ describe("기존 문서 가져오기", () => {
     expect(d.assessments[0].standardIds.length).toBe(seed.assessments[0].standardIds.length);
     expect(d.application.schoolName).toBe("가나초등학교");
     expect(r.notes).toEqual([]);
+    expect(r.missing).toEqual([]);
   });
 
   it("문서와 다른 답(예시 베끼기·다른 설계)은 막는다", () => {
@@ -119,12 +120,32 @@ describe("기존 문서 가져오기", () => {
     const r = parseImport(bad1, bad2, { schoolYear: "2027", schoolName: "" });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.doc.basic.subjectGroup).toBe("사회");
-    expect(r.notes.join("\n")).toContain("편성 교과(창체)");
+    // 선택지에 없는 편성 교과는 팝업에서 고르도록 missing으로 (임시로 기본값)
+    expect(r.missing).toEqual([{ key: "subjectGroup", raw: "창체" }]);
+    expect(r.notes.join("\n")).not.toContain("창체");
     expect(r.notes.join("\n")).toContain("2025학년도");
     expect(r.notes.join("\n")).toContain("[9없음01-01]");
     // 2027학년도는 코드에 교과 글자가 들어가 원본 코드와 다를 수 있음 → 알림
     expect(r.doc.application.startYear).toBe("2027");
+  });
+
+  it("문서에서 못 찾은 기본 정보는 모두 missing으로, 코드 알림은 편성 교과를 고른 뒤 다시 계산", () => {
+    const [a1, a2] = asAnswers(seed);
+    const p1 = JSON.parse(a1.slice(a1.indexOf("{"), a1.lastIndexOf("}") + 1));
+    for (const k of ["type", "grade", "semester", "subjectGroup", "openingType", "operationMode"]) p1[k] = "";
+    p1.hours = 99;
+    const r = parseImport("```json\n" + JSON.stringify(p1) + "\n```", a2, { schoolYear: "2027", schoolName: "" });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.missing.map((m) => m.key).sort()).toEqual(["grade", "hours", "openingType", "operationMode", "semester", "subjectGroup", "type"]);
+    expect(r.missing.find((m) => m.key === "hours")!.raw).toContain("99시간");
+    const doc = structuredClone(r.doc);
+    doc.basic.grade = 3;
+    doc.basic.subjectGroup = "사회";
+    // 원본은 2026학년도 코드(교과 글자 없음), 2027학년도로 가져오면 교과 글자가 붙음
+    expect(codeDiffNote(doc, r.originalCodes)).toContain("앱 [3사지구01-01]");
+    doc.basic.subjectGroup = "국어";
+    expect(codeDiffNote(doc, r.originalCodes)).toContain("앱 [3국지구01-01]");
   });
 
   it("JSON이 없으면 오류", () => {
