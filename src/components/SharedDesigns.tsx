@@ -75,7 +75,7 @@ function LoginNeeded({ onClose }: { onClose: () => void }) {
 /**
  * '설계안 가져오기' 화면 (탭 2개)
  * - 타학교 완성 설계안: 완성한 설계(오류 0 + 체크리스트 모두 ○)를 보고·내려받고·우리 학교로 가져온다. 본교 설계도 '본교' 표시로 함께 보인다.
- * - 우리 학교 기존 문서: 예전에 만든 문서(PDF·hwpx)를 AI 프롬프트로 옮겨 새 설계로 가져온다.
+ * - 우리 학교 기존 문서 가져오기: 예전에 만든 문서(PDF·hwpx)를 AI 프롬프트로 옮겨 새 설계로 가져온다.
  */
 export function SharedDesignsPage() {
   const [rows, setRows] = useState<Shared[] | null>(null);
@@ -97,8 +97,9 @@ export function SharedDesignsPage() {
     setTab(t);
     window.history.replaceState(null, "", t === "file" ? "/shared?tab=file" : "/shared");
   };
+  // 탭 버튼은 연한 초록 (사용자 요청, 2026-11-11). 고른 탭은 조금 더 진하게 + 테두리
   const tabBtn = (t: "shared" | "file") =>
-    `rounded-t-lg px-4 py-2 text-sm font-semibold ${tab === t ? "bg-white text-brand-700 shadow-sm" : "text-gray-500 hover:bg-white/60 hover:text-gray-700"}`;
+    `rounded-lg px-4 py-2 text-sm transition ${tab === t ? "bg-brand-100 font-bold text-brand-700 ring-1 ring-brand-500/40" : "bg-brand-50 font-semibold text-brand-600 hover:bg-brand-100"}`;
   return (
     <div className="space-y-4">
       <div>
@@ -121,15 +122,15 @@ export function SharedDesignsPage() {
         )}
       </div>
       <div>
-        <div className="flex gap-1" role="tablist">
+        <div className="mb-3 flex gap-2" role="tablist">
           <button type="button" role="tab" aria-selected={tab === "shared"} onClick={() => choose("shared")} className={tabBtn("shared")}>
             타학교 완성 설계안
           </button>
           <button type="button" role="tab" aria-selected={tab === "file"} onClick={() => choose("file")} className={tabBtn("file")}>
-            우리 학교 기존 문서
+            우리 학교 기존 문서 가져오기
           </button>
         </div>
-        <div className={`rounded-2xl bg-white p-4 shadow-sm ${tab === "shared" ? "rounded-tl-none" : ""}`}>
+        <div className="rounded-2xl bg-white p-4 shadow-sm">
           {login ? (
             <p className="text-gray-600">
               로그인한 학교만 볼 수 있어요.{" "}
