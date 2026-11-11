@@ -110,6 +110,7 @@ export function FinalStep({
   doc,
   setDoc,
   onBack,
+  onNext,
   goTo,
   stepLabel,
   onSave,
@@ -256,7 +257,7 @@ export function FinalStep({
       </Card>
 
       <DocPreview doc={doc} />
-      <NavButtons onBack={onBack} />
+      <NavButtons onBack={onBack} onNext={onNext} nextLabel="다음: 차시별 활동지 (선택)" />
     </div>
   );
 }

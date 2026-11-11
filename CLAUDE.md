@@ -67,13 +67,15 @@
 |---|---|
 | `src/domain/` | 설계 문서 타입(`types.ts`), 성취기준 코드 계산(`codes.ts`), 체크리스트(`checklist.ts`), 예시(`sample.ts`) |
 | `src/validation/` | 검증 규칙: 시수(`hours.ts`, `allocation.ts` = 시수 점검 엑셀), 단계별 점검(`design.ts`) |
-| `src/prompts/` | 단계별 복사용 프롬프트 + 붙여 넣은 답 읽기(`steps.ts`, `common.ts`) |
-| `src/export/` | .docx 만들기 (서식1·2·3·4·6·7, 편성표) |
+| `src/prompts/` | 단계별 복사용 프롬프트 + 붙여 넣은 답 읽기(`steps.ts`, `common.ts`), 기존 문서 가져오기(`importDoc.ts`), 차시별 활동지(`worksheet.ts`) |
+| `src/import/` | 기존 문서(PDF·hwpx)에서 글자 뽑기 (브라우저에서만, 서버로 보내지 않음) |
+| `src/export/` | .docx 만들기 (서식1·2·3·4·6·7, 편성표, 차시별 활동지 `worksheetDocx.ts`) |
 | `src/server/` | 저장소(MongoDB/메모리), 로그인·저장·권한 서비스, 세션 |
 | `src/components/wizard/` | 설계 단계 화면 (PPT 순서) |
 | `src/app/` | 페이지와 API (`/api/auth`, `/api/designs`, `/api/admin`, `/api/logs`) |
 
 - 설계 단계 순서(문서 작성 부분)는 2027 연수 PPT를 따른다: [전단계] → 내용 체계 → 핵심아이디어 → 성취기준 → 필요성·목표 → 단원 지도계획 → 평가 계획
+- 점검·내려받기 다음의 '활동지(선택)' 단계는 하지 않아도 설계 완성에 영향이 없다 (`src/domain/worksheet.ts`).
 - 시수 계산은 '학교자율시간 시수 편성 점검표' 엑셀 계산식이 기준이다 (`data/rules/curriculum-hours.json`).
 - 시험용 저장소: `MONGODB_URI=memory` (서버 재시작 시 사라짐).
 

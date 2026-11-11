@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Worksheets } from "./worksheet";
 
 /** 설계 유형: 과목 / 활동 */
 export const DESIGN_TYPES = { subject: "과목", activity: "활동" } as const;
@@ -212,6 +213,8 @@ export interface DesignDoc {
   planRequest?: PlanRequest;
   /** '무시하기'를 누른 확인 필요(권장) 점검 (issueKey). 내용이 바뀌어 문장이 달라지면 다시 나타남 */
   dismissed?: string[];
+  /** (선택) 차시별 활동지 */
+  worksheets?: Worksheets;
   /** 어디까지 작성했는지 (다시 열면 이 단계부터) */
   progress?: { stepKey: string; maxIndex: number };
 }

@@ -17,6 +17,7 @@ import { ContentStep, CoreIdeasStep, IntroStep, StandardsStep, TeachingStep, typ
 import { PlanStep } from "./PlanStep";
 import { AssessmentStep } from "./AssessmentStep";
 import { ApplicationStep, FinalStep } from "./FinalSteps";
+import { WorksheetStep } from "./WorksheetStep";
 
 /**
  * 설계 단계. 문서 작성 부분은 2027 연수 PPT의 순서를 따른다:
@@ -37,6 +38,8 @@ export function stepsFor(doc: { basic: Pick<DesignDoc["basic"], "type"> }): { ke
     ...(subject ? [{ key: "teaching" as StepKey, label: "교수·학습" }] : []),
     { key: "application", label: subject ? "신청서" : "계획서" },
     { key: "final", label: "점검·내려받기" },
+    // 선택 단계 (하지 않아도 설계 완성에 영향 없음)
+    { key: "worksheet", label: "활동지(선택)" },
   ];
 }
 
@@ -84,6 +87,8 @@ function stepStarted(doc: DesignDoc, key: StepKey): boolean {
       return doc.assessments.length > 0;
     case "teaching":
       return Object.values(doc.teaching).some((l) => l.length > 0);
+    case "worksheet":
+      return (doc.worksheets?.sheets.length ?? 0) > 0;
     default:
       // 계획서·신청서, 점검·내려받기: 들어가 본 적이 있으면 진행한 것으로
       return true;
@@ -480,6 +485,7 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
       {stepKey === "assessment" && <AssessmentStep {...props} />}
       {stepKey === "teaching" && <TeachingStep {...props} />}
       {stepKey === "application" && <ApplicationStep {...props} />}
+      {stepKey === "worksheet" && <WorksheetStep {...props} />}
       {stepKey === "final" && (
         <FinalStep
           {...props}

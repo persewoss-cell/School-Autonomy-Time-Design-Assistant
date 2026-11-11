@@ -221,6 +221,8 @@ function SharedTable({ rows }: { rows: Shared[] }) {
       doc.checklist = {};
       doc.dismissed = [];
       delete doc.progress;
+      // 활동지의 학교 로고는 그 학교 것이므로 빼고 가져옴
+      if (doc.worksheets) doc.worksheets.settings.logo = "";
       const r = await api<{ record: { id: string } }>("/api/designs", { method: "POST", body: { doc } });
       setCloned({ name: doc.basic.name, id: r.record.id });
     } catch (e) {
