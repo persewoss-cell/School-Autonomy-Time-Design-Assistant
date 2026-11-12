@@ -19,6 +19,7 @@ import {
 import type { DesignDoc } from "@/domain/types";
 import {
   BOX_HEIGHT_CM,
+  fillSheet,
   lessonSlots,
   ROW_CM,
   slotLabel,
@@ -42,14 +43,16 @@ const PAGE_W = 10205;
 const INNER_W = PAGE_W - 400;
 const cm = (n: number) => Math.round(n * 567);
 
-const run = (text: string, o: { bold?: boolean; size?: number; font?: string } = {}) =>
-  new TextRun({ text, bold: o.bold, size: Math.round((o.size ?? 11) * 2), font: o.font ?? BODY });
-const para = (text: string, o: { bold?: boolean; size?: number; font?: string; align?: (typeof AlignmentType)[keyof typeof AlignmentType]; before?: number; after?: number } = {}) =>
+const run = (text: string, o: { bold?: boolean; size?: number; font?: string; color?: string } = {}) =>
+  new TextRun({ text, bold: o.bold, size: Math.round((o.size ?? 11) * 2), font: o.font ?? BODY, color: o.color });
+const para = (text: string, o: { bold?: boolean; size?: number; font?: string; color?: string; align?: (typeof AlignmentType)[keyof typeof AlignmentType]; before?: number; after?: number } = {}) =>
   new Paragraph({
     alignment: o.align,
     spacing: { before: Math.round((o.before ?? 0) * 20), after: Math.round((o.after ?? 0) * 20), line: 300, lineRule: LineRuleType.AUTO },
     children: [run(text, o)],
   });
+/** 교사용 예시 답 글자색 */
+const ANSWER_COLOR = "1F4E9F";
 
 const line = (color: string, size = 4, style: (typeof BorderStyle)[keyof typeof BorderStyle] = BorderStyle.SINGLE): IBorderOptions => ({ style, size, color });
 const none: IBorderOptions = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
@@ -85,7 +88,7 @@ function dataUrlBytes(url: string): { data: Uint8Array; type: "png" | "jpg" } | 
 }
 
 /** 머리칸: [로고] 설계 이름 / 단원·차시 / 학습문제 */
-function headerTable(doc: DesignDoc, sheet: Worksheet, unitName: string, logo: string): Table {
+function headerTable(doc: DesignDoc, sheet: Worksheet, unitName: string, logo: string, teacher = false): Table {
   const img = logo ? dataUrlBytes(logo) : null;
   const logoW = img ? cm(2.1) : 0;
   const labelW = cm(2.0);
@@ -103,7 +106,7 @@ function headerTable(doc: DesignDoc, sheet: Worksheet, unitName: string, logo: s
     );
   const r1 = [
     ...(img ? [logoCell("restart")] : []),
-    cell([para(doc.basic.name, { font: HEAD, bold: true, size: 13, align: AlignmentType.CENTER })], { span: 4, borders: b }),
+    cell([para(teacher ? `${doc.basic.name} (교사용 예시 답안)` : doc.basic.name, { font: HEAD, bold: true, size: 13, align: AlignmentType.CENTER, color: teacher ? ANSWER_COLOR : undefined })], { span: 4, borders: b }),
   ];
   const r2 = [
     ...(img ? [logoCell("continue")] : []),
@@ -157,11 +160,13 @@ function blockContent(b: WorksheetBlock, color: { line: string; fill: string }):
       ];
     }
     case "box":
-      return [table([row([cell([], { width: INNER_W })], BOX_HEIGHT_CM[b.size ?? "medium"])], [INNER_W], grid)];
+      return [table([row([cell([], { width: INNER_W })], BOX_HEIGHT_CM[b.size ?? "medium"] + (b.stretchCm ?? 0))], [INNER_W], grid)];
     case "numbered":
       return [
         table(
-          Array.from({ length: b.count ?? 3 }, (_, i) => row([cell([para(`${i + 1}.`, { font: HEAD, bold: true })], { width: INNER_W, top: true })], ROW_CM.numbered)),
+          Array.from({ length: b.count ?? 3 }, (_, i) =>
+            row([cell([para(`${i + 1}.`, { font: HEAD, bold: true })], { width: INNER_W, top: true })], ROW_CM.numbered + (b.stretchCm ?? 0) / (b.count ?? 3)),
+          ),
           [INNER_W],
           grid,
         ),
@@ -194,9 +199,10 @@ function blockContent(b: WorksheetBlock, color: { line: string; fill: string }):
   }
 }
 
-/** 활동지 한 장 */
-function sheetChildren(doc: DesignDoc, sheet: Worksheet, first: boolean): (Paragraph | Table)[] {
+/** 활동지 한 장. teacher: 교사용 예시 답안 (물음 아래에 예시 답을 파란 글씨로, 남는 공간 채우기는 하지 않음) */
+function sheetChildren(doc: DesignDoc, original: Worksheet, first: boolean, teacher = false): (Paragraph | Table)[] {
   const st = doc.worksheets!.settings;
+  const sheet = !teacher && st.fillPage !== false ? fillSheet(original) : original;
   const color = WORKSHEET_COLORS[st.color] ?? WORKSHEET_COLORS.black;
   const slot = lessonSlots(doc).find((s) => s.no === sheet.no);
   const unitName = slot ? unitTitle(slot.unitName, slot.unitIndex) : "";
@@ -205,13 +211,14 @@ function sheetChildren(doc: DesignDoc, sheet: Worksheet, first: boolean): (Parag
   sheet.blocks.forEach((b, i) => {
     if (b.title.trim()) body.push(para(`${i + 1}. ${b.title.trim()}`, { before: 10, after: 4 }));
     else body.push(new Paragraph({ spacing: { before: 120 }, children: [] }));
+    if (teacher && b.answer?.trim()) body.push(para(`▶ 예시 답: ${b.answer.trim()}`, { color: ANSWER_COLOR, bold: true, size: 10, after: 3 }));
     body.push(...blockContent(b, color));
   });
   body.push(new Paragraph(""));
   const frame = table([row([cell(body, { width: PAGE_W, top: true })], 22.3)], [PAGE_W], { ...allBorders(line("000000", 8)) });
   return [
     new Paragraph({ pageBreakBefore: !first, spacing: { before: 0, after: 0, line: 40, lineRule: LineRuleType.EXACT }, children: [] }),
-    headerTable(doc, sheet, unitName, st.logo),
+    headerTable(doc, sheet, unitName, st.logo, teacher),
     new Paragraph({
       alignment: AlignmentType.RIGHT,
       spacing: { before: 100, after: 100 },
@@ -266,11 +273,14 @@ function topicTable(doc: DesignDoc, nos: number[]): (Paragraph | Table)[] {
   ];
 }
 
-/** 활동지 묶음 (.docx). nos: 넣을 차시 번호 (없으면 만든 활동지 전부) */
-export function buildWorksheetDocx(doc: DesignDoc, nos?: number[]): Document {
+/**
+ * 활동지 묶음 (.docx). nos: 넣을 차시 번호 (없으면 만든 활동지 전부)
+ * teacher: 교사용 예시 답안 (첫 장 학습 주제 표 없이 활동지마다 예시 답)
+ */
+export function buildWorksheetDocx(doc: DesignDoc, nos?: number[], opts: { teacher?: boolean } = {}): Document {
   const sheets = (doc.worksheets?.sheets ?? []).filter((s) => !nos || nos.includes(s.no)).sort((a, b) => a.no - b.no);
-  const children: (Paragraph | Table)[] = [...topicTable(doc, sheets.map((s) => s.no))];
-  sheets.forEach((s) => children.push(...sheetChildren(doc, s, false)));
+  const children: (Paragraph | Table)[] = opts.teacher ? [] : [...topicTable(doc, sheets.map((s) => s.no))];
+  sheets.forEach((s, i) => children.push(...sheetChildren(doc, s, !!opts.teacher && i === 0, opts.teacher)));
   return new Document({
     styles: { default: { document: { run: { font: BODY, size: 22 } } } },
     sections: [

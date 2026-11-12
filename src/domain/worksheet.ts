@@ -42,6 +42,10 @@ export interface WorksheetBlock {
   text?: string;
   /** box: 크기 */
   size?: BoxSize;
+  /** 교사용 예시 답 (학생 활동지에는 나오지 않고 교사용 답안 파일에만) */
+  answer?: string;
+  /** 남는 공간 채우기로 늘어난 높이(cm, box·numbered). 저장하지 않고 내려받기·미리보기 때만 계산 */
+  stretchCm?: number;
 }
 
 export interface Worksheet {
@@ -81,6 +85,8 @@ export interface WorksheetSettings {
   logo: string;
   /** 차시 번호별 활동 형태 (여러 개, 비면 알아서) */
   forms: Record<string, string[]>;
+  /** 남는 공간을 마지막 쓰기·그리기 칸을 늘려 채우기 (없으면 켜짐, 사용자 결정 2026-11-12) */
+  fillPage?: boolean;
 }
 
 export interface Worksheets {
@@ -140,8 +146,14 @@ export function blankSheet(slot: LessonSlot): Worksheet {
   };
 }
 
-/** 칸 수·줄 수를 앱 범위 안으로 */
+/** 칸 수·줄 수를 앱 범위 안으로 (교사용 예시 답은 그대로 둠) */
 export function normalizeBlock(b: WorksheetBlock): WorksheetBlock {
+  const base = normalizeShape(b);
+  const answer = b.answer?.trim();
+  return answer && b.type !== "list" && b.type !== "example" ? { ...base, answer } : base;
+}
+
+function normalizeShape(b: WorksheetBlock): WorksheetBlock {
   const clamp = (n: number | undefined, lo: number, hi: number, d: number) => Math.max(lo, Math.min(hi, Math.round(n ?? d)));
   const lines = (a?: string[]) => (a ?? []).map((s) => s.trim()).filter(Boolean);
   switch (b.type) {
@@ -193,9 +205,9 @@ export function blockHeightCm(b: WorksheetBlock): number {
     case "grid":
       return t + (b.count ?? 6) * ROW_CM.grid;
     case "box":
-      return t + BOX_HEIGHT_CM[b.size ?? "medium"];
+      return t + BOX_HEIGHT_CM[b.size ?? "medium"] + (b.stretchCm ?? 0);
     case "numbered":
-      return t + (b.count ?? 3) * ROW_CM.numbered;
+      return t + (b.count ?? 3) * ROW_CM.numbered + (b.stretchCm ?? 0);
     case "list":
       return t + (b.items?.length ?? 0) * 0.65;
     case "storyboard":
@@ -209,6 +221,37 @@ export function blockHeightCm(b: WorksheetBlock): number {
 
 export function sheetHeightCm(s: Worksheet): number {
   return (s.lead.trim() ? 1.0 : 0) + s.blocks.reduce((sum, b) => sum + blockHeightCm(b) + 0.5, 0);
+}
+
+/** 교사용 답안에서 예시 답 한 줄의 높이 (대략) */
+export const answerHeightCm = (b: WorksheetBlock) => (b.answer?.trim() ? Math.ceil(b.answer.trim().length / 45) * 0.6 + 0.3 : 0);
+
+/** 남는 공간 채우기로 늘릴 수 있는 칸 (쓰기·그리기 칸) */
+const STRETCHY: BlockType[] = ["lines", "box", "columns", "grid", "numbered"];
+
+/**
+ * A4에 남는 공간을 마지막 쓰기·그리기 칸을 늘려 채운 활동지 (내려받기·미리보기용, 저장하지 않음).
+ * 줄·원고지·표는 줄을 더하고, 상자·번호 상자는 높이를 늘린다. 이미 꽉 찼거나 늘릴 칸이 없으면 그대로.
+ */
+export function fillSheet(s: Worksheet, margin = 0.4): Worksheet {
+  const i = s.blocks.map((b) => STRETCHY.includes(b.type)).lastIndexOf(true);
+  const space = BODY_CM - margin - sheetHeightCm(s);
+  if (i === -1 || space < 0.8) return s;
+  const b = { ...s.blocks[i] };
+  switch (b.type) {
+    case "lines":
+      b.count = (b.count ?? 4) + Math.floor(space / ROW_CM.line);
+      break;
+    case "grid":
+      b.count = (b.count ?? 6) + Math.floor(space / ROW_CM.grid);
+      break;
+    case "columns":
+      b.count = (b.count ?? 3) + Math.floor(space / ROW_CM.column);
+      break;
+    default:
+      b.stretchCm = (b.stretchCm ?? 0) + space;
+  }
+  return { ...s, blocks: s.blocks.map((x, k) => (k === i ? b : x)) };
 }
 
 /** 활동지 점검 (코드가 검사). 활동지는 선택 단계라 설계 문서 오류에는 넣지 않는다. */

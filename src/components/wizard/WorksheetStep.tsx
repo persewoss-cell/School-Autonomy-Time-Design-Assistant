@@ -10,6 +10,7 @@ import {
   BOX_SIZES,
   blankSheet,
   emptyWorksheets,
+  fillSheet,
   GROUPINGS,
   lessonSlots,
   NO_SHEET,
@@ -65,12 +66,12 @@ export function WorksheetStep({ doc, setDoc, onBack }: StepProps) {
   const unitSheets = ws.sheets.filter((s) => unitNos.includes(s.no)).sort((a, b) => a.no - b.no);
   const setSheet = (no: number, fn: (s: Worksheet) => void) => update((w) => fn(w.sheets.find((s) => s.no === no)!));
 
-  const download = async (nos?: number[], suffix = "전체") => {
-    const blob = await Packer.toBlob(buildWorksheetDocx(doc, nos));
+  const download = async (nos?: number[], suffix = "전체", teacher = false) => {
+    const blob = await Packer.toBlob(buildWorksheetDocx(doc, nos, { teacher }));
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${doc.basic.name || "활동지"}_활동지_${suffix}.docx`;
+    a.download = `${doc.basic.name || "활동지"}_${teacher ? "교사용 예시 답안" : "활동지"}_${suffix}.docx`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -88,9 +89,14 @@ export function WorksheetStep({ doc, setDoc, onBack }: StepProps) {
         ]}
         action={
           ws.sheets.length > 0 && (
-            <button type="button" onClick={() => void download()} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
-              전체 활동지 내려받기 ({ws.sheets.length}장)
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => void download()} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
+                전체 활동지 내려받기 ({ws.sheets.length}장)
+              </button>
+              <button type="button" onClick={() => void download(undefined, "전체", true)} className="rounded-lg border-2 border-blue-600 px-4 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+                교사용 예시 답안 내려받기
+              </button>
+            </div>
           )
         }
       />
@@ -131,6 +137,12 @@ export function WorksheetStep({ doc, setDoc, onBack }: StepProps) {
           </div>
         </div>
         <LogoPicker logo={st.logo} onChange={(logo) => update((w) => void (w.settings.logo = logo))} />
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-0.5 h-4 w-4" checked={st.fillPage !== false} onChange={(e) => update((w) => void (w.settings.fillPage = e.target.checked))} />
+          <span>
+            <b>남는 공간 채우기</b> — A4 아래쪽이 비면 마지막 쓰기·그리기 칸(줄·상자·표·원고지)을 늘려 한 장을 채워요. (미리보기·내려받기에 적용, 칸 수 설정은 그대로)
+          </span>
+        </label>
       </Card>
 
       {/* 단원 고르기 */}
@@ -156,13 +168,22 @@ export function WorksheetStep({ doc, setDoc, onBack }: StepProps) {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-bold">{unitTitle(plan.units[unit]?.unitName ?? "", unit)} — 차시별 활동 형태 (선택, 여러 개)</h2>
           {unitSheets.length > 0 && (
-            <button
-              type="button"
-              onClick={() => void download(unitSheets.map((s) => s.no), `${unit + 1}단원`)}
-              className="rounded-lg border-2 border-brand-600 px-4 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-50"
-            >
-              이 단원 활동지 내려받기 ({unitSheets.length}장)
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void download(unitSheets.map((s) => s.no), `${unit + 1}단원`)}
+                className="rounded-lg border-2 border-brand-600 px-4 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-50"
+              >
+                이 단원 활동지 내려받기 ({unitSheets.length}장)
+              </button>
+              <button
+                type="button"
+                onClick={() => void download(unitSheets.map((s) => s.no), `${unit + 1}단원`, true)}
+                className="rounded-lg border border-blue-300 px-3 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+              >
+                교사용 예시 답안
+              </button>
+            </div>
           )}
         </div>
         <p className="text-xs text-gray-500">고르지 않으면 AI가 차시 내용에 맞게 정해요. &lsquo;{NO_SHEET}&rsquo;을 고른 차시는 만들지 않아요.</p>
@@ -225,6 +246,18 @@ export function WorksheetStep({ doc, setDoc, onBack }: StepProps) {
           doc={doc}
           onChange={(fn) => setSheet(s.no, fn)}
           onDelete={() => confirm(`${s.no}차시 활동지를 지울까요?`) && update((w) => void (w.sheets = w.sheets.filter((x) => x.no !== s.no)))}
+          onReplace={(next) => update((w) => void (w.sheets = w.sheets.map((x) => (x.no === next.no ? next : x))))}
+          onCopyTo={(no) => {
+            const target = slots.find((x) => x.no === no);
+            if (!target) return;
+            if (ws.sheets.some((x) => x.no === no) && !confirm(`${no}차시에는 이미 활동지가 있어요. 이 활동지로 덮어쓸까요?`)) return;
+            update((w) => {
+              const copy: Worksheet = { ...structuredClone(s), no, topic: target.topic };
+              w.sheets = [...w.sheets.filter((x) => x.no !== no), copy].sort((a, b) => a.no - b.no);
+            });
+            if (target.unitIndex !== unit) setUnit(target.unitIndex);
+            alert(`${no}차시로 복사했어요. 학습문제와 물음을 그 차시에 맞게 고쳐 주세요.`);
+          }}
         />
       ))}
 
@@ -276,8 +309,28 @@ function LogoPicker({ logo, onChange }: { logo: string; onChange: (v: string) =>
 const lines = (v: string) => v.split("\n");
 const linesText = (a?: string[]) => (a ?? []).join("\n");
 
-function SheetEditor({ sheet, doc, onChange, onDelete }: { sheet: Worksheet; doc: StepProps["doc"]; onChange: (fn: (s: Worksheet) => void) => void; onDelete: () => void }) {
+function SheetEditor({
+  sheet,
+  doc,
+  onChange,
+  onDelete,
+  onReplace,
+  onCopyTo,
+}: {
+  sheet: Worksheet;
+  doc: StepProps["doc"];
+  onChange: (fn: (s: Worksheet) => void) => void;
+  onDelete: () => void;
+  /** '이 차시만 다시 받기'로 받은 활동지로 바꾸기 */
+  onReplace: (s: Worksheet) => void;
+  /** 다른 차시로 복사 */
+  onCopyTo: (no: number) => void;
+}) {
   const issues = worksheetIssues(doc, sheet);
+  const slots = lessonSlots(doc);
+  const unitIndex = slots.find((x) => x.no === sheet.no)?.unitIndex ?? 0;
+  const [redo, setRedo] = useState(false);
+  const [copyTo, setCopyTo] = useState("");
   const setBlock = (i: number, patch: Partial<WorksheetBlock>) => onChange((s) => void (s.blocks[i] = { ...s.blocks[i], ...patch }));
   const move = (i: number, d: -1 | 1) =>
     onChange((s) => {
@@ -293,13 +346,54 @@ function SheetEditor({ sheet, doc, onChange, onDelete }: { sheet: Worksheet; doc
         </h3>
         <div className="flex items-center gap-3 text-sm">
           <span className={sheetHeightCm(sheet) > BODY_CM ? "font-semibold text-red-600" : "text-gray-400"}>
-            쪽 채움 {Math.round((sheetHeightCm(sheet) / BODY_CM) * 100)}%
+            내용 {Math.round((sheetHeightCm(sheet) / BODY_CM) * 100)}%
+            {doc.worksheets?.settings.fillPage !== false && sheetHeightCm(sheet) <= BODY_CM && " · 남는 공간 자동 채움"}
+          </span>
+          <button type="button" onClick={() => setRedo(!redo)} className="font-semibold text-brand-700 hover:underline">
+            {redo ? "다시 받기 닫기" : "이 차시만 AI에게 다시 받기"}
+          </button>
+          <span className="flex items-center gap-1">
+            <select className="rounded border border-gray-300 px-1 py-0.5 text-xs" value={copyTo} onChange={(e) => setCopyTo(e.target.value)} aria-label="복사할 차시">
+              <option value="">다른 차시로 복사…</option>
+              {slots
+                .filter((x) => x.no !== sheet.no)
+                .map((x) => (
+                  <option key={x.no} value={x.no}>
+                    {slotLabel(x.no, doc)} {x.topic.slice(0, 18)}
+                  </option>
+                ))}
+            </select>
+            <button
+              type="button"
+              disabled={!copyTo}
+              onClick={() => {
+                onCopyTo(Number(copyTo));
+                setCopyTo("");
+              }}
+              className="rounded border border-gray-300 px-2 py-0.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:text-gray-300"
+            >
+              복사
+            </button>
           </span>
           <button type="button" onClick={onDelete} className="text-gray-400 hover:text-red-600">
             활동지 삭제
           </button>
         </div>
       </div>
+      {redo && (
+        <AiAssist
+          doc={doc}
+          step={worksheetPrompt(unitIndex, [sheet.no])}
+          title={`${slotLabel(sheet.no, doc)} 활동지만 AI에게 다시 받기`}
+          hasContent
+          defaultOpen
+          onApply={(sheets) => {
+            const next = sheets.find((x) => x.no === sheet.no);
+            if (next) onReplace(next);
+            setRedo(false);
+          }}
+        />
+      )}
       {issues.length > 0 && (
         <ul className="space-y-1">
           {issues.map((m) => (
@@ -345,6 +439,14 @@ function SheetEditor({ sheet, doc, onChange, onDelete }: { sheet: Worksheet; doc
               </div>
               <input className={inputClass} placeholder="물음·지시 (예: 책의 표지를 살펴보세요.)" value={b.title} onChange={(e) => setBlock(i, { title: e.target.value })} />
               <BlockFields b={b} set={(p) => setBlock(i, p)} />
+              {b.type !== "list" && b.type !== "example" && (
+                <input
+                  className={`${inputClass} border-blue-200 text-sm text-blue-900`}
+                  placeholder="교사용 예시 답 (선택, 교사용 답안에만 나와요)"
+                  value={b.answer ?? ""}
+                  onChange={(e) => setBlock(i, { answer: e.target.value })}
+                />
+              )}
             </div>
           ))}
           <button
@@ -423,8 +525,10 @@ function BlockFields({ b, set }: { b: WorksheetBlock; set: (p: Partial<Worksheet
 }
 
 /** 화면 미리보기 (docx와 같은 모양을 대략. 1cm = 14px) */
-function SheetPreview({ sheet, doc }: { sheet: Worksheet; doc: StepProps["doc"] }) {
+function SheetPreview({ sheet: original, doc }: { sheet: Worksheet; doc: StepProps["doc"] }) {
   const st = (doc.worksheets ?? emptyWorksheets()).settings;
+  // 내려받을 때와 같게: 남는 공간 채우기
+  const sheet = st.fillPage !== false ? fillSheet(original) : original;
   const color = WORKSHEET_COLORS[st.color] ?? WORKSHEET_COLORS.black;
   const line = `#${color.line}`;
   const fill = `#${color.fill}`;
@@ -480,10 +584,10 @@ function SheetPreview({ sheet, doc }: { sheet: Worksheet; doc: StepProps["doc"] 
           </div>
         );
       case "box":
-        return <div style={{ ...cellBorder, height: px(BOX_HEIGHT_CM[b.size ?? "medium"]) }} />;
+        return <div style={{ ...cellBorder, height: px(BOX_HEIGHT_CM[b.size ?? "medium"] + (b.stretchCm ?? 0)) }} />;
       case "numbered":
         return Array.from({ length: b.count ?? 3 }, (_, i) => (
-          <div key={i} className="p-1 font-bold" style={{ ...cellBorder, height: px(ROW_CM.numbered), marginTop: i ? -1 : 0 }}>
+          <div key={i} className="p-1 font-bold" style={{ ...cellBorder, height: px(ROW_CM.numbered + (b.stretchCm ?? 0) / (b.count ?? 3)), marginTop: i ? -1 : 0 }}>
             {i + 1}.
           </div>
         ));

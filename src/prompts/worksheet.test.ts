@@ -3,7 +3,7 @@ import { Packer } from "docx";
 import JSZip from "jszip";
 import { seedDesigns } from "@/server/seed";
 import type { DesignDoc } from "@/domain/types";
-import { blankSheet, emptyWorksheets, lessonSlots, NO_SHEET, normalizeBlock, sheetHeightCm, worksheetIssues } from "@/domain/worksheet";
+import { BODY_CM, blankSheet, emptyWorksheets, fillSheet, lessonSlots, NO_SHEET, normalizeBlock, sheetHeightCm, worksheetIssues } from "@/domain/worksheet";
 import { buildWorksheetDocx } from "@/export/worksheetDocx";
 import { buildWorksheetPrompt, parseWorksheets, unitSlots, worksheetPrompt } from "./worksheet";
 
@@ -147,5 +147,46 @@ describe("차시별 활동지", () => {
     d.worksheets!.sheets = [s];
     d.worksheets!.settings.forms = { [String(s.no)]: [NO_SHEET] };
     expect(worksheetIssues(d, s).join()).toContain(NO_SHEET);
+  });
+
+  it("남는 공간 채우기: 마지막 쓰기·그리기 칸만 늘려 A4 거의 가득, 이미 차면 그대로", () => {
+    const base = { no: 1, topic: "t", problem: "p", lead: "", blocks: [normalizeBlock({ type: "lines", title: "써요", count: 3 }), normalizeBlock({ type: "selfcheck", title: "평가", rows: ["a"] })] };
+    const f = fillSheet(base);
+    expect(f.blocks[0].count).toBeGreaterThan(3);
+    expect(f.blocks[1]).toEqual(base.blocks[1]);
+    expect(sheetHeightCm(f)).toBeLessThanOrEqual(BODY_CM);
+    expect(sheetHeightCm(f)).toBeGreaterThan(BODY_CM - 2);
+    const box = fillSheet({ ...base, blocks: [normalizeBlock({ type: "box", title: "그려요", size: "small" })] });
+    expect(box.blocks[0].stretchCm).toBeGreaterThan(5);
+    const list = { ...base, blocks: [normalizeBlock({ type: "list", title: "", items: ["a"] })] };
+    expect(fillSheet(list)).toBe(list);
+    const full = { ...base, lead: "안내", blocks: [normalizeBlock({ type: "lines", title: "물음", count: 20 })] }; // 20.5cm
+    expect(fillSheet(full).blocks[0].count).toBe(20);
+  });
+
+  it("교사용 예시 답: 답에서 읽고, 교사용 파일에만 들어감", async () => {
+    const d = design();
+    const slot = unitSlots(d, 0)[0];
+    const r = parseWorksheets(answer({ sheets: [{ lesson: slot.no, problem: "p", blocks: [{ type: "lines", title: "써요", count: 3, answer: "예시로 이렇게 쓴다." }, { type: "list", title: "", items: ["a"], answer: "없어야 함" }] }] }), d, 0);
+    expect(r.ok && r.data[0].blocks[0].answer).toBe("예시로 이렇게 쓴다.");
+    expect(r.ok && r.data[0].blocks[1].answer).toBeUndefined();
+    if (!r.ok) return;
+    d.worksheets!.sheets = r.data;
+    const xml = async (teacher: boolean) => (await JSZip.loadAsync(await Packer.toBuffer(buildWorksheetDocx(d, undefined, { teacher })))).file("word/document.xml")!.async("string");
+    expect(await xml(true)).toContain("예시 답: 예시로 이렇게 쓴다.");
+    expect(await xml(true)).toContain("교사용 예시 답안");
+    expect(await xml(false)).not.toContain("예시로 이렇게 쓴다.");
+    expect(buildWorksheetPrompt(d, 0)).toContain('"answer"');
+  });
+
+  it("이 차시만 다시 받기: 그 차시만 프롬프트에 넣고, 번호가 달라도 그 차시로", () => {
+    const d = design();
+    const target = unitSlots(d, 0)[2];
+    const p = buildWorksheetPrompt(d, 0, [target.no]);
+    expect(p).toContain(`### ${target.no}차시`);
+    expect(p.match(/^### \d+차시/gm)).toHaveLength(1);
+    expect(p).toContain("이 차시만 다시 만듭니다");
+    const r = worksheetPrompt(0, [target.no]).parse(answer({ sheets: [{ lesson: 1, problem: "새 문제", blocks: [{ type: "box", title: "그려요" }] }] }), d);
+    expect(r.ok && r.data.map((s) => s.no)).toEqual([target.no]);
   });
 });

@@ -28,9 +28,9 @@ const EXAMPLE = `{
       "problem": "책 표지를 살펴보고 내용을 예상하여 봅시다.",
       "lead": "자신이 고른 책의 표지를 살펴보고 어떤 이야기일지 예상해 봅시다.",
       "blocks": [
-        { "type": "labels", "title": "책의 표지에 어떤 내용이 있는지 살펴보세요.", "rows": ["제목", "글쓴이", "그린이", "출판사"] },
-        { "type": "lines", "title": "책 앞표지의 배경에는 어떤 장면이 그려져 있나요?", "count": 2 },
-        { "type": "box", "title": "책 표지를 따라 그려 봅시다.", "size": "medium" }
+        { "type": "labels", "title": "책의 표지에 어떤 내용이 있는지 살펴보세요.", "rows": ["제목", "글쓴이", "그린이", "출판사"], "answer": "제목·글쓴이·그린이·출판사를 표지에서 찾아 그대로 적는다." },
+        { "type": "lines", "title": "책 앞표지의 배경에는 어떤 장면이 그려져 있나요?", "count": 2, "answer": "바닷가 마을 앞바다에 고래가 헤엄치는 장면이 그려져 있다." },
+        { "type": "box", "title": "책 표지를 따라 그려 봅시다.", "size": "medium", "answer": "표지의 주인공과 배경을 살려 그린다." }
       ]
     }
   ]
@@ -64,13 +64,15 @@ ${s.assessment ? `- 과정중심평가: ${s.assessment}\n` : ""}- 원하는 활�
 }
 
 /** 이 단원에서 활동지를 만들 차시 ('활동지 없음'을 고른 차시는 뺌) */
-export function unitSlots(doc: DesignDoc, unitIndex: number): LessonSlot[] {
+export function unitSlots(doc: DesignDoc, unitIndex: number, only?: number[]): LessonSlot[] {
   const forms = doc.worksheets?.settings.forms ?? {};
+  // only: '이 차시만 다시 받기' (활동지 없음을 골랐어도 직접 고른 차시는 넣음)
+  if (only) return lessonSlots(doc).filter((s) => s.unitIndex === unitIndex && only.includes(s.no));
   return lessonSlots(doc).filter((s) => s.unitIndex === unitIndex && !(forms[String(s.no)] ?? []).includes(NO_SHEET));
 }
 
-export function buildWorksheetPrompt(doc: DesignDoc, unitIndex: number): string {
-  const slots = unitSlots(doc, unitIndex);
+export function buildWorksheetPrompt(doc: DesignDoc, unitIndex: number, only?: number[]): string {
+  const slots = unitSlots(doc, unitIndex, only);
   const st = doc.worksheets?.settings;
   const kind = doc.basic.type === "subject" ? "과목" : "활동";
   const unit = doc.plan.selected?.units[unitIndex];
@@ -87,7 +89,8 @@ ${BLOCK_KEYS.map((k) => `  - ${BLOCK_GUIDE[k]}`).join("\n")}
 - 한 장에 칸은 2~4개. **A4 한 장(본문 약 ${BODY_CM}cm)을 넘지 않게** 줄 수·상자 크기를 정합니다. (큰 상자 13cm, 보통 8cm, 줄 하나 0.9cm)
 - problem은 '~해 봅시다.'로 끝나는 한 문장, lead는 학생의 흥미를 끄는 한 문장(선택, 없으면 "").
 - 사용 자료가 있으면 물음에 자료 이름을 구체적으로 넣습니다 (예: 「고래는 왜 돌아왔을까?」).
-- 학생 개인정보를 적게 하는 칸(주소·전화번호 등)은 만들지 않습니다.
+- 학생 개인정보를 적게 하는 칸(주소·전화번호 등)은 만들지 않습니다. 이름·반·번호 칸도 프로그램이 넣으므로 만들지 않습니다.
+- 칸마다 "answer"에 **교사용 예시 답**을 한두 문장으로 씁니다 (학생 활동지에는 나오지 않고 교사용 답안에만 들어감). 정답이 없는 칸은 '이렇게 쓰면 잘한 것'의 예를 씁니다. list·example 칸은 answer를 쓰지 않습니다.
 ${COMMON_RULES}
 
 ## 학년 수준
@@ -98,7 +101,7 @@ ${gradeGuide(doc.basic.grade)}
 - 학생 수준·특성: ${st?.learners.trim() || "(없음)"}
 - 활동 방식: ${st?.grouping || "(알아서: 차시 내용에 맞게 개인·짝·모둠)"}
 
-## 활동지를 만들 차시 (${slots.length}장)
+## 활동지를 만들 차시 (${slots.length}장)${only ? " — 이 차시만 다시 만듭니다" : ""}
 ${lessonBlock(doc, slots)}
 
 ## 답하는 형식 (아주 중요)
@@ -183,7 +186,7 @@ function rawSheets(text: string): { list: Obj[]; broken: boolean; joined: number
   return { list, broken, joined };
 }
 
-export function parseWorksheets(text: string, doc: DesignDoc, unitIndex: number): AiParse<Worksheet[]> {
+export function parseWorksheets(text: string, doc: DesignDoc, unitIndex: number, only?: number[]): AiParse<Worksheet[]> {
   if (!text.trim()) return { ok: false, error: "붙여 넣은 내용이 없습니다." };
   const { list: raw, broken, joined } = rawSheets(text);
   if (raw.length === 0) {
@@ -193,7 +196,7 @@ export function parseWorksheets(text: string, doc: DesignDoc, unitIndex: number)
     };
   }
 
-  const slots = unitSlots(doc, unitIndex);
+  const slots = unitSlots(doc, unitIndex, only);
   const notes: string[] = [];
   if (joined) notes.push("끊겨서 이어 받은 답을 이어 붙여 읽었어요.");
   if (broken) notes.push("읽지 못한 조각이 있어요. 답이 중간에 끊겼다면 같은 대화창에 '이어서'를 보내고 이어진 답까지 붙여 넣으세요.");
@@ -234,6 +237,7 @@ export function parseWorksheets(text: string, doc: DesignDoc, unitIndex: number)
           items: toList(b.items),
           text: str(b.text),
           size: boxSize(b.size),
+          answer: str(b.answer ?? b.예시답 ?? b.example_answer),
         }),
       ];
     });
@@ -253,13 +257,13 @@ export function parseWorksheets(text: string, doc: DesignDoc, unitIndex: number)
 }
 
 /** AiAssist에 넘길 단원별 프롬프트 */
-export function worksheetPrompt(unitIndex: number): StepPrompt<Worksheet[]> {
+export function worksheetPrompt(unitIndex: number, only?: number[]): StepPrompt<Worksheet[]> {
   return {
-    build: (doc) => buildWorksheetPrompt(doc, unitIndex),
-    parse: (text, doc) => parseWorksheets(text, doc, unitIndex),
+    build: (doc) => buildWorksheetPrompt(doc, unitIndex, only),
+    parse: (text, doc) => parseWorksheets(text, doc, unitIndex, only),
     reminder: () => `- 칸 종류(type)는 ${BLOCK_KEYS.join(", ")} 중에서만 고릅니다.\n- "lesson"에는 차시 번호(숫자)를 넣습니다.`,
     followUp: (sheets, doc) => {
-      const missing = unitSlots(doc, unitIndex).filter((s) => !sheets.some((x) => x.no === s.no));
+      const missing = unitSlots(doc, unitIndex, only).filter((s) => !sheets.some((x) => x.no === s.no));
       if (!missing.length) return null;
       return {
         title: `${missing.map((s) => s.no).join(", ")}차시 활동지가 빠졌어요`,
