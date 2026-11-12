@@ -1,6 +1,7 @@
 "use client";
 
 import { hwpxSectionText, sortSections } from "./textLayout";
+import { fileKind, notHwpxMessage } from "./fileKind";
 
 export interface ReadResult {
   text: string;
@@ -20,7 +21,18 @@ export async function readDocument(file: File): Promise<ReadResult> {
 
 async function readHwpx(file: File): Promise<ReadResult> {
   const JSZip = (await import("jszip")).default;
-  const zip = await JSZip.loadAsync(await file.arrayBuffer());
+  const buf = await file.arrayBuffer();
+  // 이름만 .hwpx인 파일(예전 hwp, 암호·문서보안이 걸린 파일 등)은 원인을 알려 준다
+  const kind = fileKind(new Uint8Array(buf.slice(0, 8)));
+  if (kind !== "zip") throw new Error(notHwpxMessage(kind));
+  let zip: Awaited<ReturnType<typeof JSZip.loadAsync>>;
+  try {
+    zip = await JSZip.loadAsync(buf);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (/encrypt/i.test(msg)) throw new Error("암호가 걸린 한글 파일이에요. 한글에서 [보안] → 문서 암호를 해제하고 다시 저장해 올려 주세요.");
+    throw new Error(notHwpxMessage("unknown"));
+  }
   const sections = sortSections(Object.keys(zip.files));
   if (sections.length === 0) throw new Error("한글(hwpx) 파일의 본문을 찾지 못했어요. 파일이 손상되지 않았는지 확인해 주세요.");
   const texts: string[] = [];
