@@ -113,4 +113,39 @@ describe("차시별 활동지", () => {
     expect(xml1).not.toContain("표지를 살펴봅시다.");
     expect(xml1).toContain("둘째 시간입니다.");
   });
+
+  it("AI 답이 흐트러져도 읽기 (시뮬레이션에서 찾은 경우들)", () => {
+    const d = design();
+    const slots = unitSlots(d, 1);
+    const sheet = (no: number, extra: Record<string, unknown> = {}) => ({ lesson: no, problem: "학습문제: 알아봅시다.", blocks: [{ type: "labels", title: "1. 정리해 봅시다.", rows: "알게 된 점, 이름, 반" }, { type: "그림 그리기", title: "② 그려요", size: "크게" }, { type: "체크리스트", title: "평가", rows: ["참여"] }], ...extra });
+    // 차시마다 코드 블록 따로 + 주석 + 단원 안에서 1부터 다시 센 번호
+    const text = slots.map((s, i) => "```json\n// 활동지\n" + JSON.stringify(sheet(i + 1)) + "\n```").join("\n\n");
+    const r = parseWorksheets(text, d, 1);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data.map((s) => s.no)).toEqual(slots.map((s) => s.no));
+    expect(r.notes.join()).toContain("순서대로");
+    const s0 = r.data[0];
+    expect(s0.problem).toBe("알아봅시다.");
+    expect(s0.blocks.map((b) => b.type)).toEqual(["labels", "box", "selfcheck"]);
+    expect(s0.blocks[0]).toMatchObject({ title: "정리해 봅시다.", rows: ["알게 된 점"] });
+    expect(s0.blocks[1]).toMatchObject({ title: "그려요", size: "large" });
+    expect(r.notes.join()).toContain("이름·반·번호");
+    // worksheets 키 / 맨 바깥 배열 / '이어서'로 받은 두 조각
+    expect(parseWorksheets(answer({ worksheets: slots.map((s) => sheet(s.no)) }), d, 1).ok).toBe(true);
+    const arr = parseWorksheets(answer(slots.map((s) => sheet(s.no))), d, 1);
+    expect(arr.ok && arr.notes.join()).not.toContain("읽지 못한 조각");
+    const whole = JSON.stringify({ sheets: slots.map((s) => sheet(s.no)) }, null, 2);
+    const cut = Math.floor(whole.length / 2);
+    const two = parseWorksheets("```json\n" + whole.slice(0, cut) + "\n```\n이어서\n```json\n" + whole.slice(cut - 15) + "\n```", d, 1);
+    expect(two.ok && two.data.length).toBe(slots.length);
+  });
+
+  it("'활동지 없음'으로 바꾼 차시에 활동지가 남아 있으면 알림", () => {
+    const d = design();
+    const s = blankSheet(lessonSlots(d)[0]);
+    d.worksheets!.sheets = [s];
+    d.worksheets!.settings.forms = { [String(s.no)]: [NO_SHEET] };
+    expect(worksheetIssues(d, s).join()).toContain(NO_SHEET);
+  });
 });

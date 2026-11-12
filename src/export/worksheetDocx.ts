@@ -229,12 +229,22 @@ function topicTable(doc: DesignDoc, nos: number[]): (Paragraph | Table)[] {
   const widths = [cm(3.6), PAGE_W - cm(3.6) - cm(2.2) - cm(2.2), cm(2.2), cm(2.2)];
   const b = allBorders(line("000000", 4));
   const dotted = line("000000", 4, BorderStyle.DOTTED);
-  const head = ["단원명", "학습주제", "차시", "비고"].map((t, i) => cell([para(t, { font: HEAD, bold: true, align: AlignmentType.CENTER })], { width: widths[i], fill: color.fill, borders: b }));
+  // 한 쪽에 들어가게: 차시가 많거나 학습주제가 길면 글자·줄 높이를 줄인다 (본문 약 23cm)
+  const topicText = (s: (typeof slots)[number]) => `· ${s.topic}${s.parts > 1 ? ` (${s.part}/${s.parts})` : ""}`;
+  const topicW = (widths[1] - 200) / 567; // cm
+  const fit = (size: number, minRow: number) =>
+    slots.reduce((h, s) => {
+      const perLine = Math.floor((topicW * 28.35) / size); // 한글 한 글자 폭 ≈ 글자 크기(pt)
+      const lines = Math.max(1, Math.ceil(topicText(s).length / perLine));
+      return h + Math.max(minRow, (lines * size * 1.25) / 28.35 + 0.15);
+    }, 0.8);
+  const [fontSize, rowH] = ([[11, 0.75], [10, 0.65], [9.5, 0.6], [9, 0.55], [8.5, 0.5], [8, 0.48]] as const).find(([f, r]) => fit(f, r) <= 23) ?? [8, 0.48];
+  const head = ["단원명", "학습주제", "차시", "비고"].map((t, i) => cell([para(t, { font: HEAD, bold: true, align: AlignmentType.CENTER, size: fontSize })], { width: widths[i], fill: color.fill, borders: b }));
   const rows = slots.map((s, i) => {
     const firstOfUnit = i === 0 || slots[i - 1].unitIndex !== s.unitIndex;
     const lastOfUnit = i === slots.length - 1 || slots[i + 1].unitIndex !== s.unitIndex;
     const cb = { ...b, top: firstOfUnit ? b.top : dotted, bottom: lastOfUnit ? b.bottom : dotted };
-    const unitCell = cell(firstOfUnit ? [para(unitTitle(s.unitName, s.unitIndex), { align: AlignmentType.CENTER })] : [], {
+    const unitCell = cell(firstOfUnit ? [para(unitTitle(s.unitName, s.unitIndex), { align: AlignmentType.CENTER, size: fontSize })] : [], {
       width: widths[0],
       vMerge: firstOfUnit ? "restart" : "continue",
       borders: { ...b, top: b.top, bottom: b.bottom },
@@ -242,11 +252,11 @@ function topicTable(doc: DesignDoc, nos: number[]): (Paragraph | Table)[] {
     return row(
       [
         unitCell,
-        cell([para(`· ${s.topic}${s.parts > 1 ? ` (${s.part}/${s.parts})` : ""}`)], { width: widths[1], borders: cb }),
-        cell([para(slotLabel(s.no, doc), { align: AlignmentType.CENTER })], { width: widths[2], borders: cb }),
+        cell([para(topicText(s), { size: fontSize })], { width: widths[1], borders: cb }),
+        cell([para(slotLabel(s.no, doc), { align: AlignmentType.CENTER, size: fontSize })], { width: widths[2], borders: cb }),
         cell([], { width: widths[3], borders: cb }),
       ],
-      0.75,
+      rowH,
     );
   });
   return [

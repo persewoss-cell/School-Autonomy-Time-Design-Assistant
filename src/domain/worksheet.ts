@@ -212,11 +212,12 @@ export function sheetHeightCm(s: Worksheet): number {
 }
 
 /** 활동지 점검 (코드가 검사). 활동지는 선택 단계라 설계 문서 오류에는 넣지 않는다. */
-export function worksheetIssues(doc: Pick<DesignDoc, "plan" | "basic">, sheet: Worksheet): string[] {
+export function worksheetIssues(doc: Pick<DesignDoc, "plan" | "basic" | "worksheets">, sheet: Worksheet): string[] {
   const out: string[] = [];
   const slot = lessonSlots(doc).find((s) => s.no === sheet.no);
   if (!slot) out.push("단원 지도계획에 이 차시가 없어요. (차시 수가 바뀌었어요) 지우거나 다시 만들어 주세요.");
   else if (slot.topic !== sheet.topic) out.push(`단원 지도계획의 학습주제가 바뀌었어요 (지금: ${slot.topic}). 내용이 맞는지 확인하거나 다시 만들어 주세요.`);
+  if ((doc.worksheets?.settings.forms[String(sheet.no)] ?? []).includes(NO_SHEET)) out.push(`이 차시는 '${NO_SHEET}'으로 골랐는데 활동지가 남아 있어요. 필요 없으면 '활동지 삭제'를 눌러 주세요.`);
   if (!sheet.problem.trim()) out.push("학습문제가 비어 있어요.");
   if (sheet.blocks.length === 0) out.push("활동 칸이 하나도 없어요.");
   if (sheetHeightCm(sheet) > BODY_CM) out.push("내용이 많아 A4 한 장을 넘을 수 있어요. 줄 수·상자 크기를 줄여 주세요.");

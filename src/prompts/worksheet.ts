@@ -13,6 +13,7 @@ import {
   type WorksheetBlock,
 } from "@/domain/worksheet";
 import { COMMON_RULES, extractJson, gradeGuide, toList, type AiParse } from "./common";
+import { extractJsonBlocks, stripJsonComments } from "./importDoc";
 import type { StepPrompt } from "./steps";
 
 /**
@@ -116,63 +117,136 @@ const num = (v: unknown) => {
   const m = (typeof v === "number" ? String(v) : str(v)).match(/\d+/);
   return m ? Number(m[0]) : undefined;
 };
-/** AI가 한국어 이름으로 답해도 받아 준다 */
-const TYPE_ALIASES: Record<string, BlockType> = Object.fromEntries([
-  ...BLOCK_KEYS.map((k) => [k, k]),
-  ...BLOCK_KEYS.map((k) => [BLOCK_TYPES[k], k]),
-  ["table", "columns"],
-  ["text", "lines"],
-  ["drawing", "box"],
-  ["draw", "box"],
-]);
+const squash = (t: string) => t.toLowerCase().replace(/[\s_\-·]/g, "");
+/** AI가 한국어·다른 이름으로 답해도 받아 준다 (앞에서부터 먼저 맞는 것) */
+const TYPE_WORDS: [BlockType, string[]][] = [
+  ["selfcheck", ["selfcheck", "selfassessment", "checklist", "자기평가", "스스로평가", "평가표", "체크리스트", "점검표"]],
+  ["storyboard", ["storyboard", "comic", "스토리보드", "만화", "그림판", "장면", "칸나눈"]],
+  ["grid", ["grid", "manuscript", "원고지"]],
+  ["example", ["example", "sample", "예시", "예문", "본보기"]],
+  ["numbered", ["numbered", "번호"]],
+  ["labels", ["labels", "label", "항목", "빈칸표", "항목표"]],
+  ["columns", ["columns", "column", "table", "여러열", "표"]],
+  ["list", ["list", "steps", "안내", "목록", "순서", "방법"]],
+  ["box", ["box", "drawing", "draw", "picture", "image", "그림", "그리기", "상자", "자유"]],
+  ["lines", ["lines", "line", "text", "writing", "쓰는줄", "줄", "쓰기", "글쓰기"]],
+];
+function blockType(v: unknown): BlockType | null {
+  const t = squash(str(v));
+  if (!t) return null;
+  const exact = BLOCK_KEYS.find((k) => k === t || squash(BLOCK_TYPES[k]) === t);
+  if (exact) return exact;
+  return TYPE_WORDS.find(([, words]) => words.some((w) => t.includes(w)))?.[0] ?? null;
+}
+function boxSize(v: unknown): WorksheetBlock["size"] {
+  const t = squash(str(v));
+  if (/^(large|big|l|큰|크게|크기큼|대)$/.test(t) || t.includes("크")) return "large";
+  if (/^(small|s|작은|작게|소)$/.test(t) || t.includes("작")) return "small";
+  if (t) return "medium";
+  return undefined;
+}
+/** 항목·열 제목: 배열이 아니라 '제목, 글쓴이'처럼 한 줄로 와도 나눈다 */
+const cells = (v: unknown) => (typeof v === "string" && !v.includes("\n") ? toList(v.split(/[,，/、]/).join("\n")) : toList(v));
+/** 물음 앞에 AI가 붙인 번호(1. ①)는 뗀다 (번호는 프로그램이 붙임) */
+const unnumber = (t: string) => t.replace(/^\s*(?:\d+\s*[.)]|[①-⑳]|\(\d+\))\s*/, "").trim();
+/** 이름·반·번호 칸은 머리칸에 이미 있다 */
+const NAME_ROW = /^(학년|반|번호|번|이름|성명|학번)$/;
+
+/** 붙여 넣은 글에서 활동지 묶음 꺼내기: 코드 블록 여러 개·주석·'이어서'로 이어 받은 조각·키 이름이 달라도 */
+function rawSheets(text: string): { list: Obj[]; broken: boolean; joined: number } {
+  const blocks = extractJsonBlocks(text);
+  const found: unknown[] = [...blocks.objects];
+  let broken = blocks.broken;
+  const joined = blocks.joined;
+  // 맨 바깥이 배열인 답은 extractJsonBlocks가 못 읽으므로 따로
+  if (found.length === 0) {
+    const json = extractJson(text);
+    if (json) {
+      try {
+        found.push(JSON.parse(stripJsonComments(json)));
+        broken = false;
+      } catch {
+        /* 아래에서 실패 처리 */
+      }
+    }
+  }
+  const list: Obj[] = [];
+  const take = (v: unknown) => {
+    if (Array.isArray(v)) v.forEach(take);
+    else if (isObj(v)) {
+      const inner = Object.entries(v).find(([k, x]) => Array.isArray(x) && /^(sheets|worksheets|활동지|items|lessons)$/i.test(k.trim()))?.[1];
+      if (inner) take(inner);
+      else if ("blocks" in v || "lesson" in v || "problem" in v) list.push(v);
+    }
+  };
+  found.forEach(take);
+  return { list, broken, joined };
+}
 
 export function parseWorksheets(text: string, doc: DesignDoc, unitIndex: number): AiParse<Worksheet[]> {
   if (!text.trim()) return { ok: false, error: "붙여 넣은 내용이 없습니다." };
-  const json = extractJson(text);
-  if (!json) return { ok: false, error: "답에서 JSON 코드 블록을 찾지 못했습니다." };
-  let data: unknown;
-  try {
-    data = JSON.parse(json);
-  } catch {
-    return { ok: false, error: "JSON 형식이 깨져 있습니다. (답이 중간에 끊겼거나 괄호·따옴표가 빠졌을 수 있습니다)" };
+  const { list: raw, broken, joined } = rawSheets(text);
+  if (raw.length === 0) {
+    return {
+      ok: false,
+      error: broken ? "JSON 형식이 깨져 있습니다. (답이 중간에 끊겼거나 괄호·따옴표가 빠졌을 수 있습니다)" : /[[{]/.test(text) ? "sheets(활동지 목록)가 비어 있습니다." : "답에서 JSON 코드 블록을 찾지 못했습니다.",
+    };
   }
-  const raw = isObj(data) ? data.sheets : data;
-  if (!Array.isArray(raw) || raw.length === 0) return { ok: false, error: "sheets(활동지 목록)가 비어 있습니다." };
 
   const slots = unitSlots(doc, unitIndex);
   const notes: string[] = [];
+  if (joined) notes.push("끊겨서 이어 받은 답을 이어 붙여 읽었어요.");
+  if (broken) notes.push("읽지 못한 조각이 있어요. 답이 중간에 끊겼다면 같은 대화창에 '이어서'를 보내고 이어진 답까지 붙여 넣으세요.");
+  // 차시 번호가 모두 이 단원의 차시면 번호로, 아니면(단원 안에서 1부터 다시 센 경우 등) 순서대로 맞춘다
+  const given = raw.map((r) => num(r.lesson ?? r.차시 ?? r.no));
+  const byNumber = given.every((n) => n !== undefined && slots.some((s) => s.no === n));
+  if (!byNumber && given.some((n) => n !== undefined)) notes.push("차시 번호가 이 단원의 차시 번호와 맞지 않아, 답의 순서대로 차시에 맞췄어요. 차시별 내용이 맞는지 확인해 주세요.");
   const dropped = new Set<string>();
+  let nameRows = false;
+  let dup = 0;
   const sheets: Worksheet[] = [];
-  raw.filter(isObj).forEach((r, i) => {
-    // 차시 번호로 맞추고, 번호가 없거나 틀리면 순서대로
-    const slot = slots.find((s) => s.no === num(r.lesson)) ?? slots[i];
-    if (!slot || sheets.some((s) => s.no === slot.no)) return;
+  raw.forEach((r, i) => {
+    const slot = byNumber ? slots.find((s) => s.no === given[i]) : slots[i];
+    if (!slot) return;
+    if (sheets.some((s) => s.no === slot.no)) {
+      dup++;
+      return;
+    }
     const blocks: WorksheetBlock[] = (Array.isArray(r.blocks) ? r.blocks : []).filter(isObj).flatMap((b) => {
-      const type = TYPE_ALIASES[str(b.type)];
+      const type = blockType(b.type);
       if (!type) {
         if (str(b.type)) dropped.add(str(b.type));
         return [];
       }
+      let rows = cells(b.rows);
+      if (type === "labels" && rows.some((x) => NAME_ROW.test(x.replace(/\s/g, "")))) {
+        nameRows = true;
+        rows = rows.filter((x) => !NAME_ROW.test(x.replace(/\s/g, "")));
+        if (rows.length === 0) return [];
+      }
       return [
         normalizeBlock({
           type,
-          title: str(b.title),
+          title: unnumber(str(b.title)),
           count: num(b.count),
-          rows: toList(b.rows),
-          headers: toList(b.headers),
+          rows,
+          headers: cells(b.headers),
           items: toList(b.items),
           text: str(b.text),
-          size: (["small", "medium", "large"].includes(str(b.size)) ? str(b.size) : undefined) as WorksheetBlock["size"],
+          size: boxSize(b.size),
         }),
       ];
     });
-    sheets.push({ no: slot.no, topic: slot.topic, problem: str(r.problem) || slot.goal || slot.topic, lead: str(r.lead).replace(/^※\s*/, ""), blocks });
+    const problem = str(r.problem).replace(/^(학습\s*문제|학습\s*목표)\s*[:：]\s*/, "");
+    sheets.push({ no: slot.no, topic: slot.topic, problem: problem || slot.goal || slot.topic, lead: str(r.lead).replace(/^※\s*/, ""), blocks });
   });
   if (sheets.length === 0) return { ok: false, error: "이 단원의 차시와 맞는 활동지가 없습니다. lesson에 차시 번호를 넣었는지 확인하세요." };
   sheets.sort((a, b) => a.no - b.no);
   const missing = slots.filter((s) => !sheets.some((x) => x.no === s.no)).map((s) => s.no);
   if (missing.length) notes.push(`${missing.join(", ")}차시 활동지가 답에 없어요. 아래 '고치기 요청'으로 다시 받거나 직접 추가하세요.`);
+  if (dup) notes.push(`같은 차시가 두 번 나온 것은 처음 것만 넣었어요.`);
   if (dropped.size) notes.push(`앱에 없는 칸 종류(${[...dropped].join(", ")})는 뺐어요.`);
+  if (nameRows) notes.push("이름·반·번호 칸은 활동지 머리에 이미 있어서 뺐어요.");
   const long = sheets.filter((s) => sheetHeightCm(s) > BODY_CM).map((s) => s.no);
   if (long.length) notes.push(`${long.join(", ")}차시는 A4 한 장을 넘을 수 있어요. 줄 수나 상자 크기를 줄여 주세요.`);
   return { ok: true, data: sheets, notes };
