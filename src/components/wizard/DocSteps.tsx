@@ -362,10 +362,10 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
                     }
                   />
                   <p className="text-xs text-gray-500">
-                    이 성취기준이 다루는 내용 요소 2~3개, <b>서로 다른 범주</b>에서 하나씩 (눌러서 고르기 · 회색은 같은 범주라 고를 수 없는 것, 마우스를 올리면 이유가 보여요)
+                    이 성취기준이 다루는 내용 요소 2~3개, <b>서로 다른 범주</b>에서 하나씩 권장 (눌러서 고르기 · 노란 점선 칩은 고르면 &lsquo;확인 필요&rsquo;가 되는 것, 마우스를 올리면 이유가 보여요)
                     {s.elements.length < 2 && <span className="ml-1 font-semibold text-red-600">— 2개 이상 골라 주세요 (지금 {s.elements.length}개)</span>}
-                    {s.elements.length > 3 && <span className="ml-1 font-semibold text-red-600">— 3개까지예요 (지금 {s.elements.length}개)</span>}
-                    {hasSameCategory(doc.areas, s.elements) && <span className="ml-1 font-semibold text-red-600">— 같은 범주끼리 묶였어요</span>}
+                    {s.elements.length > 3 && <span className="ml-1 font-semibold text-amber-700">— 확인 필요: {s.elements.length}개를 묶었어요 (2~3개 권장)</span>}
+                    {hasSameCategory(doc.areas, s.elements) && <span className="ml-1 font-semibold text-amber-700">— 확인 필요: 같은 범주끼리 묶였어요</span>}
                   </p>
                   <div data-fix={`std.${s.id}.elements`} data-req="" data-req-done={s.elements.length >= 2 ? "1" : "0"} className="rounded-lg">
                   <Chips
@@ -387,10 +387,11 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
                       return c ? { on: CATEGORY_STYLE[c].chipOn, off: CATEGORY_STYLE[c].chipOff } : null;
                     }}
                     selected={s.elements}
-                    disabled={(o) => {
+                    // 같은 범주·4개 이상은 막지 않고 '확인 필요'로 알림 (점검 규칙과 같게, 사용자 결정 2026-11-13)
+                    warn={(o) => {
                       const c = categoryOf(doc.areas, o);
-                      if (c && s.elements.some((e) => categoryOf(doc.areas, e) === c)) return `이미 ${CATEGORIES[c]} 내용 요소를 골랐어요 (서로 다른 범주끼리 묶어요)`;
-                      if (s.elements.length >= 3) return "3개까지 묶을 수 있어요";
+                      if (c && s.elements.some((e) => categoryOf(doc.areas, e) === c)) return `이미 ${CATEGORIES[c]} 내용 요소를 골라서 같은 범주끼리 묶여요.`;
+                      if (s.elements.length >= 3) return "4개 이상을 묶게 돼요. 2~3개를 권장해요.";
                       return false;
                     }}
                     onToggle={(o) =>

@@ -348,6 +348,14 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
     setTimeout(() => fixIt(step, fix), 100);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // 아래로 내리면 단계 버튼 줄을 한 줄로 낮게
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const on = () => setCompact(window.scrollY > 160);
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
   const halo = useNextHalo(stepKey !== "worksheet", `${undoKey}-${stepKey}`);
   const downloadFromBar = async () => {
     if (!docReady.ok) {
@@ -378,8 +386,9 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
   return (
     <DismissContext.Provider value={dismissCtx}>
     <div className="space-y-6">
-      {/* 스크롤해도 설계 이름·저장 줄은 위에 고정 */}
-      <div className="sticky top-[53px] z-20 -mx-4 flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-[#f7f8f6]/95 px-4 py-2 backdrop-blur">
+      {/* 스크롤해도 설계 이름·저장 줄과 단계 버튼 줄은 위에 고정. 내려가면 단계 버튼을 한 줄로 낮게 (사용자 결정, 2026-11-13) */}
+      <div className="sticky top-[53px] z-20 -mx-4 border-b border-gray-200 bg-[#f7f8f6]/95 px-4 pb-2 backdrop-blur">
+      <div className="flex flex-wrap items-center justify-between gap-2 py-2">
         <p className="flex items-center gap-1.5 text-sm text-gray-500">
           {doc.basic.name ? <b className="text-gray-800">{doc.basic.name}</b> : "새 설계"}
           <TypeTag type={doc.basic.type} />
@@ -416,7 +425,6 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
           </button>
         </div>
       </div>
-      <div className="-mt-4 space-y-2">
         <ol
           className="grid grid-cols-4 gap-1 sm:grid-cols-6 md:[grid-template-columns:repeat(var(--steps),minmax(0,1fr))]"
           style={{ "--steps": steps.length } as React.CSSProperties}
@@ -442,15 +450,21 @@ export function Wizard({ initial, designId, onSave, onParseFail, onDownloaded, d
                   disabled={locked}
                   onClick={() => goIndex(i)}
                   title={state === "error" ? `${s.label}: 고칠 오류가 있어요` : state === "todo" ? `${s.label}: 아직 작성하지 않았어요` : s.label}
-                  className={`flex h-full w-full flex-col items-center justify-center rounded-md px-0.5 py-1.5 text-center leading-tight disabled:cursor-not-allowed ${color} ${current ? "font-bold shadow-sm" : "font-medium"}`}
+                  className={`flex h-full w-full items-center justify-center rounded-md px-0.5 text-center leading-tight disabled:cursor-not-allowed ${compact ? "gap-0.5 py-0.5" : "flex-col py-1.5"} ${color} ${current ? "font-bold shadow-sm" : "font-medium"}`}
                 >
-                  <span className="text-[12px] font-semibold opacity-80">{i + 1}{state === "error" ? " ⚠" : ""}</span>
-                  <span className="w-full truncate text-[12px] tracking-tighter md:text-[11px] lg:text-[12px] xl:text-[13px]">{s.label}</span>
+                  <span className="shrink-0 text-[12px] font-semibold opacity-80">
+                    {i + 1}
+                    {compact ? "." : ""}
+                    {state === "error" ? " ⚠" : ""}
+                  </span>
+                  <span className={`truncate text-[12px] tracking-tighter md:text-[11px] lg:text-[12px] xl:text-[13px] ${compact ? "" : "w-full"}`}>{s.label}</span>
                 </button>
               </li>
             );
           })}
         </ol>
+      </div>
+      <div className="-mt-4 space-y-2">
         {restoredNote && <p className="rounded-lg bg-blue-50 p-2 text-xs text-blue-800">{restoredNote}</p>}
       </div>
 

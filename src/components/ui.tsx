@@ -296,6 +296,7 @@ export function Chips({
   onToggle,
   render = (o) => o,
   disabled,
+  warn,
   tone,
 }: {
   options: string[];
@@ -304,6 +305,8 @@ export function Chips({
   render?: (o: string) => React.ReactNode;
   /** 고를 수 없는 항목이면 이유 문구, 아니면 false */
   disabled?: (o: string) => string | false;
+  /** 고를 수는 있지만 고르면 '확인 필요'가 되는 항목이면 이유 문구 (노란 점선 테두리) */
+  warn?: (o: string) => string | false;
   /** 항목별 색 (고른 것 / 안 고른 것 클래스). 없으면 기본 색 */
   tone?: (o: string) => { on: string; off: string } | null;
 }) {
@@ -312,20 +315,23 @@ export function Chips({
       {options.map((o) => {
         const on = selected.includes(o);
         const why = !on && disabled ? disabled(o) : false;
+        const caution = !on && !why && warn ? warn(o) : false;
         const t = tone?.(o);
         return (
           <button
             key={o}
             type="button"
             disabled={!!why}
-            title={why || undefined}
+            title={why || (caution ? `고를 수 있어요. 다만 ${caution} (확인 필요)` : undefined)}
             onClick={() => onToggle(o)}
             className={`rounded-full border px-2.5 py-1 text-xs ${
               on
                 ? (t?.on ?? "border-brand-500 bg-brand-50 font-semibold text-brand-700")
                 : why
                   ? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-300 line-through"
-                  : (t?.off ?? "border-gray-300 text-gray-500 hover:border-brand-500")
+                  : caution
+                    ? `${t?.off ?? "text-gray-500"} border-dashed !border-amber-400 opacity-70 hover:opacity-100`
+                    : (t?.off ?? "border-gray-300 text-gray-500 hover:border-brand-500")
             }`}
           >
             {on ? "✓ " : ""}
