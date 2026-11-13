@@ -5,7 +5,7 @@ import type { Category } from "@/domain/types";
  * 범주 이름 칸은 고른 색 그대로, 내용 칸은 더 연하게, 테두리·글자는 같은 계열의 진한 색.
  * 내용 체계 표와 성취기준 내용 요소 칩에서 같이 씀.
  */
-export const CATEGORY_STYLE: Record<Category, { head: string; cell: string; box: string; chipOn: string; chipOff: string; badge: string }> = {
+export const CATEGORY_STYLE: Record<Category, { head: string; cell: string; box: string; chipOn: string; chipOff: string; badge: string; dot: string }> = {
   knowledge: {
     head: "bg-[#FDEADA] text-[#8A4A1C]",
     cell: "bg-[#FEF6EF]",
@@ -13,6 +13,8 @@ export const CATEGORY_STYLE: Record<Category, { head: string; cell: string; box:
     chipOn: "border-[#D9874A] bg-[#FBD9BD] font-semibold text-[#7A3E14]",
     chipOff: "border-[#F3CFB1] bg-[#FDEADA] text-[#8A4A1C] hover:border-[#D9874A]",
     badge: "bg-[#FDEADA] text-[#8A4A1C]",
+    /** 진한 원 (내용 요소를 쓰는 성취기준 번호) */
+    dot: "bg-[#B5622A]",
   },
   process: {
     head: "bg-[#EBF1DE] text-[#4A5E22]",
@@ -21,6 +23,7 @@ export const CATEGORY_STYLE: Record<Category, { head: string; cell: string; box:
     chipOn: "border-[#8AA552] bg-[#D8E6BE] font-semibold text-[#3F521B]",
     chipOff: "border-[#CFDDB0] bg-[#EBF1DE] text-[#4A5E22] hover:border-[#8AA552]",
     badge: "bg-[#EBF1DE] text-[#4A5E22]",
+    dot: "bg-[#5E7A2A]",
   },
   values: {
     head: "bg-[#DBEEF4] text-[#1F5767]",
@@ -29,5 +32,6 @@ export const CATEGORY_STYLE: Record<Category, { head: string; cell: string; box:
     chipOn: "border-[#4E9DB5] bg-[#BFE2EC] font-semibold text-[#184C5A]",
     chipOff: "border-[#B3DAE6] bg-[#DBEEF4] text-[#1F5767] hover:border-[#4E9DB5]",
     badge: "bg-[#DBEEF4] text-[#1F5767]",
+    dot: "bg-[#2A7590]",
   },
 };

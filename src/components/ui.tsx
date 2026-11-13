@@ -330,7 +330,7 @@ export function Chips({
                 : why
                   ? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-300 line-through"
                   : caution
-                    ? `${t?.off ?? "text-gray-500"} border-dashed !border-amber-400 opacity-70 hover:opacity-100`
+                    ? `${t?.off ?? "text-gray-500"} border-dashed !border-amber-400`
                     : (t?.off ?? "border-gray-300 text-gray-500 hover:border-brand-500")
             }`}
           >

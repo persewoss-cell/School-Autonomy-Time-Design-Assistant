@@ -372,13 +372,21 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
                     options={allElements(a)}
                     render={(o) => {
                       const c = categoryOf(doc.areas, o);
-                      // 다른 성취기준에서도 쓰는 내용 요소 (겹쳐 쓰기는 가능하지만 확인 필요)
-                      const other = doc.standards.filter((x) => x.id !== s.id && x.elements.includes(o)).map((x) => codes.get(x.id));
+                      // 이 내용 요소를 쓰는 성취기준 번호(영역 안 순서)를 진한 원으로: ⓪①처럼 (사용자 결정, 2026-11-13)
+                      const users = doc.standards.filter((x) => x.areaIndex === ai && x.elements.includes(o)).map((x) => codes.get(x.id) ?? "");
                       return (
                         <>
                           {c && <span className="mr-1 opacity-60">[{CATEGORIES[c].slice(0, 2)}]</span>}
                           {o}
-                          {other.length > 0 && <span className="ml-1 text-[10px] opacity-60">({other.join(", ")}에서도 씀)</span>}
+                          {users.map((code) => (
+                            <span
+                              key={code}
+                              title={`${code}에서 씀`}
+                              className={`ml-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 align-middle text-[10px] font-bold text-white ${c ? CATEGORY_STYLE[c].dot : "bg-brand-700"}`}
+                            >
+                              {code.match(/-(\d+)\]$/)?.[1] ?? "?"}
+                            </span>
+                          ))}
                         </>
                       );
                     }}
