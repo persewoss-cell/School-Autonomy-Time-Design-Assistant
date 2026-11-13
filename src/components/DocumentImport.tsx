@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { api } from "@/lib/api";
+import { api, sendLog } from "@/lib/api";
 import { buildFixPrompt } from "@/prompts/common";
 import { buildImportPrompt, CODE_NOTE_START, codeDiffNote, formChangesOf, IMPORT_PART2_PROMPT, parseImport, uniqueName, type MissingField } from "@/prompts/importDoc";
 import { DESIGN_TYPES, GRADES, OPENING_TYPES, OPERATION_MODES, SUBJECT_GROUPS, type DesignDoc } from "@/domain/types";
@@ -101,6 +101,7 @@ export function DocumentImport({ schoolName }: { schoolName: string }) {
       if (before && doc.basic.name !== before) notes.unshift(`${year}학년도에 같은 이름의 설계가 있어 「${doc.basic.name}」(으)로 넣었어요.`);
       const saved = await api<{ record: { id: string } }>("/api/designs", { method: "POST", body: { doc } });
       setDone({ id: saved.record.id, name: doc.basic.name, notes, fixes, formChanges });
+      sendLog("import", doc.basic.name, saved.record.id);
       setFile(null);
       setAnswer1("");
       setAnswer2("");

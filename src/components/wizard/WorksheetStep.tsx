@@ -29,6 +29,7 @@ import {
   type Worksheets,
 } from "@/domain/worksheet";
 import { buildWorksheetDocx } from "@/export/worksheetDocx";
+import { sendLog } from "@/lib/api";
 import { unitSlots, worksheetPrompt } from "@/prompts/worksheet";
 import { AiAssist } from "./AiAssist";
 import type { StepProps } from "./DocSteps";
@@ -76,6 +77,7 @@ export function WorksheetStep({ doc, setDoc, onBack }: StepProps) {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+    sendLog("worksheet_download", `${doc.basic.name} ${suffix}${teacher ? " (교사용 예시 답안)" : ""}`);
   };
 
   return (

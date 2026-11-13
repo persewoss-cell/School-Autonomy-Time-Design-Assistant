@@ -19,6 +19,7 @@ import { CheckCircleIcon, ICON_BTN, OpenNewIcon, SearchIcon } from "../icons";
 import { BulkUsers } from "./BulkUsers";
 import { SearchBox } from "../SearchBox";
 import { SeedButton } from "./SeedButton";
+import { UsageStatsButton } from "./UsageStatsModal";
 import { useSearchParams, useRouter } from "next/navigation";
 import type { Issue } from "@/validation/types";
 
@@ -664,6 +665,8 @@ const KIND_LABEL: Record<string, string> = {
   reset_request: "비밀번호 재설정 신청",
   password_reset: "비밀번호 재설정(관리자)",
   password_change: "비밀번호 변경",
+  worksheet_download: "활동지 내려받기",
+  import: "기존 문서 가져오기",
   admin: "관리자 작업",
 };
 
@@ -718,11 +721,14 @@ export function AdminLogs() {
           {q || kind ? `${filtered.length}건 찾음 · ` : ""}
           {all.length} / {total}건 보는 중 · 1년 지난 기록은 자동으로 지워져요
         </span>
-        {all.length < total && (
-          <button type="button" disabled={busy} onClick={() => void load(0, "all")} className="ml-auto rounded-lg border border-brand-500 px-3 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-50 disabled:opacity-50">
-            전체 목록 조회
-          </button>
-        )}
+        <span className="ml-auto flex flex-wrap gap-2">
+          {all.length < total && (
+            <button type="button" disabled={busy} onClick={() => void load(0, "all")} className="rounded-lg border border-brand-500 px-3 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-50 disabled:opacity-50">
+              전체 목록 조회
+            </button>
+          )}
+          <UsageStatsButton />
+        </span>
       </div>
       <Card className="overflow-x-auto">
         <table className={`${DESIGN_TABLE} [&_td]:px-4 [&_th]:px-4`}>

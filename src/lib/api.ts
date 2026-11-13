@@ -51,8 +51,13 @@ export interface Me {
   acting?: { adminSchool: string } | null;
 }
 
+/** 로그인 없이 세는 숫자 (방문자·체험하기). 누가 했는지는 보내지 않는다. 실패해도 무시 */
+export function countStat(key: "visit" | "trial") {
+  void fetch("/api/stats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key }) }).catch(() => {});
+}
+
 /** 이용 기록 보내기 (실패해도 무시) */
-export function sendLog(kind: "download" | "parse_fail", detail?: string, designId?: string) {
+export function sendLog(kind: "download" | "worksheet_download" | "import" | "parse_fail", detail?: string, designId?: string) {
   void fetch("/api/logs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

@@ -73,7 +73,7 @@
 | `src/server/` | 저장소(MongoDB/메모리), 로그인·저장·권한 서비스, 세션 |
 | `src/components/wizard/` | 설계 단계 화면 (PPT 순서) |
 | `src/components/guide.tsx` | 화면 안내: 프롬프트 복사 파란 알림, 다음 할 일 노란 후광(`data-req`), 고치러 가기 빨간 번쩍임(`data-fix` ↔ 점검 결과의 `target`) |
-| `src/app/` | 페이지와 API (`/api/auth`, `/api/designs`, `/api/admin`, `/api/logs`) |
+| `src/app/` | 페이지와 API (`/api/auth`, `/api/designs`, `/api/admin`, `/api/logs`, `/api/stats` = 방문자·체험하기 숫자, 통계 계산은 `src/domain/usageStats.ts`) |
 
 - 설계 단계 순서(문서 작성 부분)는 2027 연수 PPT를 따른다: [전단계] → 내용 체계 → 핵심아이디어 → 성취기준 → 필요성·목표 → 단원 지도계획 → 평가 계획
 - 점검·내려받기 다음의 '활동지(선택)' 단계는 하지 않아도 설계 완성에 영향이 없다 (`src/domain/worksheet.ts`).

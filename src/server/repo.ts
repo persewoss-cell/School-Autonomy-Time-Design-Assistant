@@ -60,7 +60,29 @@ export interface DesignRecord {
   updatedAt: Date;
 }
 
-export type LogKind = "signup" | "login" | "login_fail" | "save" | "delete" | "download" | "parse_fail" | "reset_request" | "password_reset" | "password_change" | "admin";
+export type LogKind =
+  | "signup"
+  | "login"
+  | "login_fail"
+  | "save"
+  | "delete"
+  | "download"
+  | "worksheet_download"
+  | "import"
+  | "parse_fail"
+  | "reset_request"
+  | "password_reset"
+  | "password_change"
+  | "admin";
+
+/** 로그인 없이도 세는 하루 숫자 (방문자·체험하기). 누가 했는지는 남기지 않는다 */
+export type CounterKey = "visit" | "trial";
+export interface DailyCounter {
+  /** 날짜 (한국 시간, 2026-11-13) */
+  day: string;
+  key: CounterKey;
+  n: number;
+}
 
 export interface LogEntry {
   id: string;
@@ -132,6 +154,13 @@ export interface Repo {
     /** 최근 것부터 skip개 건너뛰고 limit개 */
     list(limit: number, skip?: number): Promise<LogEntry[]>;
     count(): Promise<number>;
+    /** 이 시각 이후 기록 (이용 통계용) */
+    since(from: Date): Promise<LogEntry[]>;
+  };
+  counters: {
+    inc(day: string, key: CounterKey): Promise<void>;
+    /** 모든 날짜 (하루 2개뿐이라 작음) */
+    all(): Promise<DailyCounter[]>;
   };
   /** DB 사용량(바이트): 데이터 + 인덱스 */
   storageBytes(): Promise<number>;
@@ -158,6 +187,7 @@ export function memoryRepo(): Repo {
   const designs: DesignRecord[] = [];
   const versions: { designId: string; doc: DesignDoc; savedAt: Date }[] = [];
   const logs: LogEntry[] = [];
+  const counters: DailyCounter[] = [];
   const hourChecks: HourCheckRecord[] = [];
   const examples: { meta: ExampleFile; data: Buffer }[] = [];
   let seq = 0;
@@ -235,6 +265,15 @@ export function memoryRepo(): Repo {
       },
       list: async (limit, skip = 0) => [...logs].reverse().slice(skip, skip + limit),
       count: async () => logs.length,
+      since: async (from) => logs.filter((l) => l.createdAt >= from),
+    },
+    counters: {
+      inc: async (day, key) => {
+        const c = counters.find((x) => x.day === day && x.key === key);
+        if (c) c.n++;
+        else counters.push({ day, key, n: 1 });
+      },
+      all: async () => counters.map((c) => ({ ...c })),
     },
     storageBytes: async () =>
       JSON.stringify({ users, designs, versions, logs, hourChecks }).length + examples.reduce((t, e) => t + e.data.length, 0),

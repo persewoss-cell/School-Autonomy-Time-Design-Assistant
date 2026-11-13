@@ -1,7 +1,7 @@
 import "server-only";
 import { ObjectId, type Db, type WithId, type Document } from "mongodb";
 import { nameKey } from "@/validation/names";
-import { MAX_VERSIONS, type DesignRecord, type DesignSummary, type ExampleFile, type HourCheckRecord, type LogEntry, type Repo, type User } from "./repo";
+import { MAX_VERSIONS, type CounterKey, type DesignRecord, type DesignSummary, type ExampleFile, type HourCheckRecord, type LogEntry, type Repo, type User } from "./repo";
 
 /**
  * MongoDB 저장소. 컬렉션: users, designs, designVersions, hourChecks, activityLogs
@@ -39,6 +39,7 @@ function ensureIndexes(db: Db) {
     db.collection("activityLogs").dropIndex("createdAt_-1").catch(() => {}),
     db.collection("activityLogs").createIndex({ createdAt: 1 }, { expireAfterSeconds: 365 * 24 * 60 * 60 }),
     db.collection("exampleFiles").createIndex({ uploadedAt: -1 }),
+    db.collection("dailyCounters").createIndex({ day: 1, key: 1 }, { unique: true }),
     // 학년도별로 저장하므로 예전 (ownerId, grade) 고유 인덱스는 지운다
     db.collection("hourChecks").dropIndex("ownerId_1_grade_1").catch(() => {}),
     db.collection("hourChecks").createIndex({ ownerId: 1, schoolYear: 1, grade: 1 }),
@@ -139,6 +140,14 @@ export function mongoRepo(db: Db): Repo {
       list: async (limit, skip = 0) =>
         (await logs.find().sort({ createdAt: -1 }).skip(skip).limit(limit).toArray()).map(({ _id, ...rest }) => ({ ...(rest as Omit<LogEntry, "id">), id: _id.toString() })),
       count: async () => logs.countDocuments(),
+      since: async (from) =>
+        (await logs.find({ createdAt: { $gte: from } }).toArray()).map(({ _id, ...rest }) => ({ ...(rest as Omit<LogEntry, "id">), id: _id.toString() })),
+    },
+    counters: {
+      inc: async (day, key) => {
+        await db.collection("dailyCounters").updateOne({ day, key }, { $inc: { n: 1 } }, { upsert: true });
+      },
+      all: async () => (await db.collection("dailyCounters").find().toArray()).map((d) => ({ day: String(d.day), key: d.key as CounterKey, n: Number(d.n) || 0 })),
     },
     storageBytes: async () => {
       const s = await db.command({ dbStats: 1 });

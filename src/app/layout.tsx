@@ -4,6 +4,7 @@ import Link from "next/link";
 import "./globals.css";
 import { AuthNav } from "@/components/AuthNav";
 import { ToastHost } from "@/components/guide";
+import { VisitPing } from "@/components/VisitPing";
 
 export const metadata: Metadata = {
   title: "학교자율시간 설계 도우미 앱",
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           만든 이: 광양중동초등학교 강형권, 강지훈 선생님 / 문의: 나이스 업무메일 또는 메신저
         </footer>
         <ToastHost />
+        <VisitPing />
       </body>
     </html>
   );

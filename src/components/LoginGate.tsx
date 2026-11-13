@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Modal } from "./Modal";
 import { loadMe, useMe } from "./useMe";
+import { countStat } from "@/lib/api";
 
 /** 로그인하지 않았을 때의 제한 (팝업·상단 경고에 같이 씀) */
 export const GUEST_LIMIT = "로그인하지 않으면 설계·시수 점검은 할 수 있지만, 이 브라우저에만 임시 저장되고 문서로 내려받을 수 없어요.";
@@ -43,6 +44,7 @@ export function LoginGateLink({ href, className, children }: { href: string; cla
                 type="button"
                 onClick={() => {
                   setOpen(false);
+                  countStat("trial");
                   router.push(href);
                 }}
                 className="rounded-lg border border-gray-300 px-4 py-2 font-semibold text-gray-700 hover:bg-gray-50"
