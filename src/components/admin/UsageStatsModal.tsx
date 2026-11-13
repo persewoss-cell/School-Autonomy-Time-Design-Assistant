@@ -43,7 +43,7 @@ function UsageStatsModal({ onClose }: { onClose: () => void }) {
   const [openDay, setOpenDay] = useState<string | null>(null);
   const [onlyActive, setOnlyActive] = useState(false);
   useEffect(() => {
-    api<UsageStats>("/api/admin/stats")
+    api<UsageStats>("/api/admin/usage")
       .then(setStats)
       .catch((e) => setError(e instanceof Error ? e.message : "불러오지 못했어요."));
   }, []);
