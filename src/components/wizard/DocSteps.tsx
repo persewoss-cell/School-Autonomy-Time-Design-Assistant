@@ -387,6 +387,15 @@ export function StandardsStep({ doc, setDoc, onBack, onNext, onParseFail }: Step
                               {code.match(/-(\d+)\]$/)?.[1] ?? "?"}
                             </span>
                           ))}
+                          {/* 어느 성취기준에도 안 들어간 내용 요소: 빨간 원 ✕ (빠짐없이 써야 해서 오류) */}
+                          {users.length === 0 && (
+                            <span
+                              title="아직 어느 성취기준에도 넣지 않았어요"
+                              className="ml-1 inline-flex h-[18px] w-[18px] items-center justify-center rounded-full bg-red-600 align-middle text-[11px] font-bold text-white"
+                            >
+                              ✕
+                            </span>
+                          )}
                         </>
                       );
                     }}
