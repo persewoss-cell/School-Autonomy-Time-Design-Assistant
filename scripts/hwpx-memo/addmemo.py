@@ -94,7 +94,8 @@ for kind, start, end, k, m in sorted(ops, key=lambda o: -o[1]):
     lo, hi = filetime(now + k)
     iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now + k))
     prefix = os.environ.get("FIX_PREFIX", "→ 고친 예: ")
-    lines = [x for x in [m["tag"], m["body"]] if x.strip()] + ([f"{prefix}{m['fix']}"] if m.get("fix") else [])
+    # body는 줄바꿈(\n)으로 여러 줄을 쓸 수 있다 (예: (예시) 다음 줄부터 모범 문장)
+    lines = [x for x in [m["tag"], *m["body"].split("\n")] if x.strip()] + ([f"{prefix}{m['fix']}"] if m.get("fix") else [])
     if "--oneline" in opt:
         lines = [m["tag"]]
     sub = "".join(para(t, i == 0) for i, t in enumerate(lines))
